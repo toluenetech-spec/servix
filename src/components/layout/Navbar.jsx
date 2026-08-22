@@ -1,0 +1,99 @@
+import { useEffect, useState } from 'react';
+import { NavLink, Link, useLocation } from 'react-router-dom';
+import { Logo } from '../brand/Logo.jsx';
+import { Button } from '../ui/Button.jsx';
+import { Icon } from '../ui/Icon.jsx';
+
+const NAV_LINKS = [
+  { to: '/services', label: 'Services' },
+  { to: '/professionals', label: 'Professionals' },
+  { to: '/how-it-works', label: 'How It Works' },
+  { to: '/professionals/join', label: 'For Professionals' },
+  { to: '/pricing', label: 'Pricing' },
+];
+
+export function Navbar() {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const location = useLocation();
+
+  // Close the mobile menu on navigation.
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [location.pathname]);
+
+  // Lock scroll while the mobile menu is open.
+  useEffect(() => {
+    document.body.style.overflow = menuOpen ? 'hidden' : '';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [menuOpen]);
+
+  return (
+    <header className="navbar">
+      <div className="container navbar__inner">
+        <Link to="/" className="navbar__brand" aria-label="Servix home">
+          <Logo height={28} />
+        </Link>
+
+        <nav aria-label="Main navigation">
+          <ul className="navbar__links">
+            {NAV_LINKS.map((link) => (
+              <li key={link.to}>
+                <NavLink
+                  to={link.to}
+                  end={link.to === '/professionals'}
+                  className="navbar__link"
+                >
+                  {link.label}
+                </NavLink>
+              </li>
+            ))}
+          </ul>
+        </nav>
+
+        <div className="navbar__actions">
+          <Button variant="ghost" to="/login">
+            Sign In
+          </Button>
+          <Button variant="primary" to="/register">
+            Get Started
+          </Button>
+          <button
+            className="navbar__toggle"
+            aria-expanded={menuOpen}
+            aria-controls="mobile-nav"
+            aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+            onClick={() => setMenuOpen((o) => !o)}
+          >
+            <Icon name={menuOpen ? 'close' : 'menu'} size={22} />
+          </button>
+        </div>
+      </div>
+
+      {menuOpen && (
+        <nav className="mobile-nav" id="mobile-nav" aria-label="Mobile navigation">
+          {NAV_LINKS.map((link) => (
+            <NavLink
+              key={link.to}
+              to={link.to}
+              end={link.to === '/professionals'}
+              className="mobile-nav__link"
+            >
+              {link.label}
+              <Icon name="chevron-right" size={18} />
+            </NavLink>
+          ))}
+          <div className="mobile-nav__actions">
+            <Button variant="secondary" to="/login" block>
+              Sign In
+            </Button>
+            <Button variant="primary" to="/register" block>
+              Get Started
+            </Button>
+          </div>
+        </nav>
+      )}
+    </header>
+  );
+}

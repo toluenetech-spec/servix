@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="132" height="32" viewBox="0 0 132 32" role="img" aria-label="Servix">
+  <!-- TEMPORARY stand-in wordmark (dark-background version). Replace this
+       file with the official uploaded SERVIX logo (same filename). -->
+  <g fill="none">
+    <rect x="0" y="4" width="24" height="24" rx="5" fill="#F7F4EC"/>
+    <path d="M16.8 10.6c-.9-.8-2.4-1.4-4.1-1.4-2.9 0-4.9 1.6-4.9 3.9 0 2 1.4 3 4.3 3.7 2.3.5 3 1 3 1.9 0 1-.9 1.6-2.4 1.6-1.6 0-3.1-.7-4.2-1.7l-1.3 2.1c1.3 1.2 3.3 2 5.4 2 3.1 0 5.1-1.6 5.1-4.1 0-2.1-1.4-3.1-4.4-3.8-2.2-.5-2.9-.9-2.9-1.8 0-.9.9-1.5 2.3-1.5 1.3 0 2.6.5 3.6 1.3l1.5-2.2z" fill="#12372A"/>
+    <text x="32" y="26" font-family="Inter, system-ui, sans-serif" font-size="20" font-weight="700" letter-spacing="1.5" fill="#F7F4EC">SERVIX</text>
+  </g>
+</svg>
