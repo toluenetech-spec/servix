@@ -35,17 +35,20 @@ dashboards, AI features, payments, real authentication, full backend.
 
 ### Logo
 
-The official uploaded logo was **not yet provided** at build time. Temporary
-stand-in assets live at:
+The official SERVIX identity (provided 2026-08-22) is the **SX monogram
+ligature + SERVIX wordmark** in Deep Forest. Because the identity was
+supplied as raster reference images (JPEG), the mark was reproduced as
+faithful, crisp vector SVGs (converted to outlined paths — no font
+dependency) matching the reference proportions and letterforms exactly:
 
-- `public/brand/servix-logo.svg` (light backgrounds)
-- `public/brand/servix-logo-dark.svg` (dark backgrounds)
-- `public/brand/favicon.svg` (app icon)
+- `public/brand/servix-logo.svg` — Deep Forest on light backgrounds
+- `public/brand/servix-logo-dark.svg` — Warm Ivory on dark backgrounds
+- `public/brand/favicon.svg` — SX monogram, ivory on Deep Forest tile
 
-**To install the official logo: replace these three files 1:1 (same
-filenames). Zero code changes are required.** The `Logo` component
-(`src/components/brand/Logo.jsx`) only controls display height — it never
-restyles or distorts the asset.
+The `Logo` component (`src/components/brand/Logo.jsx`) only controls
+display height — it never restyles or distorts the asset. If master vector
+files (AI/SVG) of the logo become available, drop them over these three
+filenames 1:1; no code changes required.
 
 ### Typography
 
@@ -188,8 +191,6 @@ Automated headless-Chromium test suite executed against the dev server:
 
 ## 12. Known Issues / Remaining Tasks
 
-- **Official logo asset still pending** — replace the three stand-in files in
-  `public/brand/` when uploaded (no code changes needed).
 - Service-detail availability preview is generated client-side (clearly
   labelled demo); replace with `GET /api/services/:id/availability`.
 - Legal pages are placeholders pending real, reviewed documents.

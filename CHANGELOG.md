@@ -2,6 +2,17 @@
 
 All notable changes to the Servix public website.
 
+## 0.1.1 — 2026-08-22
+
+### Changed
+- Installed the official SERVIX brand identity: SX monogram ligature +
+  SERVIX wordmark, vectorised as outlined-path SVGs from the supplied
+  reference images. Replaced the temporary stand-in logo, dark-background
+  variant and favicon in `public/brand/` (1:1 swap, no code changes).
+- Regenerated the favicon with correct clear space around the monogram.
+- Verified logo rendering in navbar (light), footer (dark) and favicon at
+  1440/768/390/375 px with zero layout overflow.
+
 ## 0.1.0 — 2026-08-22
 
 ### Added

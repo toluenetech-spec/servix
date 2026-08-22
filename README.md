@@ -43,9 +43,10 @@ src/
 
 ## Brand note
 
-The files in `public/brand/` are **temporary stand-ins**. When the official
-Servix logo is available, replace `servix-logo.svg`, `servix-logo-dark.svg`
-and `favicon.svg` 1:1 — no code changes are required.
+`public/brand/` contains the official SERVIX identity (SX monogram +
+wordmark) as outlined-path SVGs: `servix-logo.svg` (light backgrounds),
+`servix-logo-dark.svg` (dark backgrounds) and `favicon.svg`. To update the
+identity, replace these three files 1:1 — no code changes are required.
 
 ## Documentation
 
