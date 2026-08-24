@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { NavLink, Link, useLocation } from 'react-router-dom';
 import { Logo } from '../brand/Logo.jsx';
@@ -13,8 +13,13 @@ const NAV_LINKS = [
   { to: '/pricing', label: 'Pricing' },
 ];
 
+/* Must mirror the desktop breakpoint in layout.css (max-width: 900px). */
+const DESKTOP_NAV_QUERY = '(min-width: 901px)';
+
 export function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const toggleRef = useRef(null);
+  const panelRef = useRef(null);
   const location = useLocation();
 
   // Close the mobile menu on navigation.
@@ -28,6 +33,35 @@ export function Navbar() {
     return () => {
       document.body.style.overflow = '';
     };
+  }, [menuOpen]);
+
+  // Move focus into the panel when the menu opens.
+  useEffect(() => {
+    if (menuOpen) panelRef.current?.focus();
+  }, [menuOpen]);
+
+  // Close on Escape and return focus to the toggle button.
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setMenuOpen(false);
+        toggleRef.current?.focus();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [menuOpen]);
+
+  // Close the menu if the viewport grows into the desktop layout.
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const media = window.matchMedia(DESKTOP_NAV_QUERY);
+    const onChange = (e) => {
+      if (e.matches) setMenuOpen(false);
+    };
+    media.addEventListener('change', onChange);
+    return () => media.removeEventListener('change', onChange);
   }, [menuOpen]);
 
   return (
@@ -61,6 +95,7 @@ export function Navbar() {
             Get Started
           </Button>
           <button
+            ref={toggleRef}
             className="navbar__toggle"
             aria-expanded={menuOpen}
             aria-controls="mobile-nav"
@@ -72,7 +107,10 @@ export function Navbar() {
         </div>
       </div>
 
-           {menuOpen &&
+      {menuOpen &&
+        /* Portaled to <body>: the navbar's backdrop-filter creates a
+           containing block that would otherwise clip this fixed panel
+           to the navbar's height. */
         createPortal(
           <nav
             ref={panelRef}
