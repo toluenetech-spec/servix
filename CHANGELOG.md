@@ -2,6 +2,30 @@
 
 All notable changes to the Servix public website.
 
+## 0.1.2 — 2026-08-24
+
+### Added
+- Vercel Web Analytics (`@vercel/analytics` ^2.0.1) and Vercel Speed
+  Insights (`@vercel/speed-insights` ^2.0.0), mounted once in
+  `src/App.jsx` as `<Analytics />` and `<SpeedInsights />` inside
+  `ToastProvider`, after `</Suspense>` — so they cover every route,
+  including the lazy-loaded ones. Merged in PR #3 (commit `95de989`).
+
+### Fixed
+- Mobile navigation: three behaviour/accessibility defects, tracked as
+  BUG-004. The menu now closes on Escape and returns focus to the toggle
+  button, moves focus into the panel on open (`tabIndex={-1}`), and
+  closes when the viewport grows into the desktop range
+  (`(min-width: 901px)`, mirroring the `max-width: 900px` rule in
+  `layout.css`), so the fixed panel and the body scroll lock can never
+  trap the desktop layout.
+
+### Notes
+- PR #3 recreated work from an earlier session whose changes were never
+  committed, and supersedes the closed Vercel bot PR #2 (analytics only).
+- This entry was written retroactively: PR #3 merged to `main` without a
+  CHANGELOG/BUGS/PROJECT_PROGRESS update (BUG-005).
+
 ## 0.1.1 — 2026-08-22
 
 ### Changed
