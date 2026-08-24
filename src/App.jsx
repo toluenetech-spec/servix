@@ -1,5 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { Routes, Route } from 'react-router-dom';
+import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { Layout } from './components/layout/Layout.jsx';
 import { ToastProvider } from './components/ui/Toast.jsx';
 import HomePage from './pages/HomePage.jsx';
@@ -59,6 +61,8 @@ export default function App() {
           </Route>
         </Routes>
       </Suspense>
+      <Analytics />
+      <SpeedInsights />
     </ToastProvider>
   );
 }
