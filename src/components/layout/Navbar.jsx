@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { NavLink, Link, useLocation } from 'react-router-dom';
 import { Logo } from '../brand/Logo.jsx';
 import { Button } from '../ui/Button.jsx';
@@ -12,8 +12,13 @@ const NAV_LINKS = [
   { to: '/pricing', label: 'Pricing' },
 ];
 
+/* Must mirror the desktop breakpoint in layout.css (max-width: 900px). */
+const DESKTOP_NAV_QUERY = '(min-width: 901px)';
+
 export function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const toggleRef = useRef(null);
+  const panelRef = useRef(null);
   const location = useLocation();
 
   // Close the mobile menu on navigation.
@@ -27,6 +32,36 @@ export function Navbar() {
     return () => {
       document.body.style.overflow = '';
     };
+  }, [menuOpen]);
+
+  // Move focus into the panel when the menu opens.
+  useEffect(() => {
+    if (menuOpen) panelRef.current?.focus();
+  }, [menuOpen]);
+
+  // Close on Escape and return focus to the toggle button.
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setMenuOpen(false);
+        toggleRef.current?.focus();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [menuOpen]);
+
+  // Close the menu if the viewport grows into the desktop layout, so the
+  // fixed panel and the body scroll lock can never trap the desktop page.
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const media = window.matchMedia(DESKTOP_NAV_QUERY);
+    const onChange = (e) => {
+      if (e.matches) setMenuOpen(false);
+    };
+    media.addEventListener('change', onChange);
+    return () => media.removeEventListener('change', onChange);
   }, [menuOpen]);
 
   return (
@@ -60,6 +95,7 @@ export function Navbar() {
             Get Started
           </Button>
           <button
+            ref={toggleRef}
             className="navbar__toggle"
             aria-expanded={menuOpen}
             aria-controls="mobile-nav"
@@ -72,7 +108,13 @@ export function Navbar() {
       </div>
 
       {menuOpen && (
-        <nav className="mobile-nav" id="mobile-nav" aria-label="Mobile navigation">
+        <nav
+          ref={panelRef}
+          className="mobile-nav"
+          id="mobile-nav"
+          aria-label="Mobile navigation"
+          tabIndex={-1}
+        >
           {NAV_LINKS.map((link) => (
             <NavLink
               key={link.to}
