@@ -1,7 +1,7 @@
 # SERVIX — Project Progress
 
 > Living documentation for the Servix public website (Phase 1).
-> Last updated: 2026-08-22
+> Last updated: 2026-08-24
 
 ---
 
@@ -146,10 +146,13 @@ component imports raw data for fetching (cards resolve display-only joins).
 | `react`, `react-dom` | UI framework |
 | `react-router-dom` | Routing for 18 public routes |
 | `@fontsource-variable/inter` | Self-hosted brand typeface (no external font CDN, better performance/privacy) |
+| `@vercel/analytics` | Vercel Web Analytics — privacy-friendly traffic/pageview tracking for the live Vercel deployment (added 2026-08-24, PR #3) |
+| `@vercel/speed-insights` | Vercel Speed Insights — real-user Core Web Vitals (LCP/CLS/INP/TTFB) from the live deployment (added 2026-08-24, PR #3) |
 | `vite`, `@vitejs/plugin-react` | Build tooling (dev) |
 
 No UI library, no CSS framework, no animation library — deliberate, per the
-"every dependency needs a reason" rule.
+"every dependency needs a reason" rule. Both Vercel packages are inert
+outside a Vercel deployment, so they add no behaviour in local dev.
 
 ## 9. Accessibility
 
@@ -170,6 +173,20 @@ No UI library, no CSS framework, no animation library — deliberate, per the
 - Self-hosted variable font (single file)
 - No runtime CSS-in-JS; plain CSS with tokens
 
+### Observability (added 2026-08-24)
+
+The live Vercel deployment reports real-user metrics back to the Vercel
+dashboard, mounted once in `src/App.jsx` after `</Suspense>` so lazy routes
+are covered:
+
+- `<Analytics />` — pageviews and traffic by route, without cookies.
+- `<SpeedInsights />` — Core Web Vitals (LCP, CLS, INP, TTFB) from real
+  visitors.
+
+These are the baseline for judging the §10 budget against real traffic
+rather than lab numbers only. They are inert outside a Vercel deployment,
+so local dev sends nothing.
+
 ## 11. Testing Performed (2026-08-22)
 
 Automated headless-Chromium test suite executed against the dev server:
@@ -189,6 +206,14 @@ Automated headless-Chromium test suite executed against the dev server:
    service detail, professionals, profile, pricing, login reviewed for
    spacing/consistency/overflow.
 
+### Re-verification 2026-08-24
+
+`npm ci` + `npm run build` re-run on `main` (`d20b8dc`) with the two Vercel
+packages installed: clean build, no warnings (~1.5–1.8s). This confirms the
+analytics integration compiles and ships; it does **not** re-run the
+headless-Chromium suite, so the BUG-004 mobile-nav fixes remain
+code-reviewed rather than browser-tested (see BUGS.md).
+
 ## 12. Known Issues / Remaining Tasks
 
 - Service-detail availability preview is generated client-side (clearly
@@ -197,6 +222,19 @@ Automated headless-Chromium test suite executed against the dev server:
 - Social links in the footer are non-functional placeholders by design.
 - Portfolio items on profiles use placeholder tiles (no fabricated project
   imagery) until real professionals supply work samples.
+- **Unmerged Navbar work — now reconciled (this PR).** Branch
+  `arena/01a029fd-servix` (tip `c42da2c`) held two commits — `6c937b5`
+  "Fix mobile nav: portal menu panel to body" and `c42da2c` "Fix Navbar:
+  complete file with portal fix and refs defined" — pushed to origin but
+  never merged. It had forked *before* PR #3 and independently re-added
+  PR #3's three accessibility fixes, so a plain merge conflicted in
+  `src/components/layout/Navbar.jsx`. Resolved here as the union: PR #3's
+  fixes kept, plus the genuinely new `createPortal(<nav/>, document.body)`
+  so the navbar's `backdrop-filter` no longer clips the fixed panel to the
+  navbar's height.
+- **Documentation discipline** (BUG-005). PR #3 merged without doc
+  updates; the 0.1.2 entries were reconstructed afterwards from
+  `git show 95de989`. Ship doc changes in the same PR as the code.
 
 ## 13. Backend Integration Points (next phase)
 

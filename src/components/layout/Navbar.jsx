@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { NavLink, Link, useLocation } from 'react-router-dom';
 import { Logo } from '../brand/Logo.jsx';
 import { Button } from '../ui/Button.jsx';
@@ -107,35 +108,40 @@ export function Navbar() {
         </div>
       </div>
 
-      {menuOpen && (
-        <nav
-          ref={panelRef}
-          className="mobile-nav"
-          id="mobile-nav"
-          aria-label="Mobile navigation"
-          tabIndex={-1}
-        >
-          {NAV_LINKS.map((link) => (
-            <NavLink
-              key={link.to}
-              to={link.to}
-              end={link.to === '/professionals'}
-              className="mobile-nav__link"
-            >
-              {link.label}
-              <Icon name="chevron-right" size={18} />
-            </NavLink>
-          ))}
-          <div className="mobile-nav__actions">
-            <Button variant="secondary" to="/login" block>
-              Sign In
-            </Button>
-            <Button variant="primary" to="/register" block>
-              Get Started
-            </Button>
-          </div>
-        </nav>
-      )}
+      {menuOpen &&
+        /* Portaled to <body>: the navbar's backdrop-filter creates a
+           containing block that would otherwise clip this fixed panel
+           to the navbar's height. */
+        createPortal(
+          <nav
+            ref={panelRef}
+            className="mobile-nav"
+            id="mobile-nav"
+            aria-label="Mobile navigation"
+            tabIndex={-1}
+          >
+            {NAV_LINKS.map((link) => (
+              <NavLink
+                key={link.to}
+                to={link.to}
+                end={link.to === '/professionals'}
+                className="mobile-nav__link"
+              >
+                {link.label}
+                <Icon name="chevron-right" size={18} />
+              </NavLink>
+            ))}
+            <div className="mobile-nav__actions">
+              <Button variant="secondary" to="/login" block>
+                Sign In
+              </Button>
+              <Button variant="primary" to="/register" block>
+                Get Started
+              </Button>
+            </div>
+          </nav>,
+          document.body
+        )}
     </header>
   );
 }

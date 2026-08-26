@@ -53,6 +53,51 @@ ignored.
   correct: menu closes via a `useEffect` on `location.pathname`.
 - **Testing result:** 3/3 PASS at 390px viewport.
 
+## BUG-004
+
+- **Date:** 2026-08-24
+- **Page:** Mobile navigation (`src/components/layout/Navbar.jsx`)
+- **Description:** Three related defects in the mobile menu:
+  1. Escape did not close the menu and did not restore focus to the
+     toggle button — inconsistent with the focus pattern already used by
+     Modal and Drawer.
+  2. Focus stayed on the toggle button when the panel opened, so keyboard
+     users tabbed into the page behind the panel.
+  3. If the viewport was resized or rotated into the desktop layout while
+     the menu was open, the fixed panel and the `body` scroll lock stayed
+     applied and could trap the desktop page.
+- **Severity:** Medium (accessibility, plus a state that can lock the page)
+- **Status:** Fixed — PR #3, commit `95de989`
+- **Fix:** Added `toggleRef` and `panelRef`. A `keydown` listener closes
+  on Escape and refocuses the toggle; a separate effect moves focus into
+  the panel on open (`tabIndex={-1}`); a `matchMedia` listener on
+  `(min-width: 901px)` closes the menu when the viewport enters the
+  desktop range. All three listeners clean up on close/unmount.
+- **Testing result:** `npm run build` clean, no warnings. The three fixes
+  were verified by review against the merged diff in `95de989`. They were
+  **not** re-run through the headless-Chromium suite in that PR — see
+  BUG-005.
+
+## BUG-005
+
+- **Date:** 2026-08-24
+- **Page:** Documentation process (not the app)
+- **Description:** PR #3 merged into `main` without a matching CHANGELOG,
+  BUGS or PROJECT_PROGRESS update, so the project documentation silently
+  described a pre-analytics codebase (CHANGELOG still topped out at
+  0.1.1, BUGS.md still ended "No open bugs at the end of Phase 1"). This
+  made the already-merged analytics integration look like uncommitted
+  pending work in a later session.
+- **Severity:** Low (process; no user-facing impact)
+- **Status:** Fixed
+- **Fix:** Retroactively added the 0.1.2 CHANGELOG entry, BUG-004 and
+  this entry, and the PROJECT_PROGRESS updates (dependencies,
+  observability, known issues). Going forward, documentation updates ship
+  in the same PR as the change that motivates them.
+- **Testing result:** Entries checked against `git show 95de989` and the
+  merged history of `main` (`d20b8dc`); every claim matches the actual
+  diff.
+
 ---
 
-_No open bugs at the end of Phase 1._
+_No open bugs. BUG-004 and BUG-005 were found and closed after Phase 1._
