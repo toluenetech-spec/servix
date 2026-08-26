@@ -222,16 +222,16 @@ code-reviewed rather than browser-tested (see BUGS.md).
 - Social links in the footer are non-functional placeholders by design.
 - Portfolio items on profiles use placeholder tiles (no fabricated project
   imagery) until real professionals supply work samples.
-- **Unmerged Navbar work needs reconciling.** Branch
-  `arena/01a029fd-servix` (tip `c42da2c`) holds two commits — `6c937b5`
+- **Unmerged Navbar work — now reconciled (this PR).** Branch
+  `arena/01a029fd-servix` (tip `c42da2c`) held two commits — `6c937b5`
   "Fix mobile nav: portal menu panel to body" and `c42da2c` "Fix Navbar:
-  complete file with portal fix and refs defined". Relative to its merge
-  base with `main` (`17018829`) it changes **only**
-  `src/components/layout/Navbar.jsx` (+72/−25). It is not on `main` and has
-  no open PR. It diverged *before* PR #3 landed, so it overlaps the
-  BUG-004 fixes already merged — merging it as-is would collide with
-  those. Decide whether the portal approach replaces or supplements them
-  before opening a PR.
+  complete file with portal fix and refs defined" — pushed to origin but
+  never merged. It had forked *before* PR #3 and independently re-added
+  PR #3's three accessibility fixes, so a plain merge conflicted in
+  `src/components/layout/Navbar.jsx`. Resolved here as the union: PR #3's
+  fixes kept, plus the genuinely new `createPortal(<nav/>, document.body)`
+  so the navbar's `backdrop-filter` no longer clips the fixed panel to the
+  navbar's height.
 - **Documentation discipline** (BUG-005). PR #3 merged without doc
   updates; the 0.1.2 entries were reconstructed afterwards from
   `git show 95de989`. Ship doc changes in the same PR as the code.

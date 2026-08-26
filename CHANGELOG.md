@@ -19,6 +19,12 @@ All notable changes to the Servix public website.
   (`(min-width: 901px)`, mirroring the `max-width: 900px` rule in
   `layout.css`), so the fixed panel and the body scroll lock can never
   trap the desktop layout.
+- Mobile navigation panel is now rendered with
+  `createPortal(<nav/>, document.body)`. The navbar's `backdrop-filter`
+  creates a containing block, which clipped the `position: fixed` panel
+  to the navbar's own height. Portaling to `<body>` escapes it.
+  (Recovered from branch `arena/01a029fd-servix`, commits `6c937b5` +
+  `c42da2c`, which had been pushed to origin but never merged.)
 
 ### Notes
 - PR #3 recreated work from an earlier session whose changes were never
