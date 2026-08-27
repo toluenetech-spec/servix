@@ -33,58 +33,48 @@ paid.
 
 ## 3. Paystack integration (provider abstraction)
 
-`src/lib/payments.ts` defines `PaymentProvider`:
-
-```ts
-interface PaymentProvider {
-  name: string;
-  initialize(p: { reference, amountKobo, email, callbackUrl }): { authorizationUrl, reference };
-  verify(reference): { status: 'success'|'failed'|'pending', amountKobo, currency };
-  transfer(p: { reference, amountKobo, recipient }): { status, providerRef };
-}
-```
+`src/lib/payments.ts` defines `PaymentProvider` with two drivers:
 
 - **PaystackProvider** (active when `PAYSTACK_SECRET_KEY` is set): calls
   `api.paystack.co` — `/transaction/initialize`, `/transaction/verify`,
-  `/transfer`. The booking/ledger domain only sees the interface.
-- **SandboxProvider** (active otherwise, e.g. this environment, where
-  outbound Paystack traffic is blocked): serves a clearly-labelled local
+  `/transfer` — each with a 15s timeout (Phase E).
+- **SandboxProvider** (active otherwise): serves a clearly-labelled local
   test-checkout page. Completing it emits a webhook **through the exact
   same signature-verified, idempotent pipeline** (HMAC-SHA512 with the
-  configured secret) — the domain code path is identical to production.
-  It is impossible to reach `captured` without a correctly signed
-  webhook in either mode. This is sandbox parity, not faked success.
+  configured secret). It is impossible to reach `captured` without a
+  correctly signed webhook in either mode — sandbox parity, not faked
+  success.
 
 ## 4. Webhook lifecycle & security
 
 `POST /api/v1/webhooks/paystack`:
-1. Raw request body captured; `x-paystack-signature` must equal
-   HMAC-SHA512(raw body, secret) — otherwise **401, nothing persisted**.
-2. Event stored in `webhook_events` with `UNIQUE(provider, provider_id)`
-   — duplicate deliveries hit the constraint and return 200 no-op
-   (never double-credit).
-3. `charge.success` → `provider.verify(reference)` server-to-server;
-   verified amount/currency must match the payment row exactly
-   (mismatch → event recorded as error, nothing credited).
-4. Booking transition + ledger entries run in ONE DB transaction with a
-   CAS on both payment (`initiated→captured`) and booking
-   (`pending_payment→requested`). Out-of-order or repeated events find
-   the CAS empty and no-op safely.
+1. Raw body captured; `x-paystack-signature` must equal
+   HMAC-SHA512(raw body, secret), timing-safe compared — otherwise
+   **401, nothing persisted**.
+2. Event stored with `UNIQUE(provider, provider_id)` — duplicates return
+   200 no-op (never double-credit).
+3. `charge.success` → server-to-server verify; amount/currency must match
+   the payment row exactly.
+4. Booking transition + ledger entries run in ONE DB transaction with
+   CAS on payment AND booking. Out-of-order/repeated events no-op.
+5. **Phase E:** processing errors record the error AND enqueue an
+   idempotent `webhooks.retry` job that reprocesses the stored event
+   with backoff; replays of processed events no-op.
 
 ## 5. Idempotency strategy
 
 | Operation | Mechanism |
 |---|---|
-| Booking creation | `Idempotency-Key` header stored on the booking (`UNIQUE(customer_id, idempotency_key)`); replays return the original booking |
+| Booking creation | `Idempotency-Key` header (`UNIQUE(customer_id, idempotency_key)`) |
 | Slot integrity | Partial unique index on `(professional_id, scheduled_at)` for active statuses |
-| Payment init | One open payment per booking (unique partial index); repeat calls return the existing checkout URL |
+| Payment init | One open payment per booking (unique partial index) |
 | Webhooks | `UNIQUE(provider, provider_id)` + CAS transitions |
-| Payouts | `UNIQUE(professional_id) WHERE status='processing'` + ledger-derived balance recomputed inside the transaction |
+| Payouts | `UNIQUE(professional_id) WHERE status='processing'` + in-transaction balance |
+| Jobs (Phase E) | `UNIQUE(queue, idempotency_key)` + `FOR UPDATE SKIP LOCKED` claims |
 
 ## 6. Escrow & release
 
-Verified payment → funds sit in `customer_escrow` (ledger). Release
-happens only on `completed` (customer confirm or 3-day auto-confirm):
+Verified payment → `customer_escrow`. Release only on `completed`:
 
 ```
 DR customer_escrow  amount
@@ -92,9 +82,8 @@ CR professional_payable  amount − fee
 CR platform_revenue      fee
 ```
 
-A `disputed` booking cannot reach `completed` except through the
-internal resolution endpoint, so disputed funds are frozen by
-construction.
+A `disputed` booking cannot reach `completed` except through the admin
+resolution endpoint, so disputed funds are frozen by construction.
 
 ## 7. Refund lifecycle (policy-controlled)
 
@@ -104,41 +93,42 @@ client never sends an amount:
 | Scenario | Refund |
 |---|---|
 | Cancel before payment | n/a (nothing captured) |
-| Customer cancels before acceptance (`requested`) | 100% |
+| Customer cancels before acceptance | 100% |
 | Professional declines / cancels at any stage | 100% |
-| Customer cancels after acceptance, before work (`accepted`) | 100% (config `REFUND_BEFORE_WORK_PCT`) |
-| After work begins (`in_progress`) | no unilateral cancel → dispute; resolution decides 0% or 100% |
+| Customer cancels after acceptance, before work | 100% (config `REFUND_BEFORE_WORK_PCT`) |
+| After work begins | no unilateral cancel → dispute; resolution decides |
 
-Ledger: `DR customer_escrow / CR refunds_paid`. Payment row →
-`refunded`. With Paystack credentials the provider refund call is issued;
-the ledger is the source of truth either way.
+Ledger: `DR customer_escrow / CR refunds_paid`. Payment → `refunded`.
 
 ## 8. Dispute lifecycle
 
 Customer opens from `in_progress`/`delivered` with a reason →
-`disputed` + funds frozen. Resolution is **internal-only** (same
-`X-Servix-Review-Key` guard as application review; admin dashboard is
-Phase E): `release` → completed + normal release entries, or `refund` →
-refunded + refund entries. Both are CAS transitions; no automatic path
-touches disputed money.
+`disputed` + funds frozen. **Phase E:** resolution is performed by
+authenticated admins via `POST /admin/bookings/:id/resolve` (`release` →
+completed, `refund` → refunded), every decision audit-logged, customer
+notified by a queued email. The Phase D review-key endpoint is removed.
 
 ## 9. Ledger model (double-entry)
 
-`ledger_entries(txn_id, booking_id, payment_id, payout_id, account,
-direction, amount_kobo)` — append-only, no updates/deletes. Accounts:
+`ledger_entries` — append-only, no updates/deletes. Accounts:
 `provider_cash · customer_escrow · professional_payable ·
-platform_revenue · refunds_paid`. Every `txn_id` balances
-(Σdebits = Σcredits) — asserted in tests for every flow. Balances (e.g.
-a professional's payable) are always **derived from ledger entries**,
-never from summing mutable booking/payment rows.
+platform_revenue · refunds_paid`. Every `txn_id` balances (asserted in
+tests over ALL rows). Balances are always **derived from ledger
+entries**, never from mutable rows.
 
 ## 10. Payout lifecycle
 
-`POST /pro/payouts` (professional): payable = ledger credits − debits on
-`professional_payable` for that professional. If > 0 and no payout is
-in-flight: create `payouts` row (processing) + `DR professional_payable /
-CR provider_cash`, call `provider.transfer(reference…)`, store the
-provider reference, mark `paid`. Duplicate requests while one is
-processing → `409`. Disputed bookings never contributed to payable, so
-they cannot be paid out. `GET /pro/earnings` returns payable balance,
-lifetime earnings and payout history — all ledger-derived.
+`POST /pro/payouts`: payable = ledger balance, recomputed inside the
+transaction; hold posted (`DR professional_payable / CR provider_cash`);
+provider transfer executed; `paid` on success. Duplicates → 409 (partial
+unique index). Disputed bookings never contributed to payable.
+
+### Failure recovery (Phase E)
+
+If the provider transfer fails, the payout is CAS-marked `failed` and
+the ledger hold is reversed **exactly once**
+(`DR provider_cash / CR professional_payable`) — the professional's
+balance is restored. `POST /admin/payouts/:id/retry` (or the
+`payouts.retry` job) creates a fresh attempt; retrying an
+already-recovered payout returns the successor payout instead of moving
+money again.

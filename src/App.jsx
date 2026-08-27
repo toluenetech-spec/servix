@@ -17,6 +17,7 @@ const ApplyPage = lazy(() => import('./pages/pro/ApplyPage.jsx'));
 const WorkspacePage = lazy(() => import('./pages/pro/WorkspacePage.jsx'));
 const BookingsPage = lazy(() => import('./pages/bookings/BookingsPage.jsx'));
 const BookingDetailPage = lazy(() => import('./pages/bookings/BookingDetailPage.jsx'));
+const AdminPage = lazy(() => import('./pages/admin/AdminPage.jsx'));
 const HowItWorksPage = lazy(() => import('./pages/HowItWorksPage.jsx'));
 const PricingPage = lazy(() => import('./pages/PricingPage.jsx'));
 const AboutPage = lazy(() => import('./pages/AboutPage.jsx'));
@@ -55,6 +56,7 @@ export default function App() {
             <Route path="/pro" element={<WorkspacePage />} />
             <Route path="/bookings" element={<BookingsPage />} />
             <Route path="/bookings/:id" element={<BookingDetailPage />} />
+            <Route path="/admin" element={<AdminPage />} />
             <Route path="/professionals/:id" element={<ProfessionalProfilePage />} />
             <Route path="/how-it-works" element={<HowItWorksPage />} />
             <Route path="/pricing" element={<PricingPage />} />

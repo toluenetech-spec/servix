@@ -1,7 +1,7 @@
 /**
- * SERVIX Phase C — professional application workflow.
+ * SERVIX Phase C — professional application workflow (Phase E update).
  *
- *   CUSTOMER → APPLICATION → REVIEW → APPROVED → PROFESSIONAL
+ *   CUSTOMER → APPLICATION → ADMIN REVIEW → APPROVED → PROFESSIONAL
  *   states: pending → under_review → approved | rejected
  *
  * Rules enforced server-side:
@@ -9,14 +9,13 @@
  *  - one active (pending/under_review/approved) application per user
  *  - applications are editable only while status = pending
  *  - approval is SERVER-controlled: role promotion happens exclusively in
- *    the approval transaction — no client-writable role field anywhere
+ *    the admin approval transaction — no client-writable role field anywhere
  *  - rejected applicants may re-apply (new application), but never edit
  *    the rejected record
  *
- * Review endpoints: the admin dashboard is out of scope for Phase C, so
- * approval/rejection is exposed ONLY as an internal, non-public route
- * guarded by X-Servix-Review-Key (SERVIX_REVIEW_KEY env). It exists so
- * the lifecycle is real and testable end-to-end without faking states.
+ * Phase E: the temporary X-Servix-Review-Key review endpoint is REMOVED.
+ * Review now happens exclusively through the authenticated, audited
+ * admin endpoints in routes/admin.ts.
  */
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -44,7 +43,7 @@ const applicationSchema = z.object({
 
 const ACTIVE_STATUSES = ['pending', 'under_review', 'approved'] as const;
 
-function serializeApplication(a: {
+export function serializeApplication(a: {
   id: string;
   status: string;
   title: string;
@@ -76,7 +75,7 @@ function serializeApplication(a: {
   };
 }
 
-function slugify(base: string): string {
+export function slugify(base: string): string {
   return base
     .toLowerCase()
     .normalize('NFKD')
@@ -176,92 +175,6 @@ export async function applicationRoutes(app: FastifyInstance) {
         where: { id },
         data: { status: 'under_review', submittedAt: new Date() },
       });
-      return serializeApplication(updated);
-    },
-  );
-
-  /* -------- internal review (admin dashboard is Phase E) --------
-     Guarded by a server-side key; not part of the public API surface. */
-  app.post(
-    '/applications/:id/review',
-    { schema: { hide: true } },
-    async (req) => {
-      const key = req.headers['x-servix-review-key'];
-      const expected = process.env.SERVIX_REVIEW_KEY ?? 'dev-review-key';
-      if (!key || key !== expected) throw forbidden('Review access denied.');
-
-      const { id } = req.params as { id: string };
-      const body = parseBody(
-        z.object({
-          decision: z.enum(['approved', 'rejected']),
-          reason: z.string().trim().max(1000).optional(),
-        }),
-        req.body,
-      );
-
-      const application = await prisma.professionalApplication.findUnique({
-        where: { id },
-        include: { user: true },
-      });
-      if (!application) throw notFound('APPLICATION_NOT_FOUND', 'No application found.');
-      if (application.status !== 'under_review') {
-        throw new ApiError(409, 'INVALID_TRANSITION', 'Only submitted applications can be reviewed.');
-      }
-
-      if (body.decision === 'rejected') {
-        const updated = await prisma.professionalApplication.update({
-          where: { id },
-          data: { status: 'rejected', reviewedAt: new Date(), rejectionReason: body.reason ?? null },
-        });
-        return serializeApplication(updated);
-      }
-
-      /* APPROVAL — the only place role promotion happens. Transactional:
-         application → approved, user → professional, profile created. */
-      const category = application.categorySlug
-        ? await prisma.category.findUnique({ where: { slug: application.categorySlug } })
-        : null;
-
-      // Unique slug from the user's name.
-      const base = slugify(application.user.fullName) || `pro-${application.userId.slice(0, 8)}`;
-      let slug = base;
-      for (let i = 2; await prisma.professionalProfile.findUnique({ where: { slug } }); i += 1) {
-        slug = `${base}-${i}`;
-      }
-
-      const skills = (application.skills as string[]) ?? [];
-      const portfolio = (application.portfolio as { title: string; category?: string }[]) ?? [];
-
-      const [updated] = await prisma.$transaction([
-        prisma.professionalApplication.update({
-          where: { id },
-          data: { status: 'approved', reviewedAt: new Date() },
-        }),
-        prisma.user.update({
-          where: { id: application.userId },
-          data: { role: 'professional' },
-        }),
-        prisma.professionalProfile.create({
-          data: {
-            userId: application.userId,
-            slug,
-            name: application.user.fullName,
-            title: application.title,
-            about: application.about,
-            locationCity: application.locationCity,
-            categoryId: category?.id ?? null,
-            memberSince: String(new Date().getFullYear()),
-            skills: { create: skills.map((skill, i) => ({ skill, position: i })) },
-            portfolio: {
-              create: portfolio.map((item, i) => ({
-                title: item.title,
-                category: item.category,
-                position: i,
-              })),
-            },
-          },
-        }),
-      ]);
       return serializeApplication(updated);
     },
   );

@@ -104,3 +104,11 @@ export function payoutLegs(amount: bigint, professionalId: string): Leg[] {
     { account: 'provider_cash', direction: 'credit', amountKobo: amount },
   ];
 }
+
+/** Reversal of a payout hold (failed transfer recovery, exactly once). */
+export function payoutReversalLegs(amount: bigint, professionalId: string): Leg[] {
+  return [
+    { account: 'provider_cash', direction: 'debit', amountKobo: amount },
+    { account: 'professional_payable', direction: 'credit', amountKobo: amount, subjectId: professionalId },
+  ];
+}

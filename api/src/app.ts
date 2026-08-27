@@ -2,8 +2,12 @@
  * SERVIX API — Fastify application factory.
  * Phase A: read-only public catalogue + contact intake.
  * Phase B: accounts & authentication.
+ * Phase C: professional onboarding. Phase D: bookings & payments.
+ * Phase E: admin system, security headers, request ids, redacted
+ * structured logging, body limits, readiness checks.
  */
 import Fastify from 'fastify';
+import { randomUUID } from 'node:crypto';
 import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
 import formbody from '@fastify/formbody';
@@ -12,6 +16,8 @@ import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import { loadConfig } from './lib/config.js';
 import { ApiError } from './lib/errors.js';
+import { prisma } from './lib/db.js';
+import { queueHealthy } from './lib/jobs.js';
 import { categoryRoutes } from './routes/categories.js';
 import { serviceRoutes } from './routes/services.js';
 import { professionalRoutes } from './routes/professionals.js';
@@ -22,10 +28,33 @@ import { proRoutes } from './routes/pro.js';
 import { bookingRoutes } from './routes/bookings.js';
 import { webhookRoutes } from './routes/webhooks.js';
 import { earningsRoutes } from './routes/earnings.js';
+import { adminRoutes } from './routes/admin.js';
 
 export async function buildApp() {
   const config = loadConfig();
-  const app = Fastify({ logger: config.nodeEnv !== 'test' ? { level: 'info' } : false });
+  const app = Fastify({
+    // Phase E: request ids + structured logs with secret redaction.
+    genReqId: () => randomUUID(),
+    bodyLimit: 512 * 1024, // 512 KB
+    logger:
+      config.nodeEnv !== 'test'
+        ? {
+            level: 'info',
+            redact: {
+              paths: [
+                'req.headers.authorization',
+                'req.headers.cookie',
+                '*.password',
+                '*.passwordHash',
+                '*.accessToken',
+                '*.token',
+                '*.secret',
+              ],
+              censor: '[REDACTED]',
+            },
+          }
+        : false,
+  });
 
   /* ---------------- CORS ---------------- */
   await app.register(cors, {
@@ -59,6 +88,17 @@ export async function buildApp() {
     allowList: () => config.nodeEnv === 'test',
   });
 
+  /* ---------------- Security headers (Phase E) ---------------- */
+  app.addHook('onSend', async (req, reply) => {
+    reply.header('X-Content-Type-Options', 'nosniff');
+    reply.header('X-Frame-Options', 'DENY');
+    reply.header('Referrer-Policy', 'strict-origin-when-cross-origin');
+    reply.header('X-Request-Id', req.id);
+    if (config.nodeEnv === 'production') {
+      reply.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    }
+  });
+
   /* ---------------- OpenAPI ---------------- */
   await app.register(swagger, {
     openapi: {
@@ -66,8 +106,8 @@ export async function buildApp() {
       info: {
         title: 'Servix API',
         description:
-          'Servix marketplace API. Phase A: public read-only catalogue. Phase B: accounts & authentication.',
-        version: '0.2.0',
+          'Servix marketplace API. Catalogue, accounts, professional onboarding, bookings & payments, administration.',
+        version: '0.6.0',
       },
       servers: [{ url: '/api/v1' }],
       tags: [
@@ -77,6 +117,7 @@ export async function buildApp() {
         { name: 'professional', description: 'Professional onboarding and management' },
         { name: 'bookings', description: 'Bookings, availability, disputes, reviews' },
         { name: 'payments', description: 'Payments, webhooks, earnings, payouts' },
+        { name: 'admin', description: 'Administration (server-verified admin role)' },
         { name: 'meta', description: 'Health and metadata' },
       ],
       components: {
@@ -124,11 +165,26 @@ export async function buildApp() {
     }),
   );
 
-  /* ---------------- Routes ---------------- */
+  /* ---------------- Health & readiness ---------------- */
   app.get('/healthz', { schema: { tags: ['meta'], summary: 'Liveness probe' } }, async () => ({
     ok: true,
   }));
 
+  app.get('/readyz', { schema: { tags: ['meta'], summary: 'Readiness probe (db, queue, storage)' } }, async (_req, reply) => {
+    const checks: Record<string, boolean> = {};
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      checks.database = true;
+    } catch {
+      checks.database = false;
+    }
+    checks.queue = await queueHealthy();
+    checks.storage = process.env.STORAGE_PROVIDER !== 'r2' || Boolean(process.env.R2_BUCKET);
+    const ready = Object.values(checks).every(Boolean);
+    return reply.code(ready ? 200 : 503).send({ ready, checks });
+  });
+
+  /* ---------------- Routes ---------------- */
   await app.register(webhookRoutes); // /api/v1/webhooks/* + /sandbox/* (see route defs)
 
   await app.register(
@@ -142,6 +198,7 @@ export async function buildApp() {
       await proRoutes(v1);
       await bookingRoutes(v1);
       await earningsRoutes(v1);
+      await adminRoutes(v1);
     },
     { prefix: '/api/v1' },
   );

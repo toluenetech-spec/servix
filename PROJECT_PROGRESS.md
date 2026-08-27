@@ -1,7 +1,7 @@
 # SERVIX — Project Progress
 
 > Living documentation for the Servix public website (Phase 1).
-> Last updated: 2026-08-22
+> Last updated: 2026-08-27 (Phase E complete)
 
 ---
 
@@ -191,158 +191,165 @@ Automated headless-Chromium test suite executed against the dev server:
 
 ## 11d. Phase B — Accounts & Authentication (2026-08-26)
 
-**Delivered** (scope: accounts/auth only — no onboarding, bookings,
-payments, messaging or subscriptions):
+**Delivered:** users/refresh_tokens/one_time_tokens tables; register,
+login, refresh (rotating httpOnly cookie + family reuse detection),
+logout, verify-email (+resend), forgot/reset password, `GET /me`; scrypt
+hashing (OWASP), JWT HS256 15-min memory-only tokens, single-use hashed
+one-time tokens, anti-enumeration, per-route rate limits with 429
+envelopes; console email transport abstraction; AuthProvider/useAuth on
+the frontend with session resume; all five auth pages perform real auth
+when `VITE_API_URL` is set (honest pre-launch messaging otherwise).
 
-- DB: `users`, `refresh_tokens`, `one_time_tokens` (+2 enums), migration
-  `20260826000000_auth_accounts` applied via the offline runner.
-- API (`/api/v1`): register, login, refresh, logout, verify-email
-  (+resend), forgot-password, reset-password, `GET /me`.
-- Security: scrypt hashing (OWASP params, timing-safe compare); JWT HS256
-  access tokens (15 min) kept in client memory only; rotating refresh
-  tokens in httpOnly SameSite=Lax cookies scoped to /api/v1/auth, stored
-  sha256-hashed with family reuse detection; single-use hashed one-time
-  tokens (verify 24h, reset 30m); reset revokes all sessions;
-  anti-enumeration on login and forgot-password; per-route rate limits
-  (login/register 10/min, forgot 5/15min, resend 3/5min) with 429
-  envelopes; production boot refuses a missing AUTH_JWT_SECRET.
-- Email: console transport abstraction (`api/src/lib/mailer.ts`) —
-  provider swap is one file at deploy time; no fake "email sent" claims.
-- Frontend: `AuthProvider`/`useAuth` (src/lib/AuthContext.jsx) with
-  session resume; authApi.js client (no demo fallback for auth — real or
-  honestly unavailable); all five existing auth pages now perform real
-  auth with API field errors mapped into the existing `Field` component;
-  Navbar shows first name + Sign Out when signed in (desktop + mobile);
-  design and component structure unchanged.
-
-**Testing performed (all actually executed):**
-- `tsc --noEmit` clean (API); frontend `vite build` clean.
-- 61/61 vitest integration tests (20 catalogue + 40 auth/limits + docs):
-  register happy/duplicate/validation/roles; login valid/wrong/unknown
-  parity; /me token handling; refresh rotation + family reuse detection;
-  logout revocation; verification valid/single-use/unknown/expired;
-  reset full-flow + session revocation + reuse; CORS with credentials;
-  429 envelope.
-- Manual curl pass over every auth endpoint including reset-link
-  round-trip from the console-transport email.
-- Browser E2E (live API): register → /verify-email redirect; navbar
-  signed-in chip; session survives reload; sign out; wrong-password
-  inline error; login redirect; forgot-password confirmation screen;
-  email-link verification (valid + reused-link failure states).
-- Demo-mode drill (no VITE_API_URL): auth pages show the original honest
-  pre-launch toasts and make zero API calls; catalogue demo data intact.
-
-**Bugs found & fixed:** BUG-007 (rate-limit 500s), BUG-008 (refresh 400
-on empty JSON body) — see BUGS.md.
+**Testing:** 61/61 vitest integration tests; manual curl pass; browser
+E2E (register → verify redirect → session survival → sign-out →
+wrong-password → login → forgot-password → email-link verification);
+demo-mode drill (zero API calls without VITE_API_URL).
+**Bugs fixed:** BUG-007, BUG-008 (see BUGS.md).
 
 ## 11e. Phase C — Professional Onboarding (2026-08-26)
 
-**Delivered** (scope: onboarding + profile + service management only):
+**Delivered:** professional_applications workflow (pending →
+under_review → approved/rejected) with the ONLY role promotion in the
+codebase inside the transactional approval; `/pro/*` management API
+(profile/skills/portfolio/service CRUD with draft→publish→unpublish→
+archive, slugs or UUIDs, startingPrice aggregates, full zod validation);
+`requireProfessional` DB re-read authorization with owner scoping and
+404 masking; honest presigned-upload stub; `/professionals/apply` +
+`/pro` workspace frontend from the existing design system. Review was
+guarded by the temporary X-Servix-Review-Key bridge (replaced in
+Phase E by the admin system).
 
-- Application workflow (`professional_applications`): pending →
-  under_review → approved/rejected. Server-controlled approval performs
-  the ONLY role promotion in the codebase, transactionally (application +
-  user.role + profile creation). Duplicate-active blocked, rejected may
-  re-apply, locked once submitted. Review endpoint is internal-only
-  (hidden from OpenAPI, X-Servix-Review-Key guarded) until the Phase E
-  admin dashboard.
-- `/pro/*` management API: profile (get/patch with category validation),
-  skills (replace-on-write), portfolio (add/remove, 20-item cap), service
-  CRUD with draft → publish → unpublish → archive lifecycle; slugs or
-  UUIDs accepted; startingPrice aggregate maintained; drafts invisible
-  publicly. Full zod validation server-side (title/price/description
-  lengths, category existence, bounded lists).
-- Authorization: `requireProfessional` re-reads role+profile from the DB
-  every request (JWT alone never grants pro access); all queries scoped
-  to the owner; cross-owner probes get 404 (anti-enumeration); unknown
-  body fields stripped (role-escalation test proves users.role is
-  untouched).
-- Storage boundary: `POST /pro/uploads` presign contract with type/size
-  validation and an HONEST LocalStubProvider (enabled:false, no fake
-  uploads); R2 provider is a documented deploy-time swap.
-- Frontend: `/professionals/apply` + `/pro` workspace (Services/Profile
-  tabs) using only existing components/tokens; navbar Workspace link;
-  Join page CTAs → application flow. Route order preserved
-  (`/professionals/join`, `/professionals/apply` before `:id`).
-- Migration `20260826100000_professional_onboarding` applied; catalogue
-  data untouched.
-
-**Testing performed (all actually executed):**
-- `tsc --noEmit` clean; frontend `vite build` clean.
-- **72/72 API integration tests** — Phase A catalogue regression
-  (hardened for organic growth: seed presence, filter correctness,
-  duplicate-free pagination at any total), Phase B auth suite, and 31
-  Phase C tests: application lifecycle, duplicates, ownership,
-  transitions, rejection/re-application, approval side-effects, full
-  authorization matrix (customer/rejected/anonymous/role-escalation),
-  profile/skills/portfolio, upload presign honesty, service CRUD +
-  publish/unpublish/archive + cross-professional denial, public
-  visibility rules, new-professional public-directory appearance.
-- **9-step browser E2E** (real DB/API, zero console errors): register →
-  apply → submit → server approval → workspace redirect → profile loads →
-  service created as draft → publish → public service page (₦250,000) →
-  public professional profile page.
-
-**Bugs found & fixed:** BUG-009 (slug lookup), BUG-010 (parallel refresh
-vs. reuse detection) — see BUGS.md.
+**Testing:** 72/72 API integration tests (incl. authorization matrix and
+role-escalation proof); 9-step browser E2E (register → apply → approval
+→ workspace → create → publish → public pages).
+**Bugs fixed:** BUG-009, BUG-010 (see BUGS.md).
 
 ## 11f. Phase D — Bookings + Payments (2026-08-26)
 
 **Design first:** api/docs/BOOKINGS.md + api/docs/PAYMENTS.md written and
-internally reconciled before implementation (state machine, transitions
-table with actors, availability, payment/webhook/escrow/refund/dispute/
-payout/ledger lifecycles, review eligibility, idempotency and
-concurrency strategy).
+reconciled before implementation.
 
-**Delivered:**
-- Bookings: customer+professional+service links, immutable kobo price
-  snapshot + service title snapshot, scheduled slot, cancellation/
-  completion/dispute fields, reference, immutable booking_events audit
-  trail. 10-state machine; every transition is a compare-and-swap inside
-  a DB transaction (2 simultaneous accepts → exactly one winner, tested).
-- Availability: weekly rules + date exceptions + defaults; conflicts
-  rejected in API AND enforced by a partial unique index on
-  (professional_id, scheduled_at) for active statuses.
-- Payments: provider abstraction (Paystack live / sandbox parity). The
-  ONLY path to paid state is: signed webhook (HMAC-SHA512 over raw body,
-  timing-safe compare) → server-to-server verify → amount/currency match
-  → CAS capture. Init idempotent (one open payment per booking, partial
-  unique index); webhooks idempotent (UNIQUE provider event id);
-  duplicates/out-of-order no-op; booking creation idempotent via
-  Idempotency-Key (UNIQUE customer+key).
-- Escrow & ledger: append-only double-entry (5 accounts), every
-  transaction balanced (asserted over ALL entries in tests), balances
-  ledger-derived only. Release on confirm or 3-day auto-sweep (interval
-  in server, direct invocation in tests); disputes freeze funds and are
-  excluded from the sweep by construction.
-- Refund policy module (single source, env-configurable): full refund
-  before acceptance/professional cancellation, configurable before-work,
-  dispute-only after work begins. Clients never supply amounts.
-- Payouts: ledger-derived balance recomputed in-transaction, in-flight
-  uniqueness at DB level, provider refs stored, failures marked.
-- Reviews: bound to completed bookings (customer-only, once-only via DB
-  unique, target derived server-side), aggregates recomputed atomically.
-- Frontend (existing design system): booking modal with real slots,
-  checkout redirect, booking detail (status polling, confirm/cancel/
-  dispute/review), My Bookings, workspace Bookings + Earnings tabs.
+**Delivered:** bookings with immutable kobo price snapshots and a
+10-state CAS machine + immutable booking_events; availability (weekly
+rules + exceptions + partial-unique-index double-booking prevention +
+real slots endpoint); payments behind a provider abstraction (Paystack
+live / sandbox parity) where the ONLY path to paid state is the signed
+webhook → server verify → amount match → CAS capture; append-only
+double-entry ledger (5 accounts, every txn balanced, ledger-derived
+balances); policy-controlled refunds (client never supplies amounts);
+disputes freeze funds and are excluded from the 3-day auto-confirm sweep
+by construction; payouts with in-flight uniqueness; reviews bound to
+completed bookings with transactional aggregates; booking/checkout/
+booking-detail/My-Bookings/workspace-Earnings frontend.
 
-**Testing:** 96/96 API tests (A+B+C+D: creation, conflicts, duplicate
-requests, init, success/duplicate/invalid webhooks, verification, failed
-payment, cancellation, refunds, completion, auto-confirm, disputes,
-escrow hold/release, payout + duplicate payout, review eligibility +
-duplicate, authorization matrix incl. price/refund manipulation attempts,
-concurrent accepts, ledger balance invariant). `tsc --noEmit` clean.
-Frontend build clean. 11-step browser E2E across both journeys
-(customer: register→book→pay→confirm→review; professional:
-accept→start→deliver→earnings→payout) — zero page errors; payable
+**Testing:** 96/96 API tests; 11-step dual-journey browser E2E; payable
 ₦135,000 on a ₦150,000 booking (10% fee) verified in UI.
-
-**Bugs:** BUG-011 (missing useEffect import) — fixed. See BUGS.md.
+**Bugs fixed:** BUG-011 (see BUGS.md).
 
 **Environment note:** outbound Paystack API is blocked in this sandbox,
 so live-key integration ran against the sandbox provider with full
 signature/webhook parity; PaystackProvider activates automatically when
 PAYSTACK_SECRET_KEY is configured at deploy time.
+
+## 11g. Phase E — Production Hardening, Administration & Launch Readiness (2026-08-27)
+
+**Design first:** api/docs/PRODUCTION_HARDENING.md written before
+implementation (admin model, audit logging, storage, email, job system,
+security checklist, observability, deployment and reliability plans).
+
+**Delivered:**
+- **Admin system** (the X-Servix-Review-Key bridge is REMOVED):
+  `requireAdmin` guard re-reads the role from the DATABASE on every
+  request — a forged JWT `role:admin` claim is rejected (tested), and a
+  suspended admin's token stops working immediately. Idempotent
+  server-side bootstrap from ADMIN_EMAIL/ADMIN_PASSWORD (≥12 chars or it
+  refuses). Endpoints: /admin/stats, /admin/applications (+approve/
+  reject with transactional role promotion), /admin/services
+  (+pause/unpause CAS), /admin/users (search/suspend-with-session-
+  revocation/reinstate; no self-suspend; admins protected), /admin/
+  bookings (+detail with event timeline, +resolve release/refund),
+  /admin/payouts (+retry), /admin/audit (read-only). EVERY admin
+  mutation writes an audit_log row transactionally.
+- **Admin console UI** (`/admin`): Overview/Applications/Services/Users/
+  Bookings & Disputes/Payouts/Audit Log tabs — existing design system
+  only; navbar Admin link for admins.
+- **Storage (Cloudflare R2)**: S3-compatible SigV4 presigner implemented
+  and verified byte-for-byte against the official AWS documentation test
+  vector; content-type whitelist + 5 MB cap enforced server-side; UUID
+  keys (no path traversal); deletion presign; daily orphan sweep. Stub
+  remains honest (enabled:false) without credentials. No binaries in
+  PostgreSQL; secrets never sent to the browser.
+- **Email**: transports console/noop/resend behind one `deliverMail`;
+  the resend transport throws unless the provider returns 2xx+id — the
+  system never claims delivery the provider didn't accept. All mails
+  (verify, reset, booking confirmed, payment received, cancelled,
+  dispute opened/resolved, payout sent) are queued jobs.
+- **Job system**: `jobs` table with UNIQUE(queue, idempotency_key);
+  PgQueue worker claims via FOR UPDATE SKIP LOCKED (concurrent claim
+  test: 3 parallel workers, exactly 1 execution); exponential backoff
+  30s·2^n; dead-letter state; repeatables idempotent by key;
+  webhook-retry and payout-retry jobs. Inline worker by default,
+  standalone worker.ts + WORKER_MODE=external for production; BullMQ/
+  Redis documented as a deploy-time driver swap (no Redis available in
+  this environment to verify).
+- **Payout failure recovery**: transfer failure → payout `failed` +
+  ledger hold reversed EXACTLY once (CAS on payout status); retry
+  creates a fresh attempt; replayed retries return the successor payout
+  (no double money — tested with the sandbox failNextTransfer hook and
+  balance-conservation assertions).
+- **Security hardening**: validateProductionConfig() refuses production
+  boot on missing/weak config (9 classes, tested); bodyLimit 512 KB (413
+  tested); security headers on every response; UUID request ids echoed
+  as X-Request-Id; pino redaction (authorization, cookies, passwords,
+  tokens — secrets never logged). npm audit run on both packages (see
+  LAUNCH_AUDIT.md for the honest findings).
+- **Observability**: structured request logs; /healthz liveness; /readyz
+  readiness (DB + queue + storage), 503 when degraded (verified during
+  the DB-kill drill).
+- **Reliability**: graceful SIGTERM/SIGINT shutdown (HTTP close → finish
+  in-flight job → prisma disconnect, 10s deadline); 15s timeout on
+  provider HTTP calls; webhook processing errors enqueue retry jobs.
+
+**Testing performed (all actually executed):**
+- `tsc --noEmit` clean; frontend `vite build` clean.
+- **128/128 API integration tests** (20 catalogue + 21 auth + 1 rate
+  limit + 32 professional + 24 bookings + 15 admin + 15 phase-e —
+  professional/bookings suites migrated from the review-key bridge to
+  real admin auth). New coverage: admin authz matrix (anon 401, customer/
+  pro 403, forged-JWT-role 403, suspended-admin 401, real admin 200),
+  audit rows for approve/pause/suspend/resolve, job lifecycle
+  (enqueue→done, duplicate-key no-op, backoff→dead-letter, concurrent
+  claim = exactly-once), SigV4 AWS test vector, safe key generation,
+  stub honesty + presign audit tracking, webhook replay ×3 (zero new
+  ledger rows/events), payout failure→reversal-exactly-once→retry→paid→
+  replay-no-op with global ledger balance assertion, production config
+  validation, security headers, /readyz, 413 body limit.
+- **21-step browser E2E** (single context, real sign-in/sign-out role
+  switching, real DB/API/webhooks): Journey 1 Admin→Application→Approve→
+  Professional; Journey 2 Admin→Dispute→Resolution (full refund);
+  Journey 3 Customer→Booking→Payment→Completion→Payout (₦135,000
+  payable on ₦150,000 booking verified in UI). Plus a security
+  spot-check: non-admin blocked from the console AND the API (401).
+- **Reliability drills** (executed, not simulated): API SIGTERM
+  mid-payment → graceful shutdown logged; after restart the interrupted
+  booking is still pending_payment with ZERO ledger entries and a
+  retryable initiated payment; the orphaned sandbox session honestly
+  409s instead of faking success. PostgreSQL killed → /readyz degrades
+  to 503 {database:false,queue:false} while /healthz stays alive →
+  postgres restarted → WAL crash recovery → API self-heals to /readyz
+  200 without an API restart. Post-drill global ledger audit: all
+  transactions balanced, no stuck jobs.
+
+**Bugs found & fixed:** BUG-012 (live search param mismatch query vs q)
+— see BUGS.md.
+
+**Honest limits of this environment:** live Paystack, live R2, live
+Resend, Redis/BullMQ, managed Postgres, backups/restore and TLS/edge
+config CANNOT be verified from this sandbox (no external network). The
+final launch audit (api/docs/LAUNCH_AUDIT.md) classifies every item as
+Code verified / Infrastructure verified / Third-party verified / Not yet
+verified — nothing is claimed "production ready" merely because tests
+pass.
 
 ## 12. Known Issues / Remaining Tasks
 

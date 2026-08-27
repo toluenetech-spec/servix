@@ -40,8 +40,15 @@ export async function getCategories() {
   return get('/categories');
 }
 
+/** The demo provider names the search param `query`; the API uses `q`. */
+function mapSearchParam(params) {
+  if (params.query === undefined) return params;
+  const { query, ...rest } = params;
+  return { ...rest, q: query };
+}
+
 export async function getServices(params = {}) {
-  return get('/services', params);
+  return get('/services', mapSearchParam(params));
 }
 
 export async function getService(id) {
@@ -53,7 +60,7 @@ export async function getServiceReviews(serviceId) {
 }
 
 export async function getProfessionals(params = {}) {
-  return get('/professionals', params);
+  return get('/professionals', mapSearchParam(params));
 }
 
 export async function getProfessional(id) {

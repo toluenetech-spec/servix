@@ -27,10 +27,10 @@
                                                                         ▼                ┌────────┐
                                                                    ┌─────────┐  dispute  │disputed│
                                                                    │delivered│──────────▶└───┬────┘
-                                                                   └────┬────┘               │resolve (internal)
-                                                охи                     │confirm (customer)   │ release → completed
-                                                                        │or AUTO after 3 days │ refund  → refunded
-                                                                        ▼                     ▼
+                                                                   └────┬────┘               │resolve (admin, Phase E)
+                                                                        │confirm (customer)  │ release → completed
+                                                                        │or AUTO after 3 days│ refund  → refunded
+                                                                        ▼                    ▼
                                                                     completed          completed | refunded
 ```
 
@@ -53,10 +53,15 @@
 | `delivered` | `completed` | customer | `/confirm` | escrow → payable + fee |
 | `delivered` | `completed` (auto) | **system** (3-day sweep) | — | escrow → payable + fee |
 | `delivered` | `disputed` | customer (within window) | `/dispute` | funds frozen |
-| `disputed` | `completed` | **internal** (review key) | `/resolve` release | escrow → payable + fee |
-| `disputed` | `refunded` | **internal** (review key) | `/resolve` refund | escrow → refund |
+| `disputed` | `completed` | **admin** (Phase E, audited) | `POST /admin/bookings/:id/resolve` release | escrow → payable + fee |
+| `disputed` | `refunded` | **admin** (Phase E, audited) | `POST /admin/bookings/:id/resolve` refund | escrow → refund |
 
 Everything else → `409 INVALID_TRANSITION`.
+
+> **Phase E change:** the temporary `X-Servix-Review-Key`-guarded
+> `/bookings/:id/resolve` endpoint has been REMOVED. Dispute resolution
+> is now performed by authenticated admins through
+> `POST /api/v1/admin/bookings/:id/resolve` and recorded in the audit log.
 
 ### Concurrency / race strategy
 
@@ -86,26 +91,23 @@ configured fee (default 10%) and frozen.
   application race conditions. The API also pre-checks and returns a
   friendly `409 SLOT_TAKEN`.
 - `GET /services/:slug/availability?days=N` returns real bookable slots
-  (rules − exceptions − active bookings). This replaces the Phase A
-  client-generated demo preview.
+  (rules − exceptions − active bookings).
 
-## 3. Review eligibility (integration with existing reviews)
+## 3. Review eligibility
 
 `reviews.booking_id` (nullable for legacy seed reviews, **UNIQUE** when
-set). `POST /bookings/:id/review` requires, server-side:
-1. requester **is** the booking's customer;
-2. booking status = `completed`;
-3. the review targets the booking's own service/professional (derived
-   server-side — client cannot choose);
-4. no review exists for the booking (DB unique constraint backs this).
-On success the service and professional `rating_avg`/`review_count`
-aggregates are recomputed in the same transaction.
+set). `POST /bookings/:id/review` requires, server-side: requester is the
+booking's customer; booking status = `completed`; the review targets the
+booking's own service/professional (derived server-side); no review
+exists for the booking. On success service and professional aggregates
+are recomputed in the same transaction.
 
 ## 4. Auto-confirmation sweep
 
 `runAutoConfirmSweep()` finds `delivered` bookings with
 `delivered_at <= now() − 3 days`, and completes each via the same CAS
 transition + release transaction as a manual confirm (marked
-`auto: true` in `booking_events`). The API server runs the sweep every
-10 minutes; tests invoke it directly. Disputed bookings are by
-definition no longer `delivered`, so they can never auto-release.
+`auto: true` in `booking_events`). In Phase E the sweep is scheduled as
+an idempotent repeatable job (10-minute buckets) through the job queue;
+tests invoke it directly. Disputed bookings are by definition no longer
+`delivered`, so they can never auto-release.

@@ -9,6 +9,12 @@ export default defineConfig({
     port: 5173,
     // Allow the sandbox preview host.
     allowedHosts: true,
+    // Dev-only: forward API + sandbox-checkout calls to the local backend so
+    // the browser can use relative URLs (never hardcoded localhost).
+    proxy: {
+      '/api': 'http://localhost:8080',
+      '/sandbox': 'http://localhost:8080',
+    },
   },
   preview: {
     host: '0.0.0.0',

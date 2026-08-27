@@ -1,6 +1,8 @@
 /**
  * SERVIX API — Phase D bookings + payments integration tests.
  * Real database, real webhook pipeline (signed), real ledger.
+ * Phase E migration: application approval and dispute resolution now go
+ * through authenticated admin endpoints (the review-key bridge is gone).
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { FastifyInstance } from 'fastify';
@@ -9,15 +11,17 @@ import { prisma } from '../src/lib/db.js';
 import { signWebhook } from '../src/lib/payments.js';
 import { runAutoConfirmSweep } from '../src/lib/bookingService.js';
 import { accountBalance } from '../src/lib/ledger.js';
+import { hashPassword } from '../src/lib/password.js';
 
 let app: FastifyInstance;
 const stamp = Date.now();
-const REVIEW_KEY = process.env.SERVIX_REVIEW_KEY ?? 'dev-review-key';
 
 const customer = { email: `bk-cust-${stamp}@test.servix`, password: 'customer-pass-1', token: '', id: '' };
 const intruder = { email: `bk-intr-${stamp}@test.servix`, password: 'intruder-pass-1', token: '' };
 const proUser = { email: `bk-pro-${stamp}@test.servix`, password: 'pro-pass-1', token: '', profileId: '' };
 const proB = { email: `bk-prob-${stamp}@test.servix`, password: 'pro-b-pass-1', token: '' };
+let adminToken = '';
+const ADMIN_EMAIL = `bk-admin-${stamp}@test.servix`;
 
 let serviceSlug = '';
 let servicePriceNaira = 200000;
@@ -30,12 +34,12 @@ const inject = (method: string, url: string, token?: string, payload?: object, h
     headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), ...headers },
   });
 
-/** Register + approve a professional + publish a service. */
+/** Register + approve a professional (through the real admin endpoint). */
 async function makeProfessional(actor: { email: string; password: string; token: string }, title: string) {
   const appRes = await inject('POST', '/api/v1/applications', actor.token, { title });
   const appId = appRes.json().id;
   await inject('POST', `/api/v1/applications/${appId}/submit`, actor.token);
-  await inject('POST', `/api/v1/applications/${appId}/review`, undefined, { decision: 'approved' }, { 'x-servix-review-key': REVIEW_KEY });
+  await inject('POST', `/api/v1/admin/applications/${appId}/approve`, adminToken);
 }
 
 async function futureSlot(offsetDays = 1, hour = 10): Promise<string> {
@@ -71,6 +75,23 @@ beforeAll(async () => {
     if (a === customer) customer.id = res.json().user.id;
   }
 
+  // Server-side admin — clients can never set roles.
+  await prisma.user.create({
+    data: {
+      email: ADMIN_EMAIL,
+      fullName: 'Bookings Test Admin',
+      passwordHash: await hashPassword('admin-test-pass-1'),
+      role: 'admin',
+      status: 'active',
+      emailVerifiedAt: new Date(),
+    },
+  });
+  const adminLogin = await inject('POST', '/api/v1/auth/login', undefined, {
+    email: ADMIN_EMAIL,
+    password: 'admin-test-pass-1',
+  });
+  adminToken = adminLogin.json().accessToken;
+
   await makeProfessional(proUser, 'Booking Test Pro');
   await makeProfessional(proB, 'Other Pro');
   const profile = await prisma.professionalProfile.findFirstOrThrow({
@@ -98,6 +119,7 @@ afterAll(async () => {
   await prisma.payout.deleteMany({ where: { professionalId: { in: pids } } });
   await prisma.service.deleteMany({ where: { professionalId: { in: pids } } });
   await prisma.professionalProfile.deleteMany({ where: { id: { in: pids } } });
+  await prisma.auditLog.deleteMany({ where: { actorId: { in: ids } } });
   await prisma.user.deleteMany({ where: { id: { in: ids } } });
   await app.close();
 });
@@ -382,7 +404,7 @@ describe('refunds (policy-controlled)', () => {
     const res = await inject('POST', `/api/v1/bookings/${id}/cancel`, customer.token, { reason: 'nope', refundPercent: 100, amount: 999999 } as object);
     expect(res.statusCode).toBe(409);
     expect(res.json().error.code).toBe('NOT_CANCELLABLE');
-    // park it in dispute for the next suite? no — clean up via pro cancel (full refund)
+    // clean up via pro cancel (full refund)
     await inject('POST', `/api/v1/pro/bookings/${id}/cancel`, proUser.token, {});
   });
 });
@@ -428,20 +450,23 @@ describe('disputes and auto-confirmation', () => {
     // no release entries
     expect(await prisma.ledgerEntry.count({ where: { bookingId: id, account: 'professional_payable' } })).toBe(0);
 
-    // resolution requires the internal key
-    expect((await inject('POST', `/api/v1/bookings/${id}/resolve`, customer.token, { decision: 'refund' })).statusCode).toBe(403);
+    // resolution requires the admin role (customer forbidden; old bridge is gone)
+    expect((await inject('POST', `/api/v1/admin/bookings/${id}/resolve`, customer.token, { decision: 'refund' })).statusCode).toBe(403);
+    expect((await inject('POST', `/api/v1/bookings/${id}/resolve`, undefined, { decision: 'refund' }, { 'x-servix-review-key': 'dev-review-key' })).statusCode).toBe(404);
 
-    // internal refund resolution
-    const resolved = await inject('POST', `/api/v1/bookings/${id}/resolve`, undefined, { decision: 'refund' }, { 'x-servix-review-key': REVIEW_KEY });
+    // admin refund resolution (audited)
+    const resolved = await inject('POST', `/api/v1/admin/bookings/${id}/resolve`, adminToken, { decision: 'refund' });
     expect(resolved.json().status).toBe('refunded');
     const refund = await prisma.ledgerEntry.findFirst({ where: { bookingId: id, account: 'refunds_paid' } });
     expect(refund?.amountKobo).toBe(BigInt(servicePriceNaira) * 100n);
+    const auditRow = await prisma.auditLog.findFirst({ where: { action: 'dispute.refund', entityId: id } });
+    expect(auditRow).not.toBeNull();
   });
 
   it('dispute release resolution completes the booking and releases escrow', async () => {
     const id = await deliveredBooking(10, 11);
     await inject('POST', `/api/v1/bookings/${id}/dispute`, customer.token, { reason: 'Not matching the agreed scope.' });
-    const resolved = await inject('POST', `/api/v1/bookings/${id}/resolve`, undefined, { decision: 'release' }, { 'x-servix-review-key': REVIEW_KEY });
+    const resolved = await inject('POST', `/api/v1/admin/bookings/${id}/resolve`, adminToken, { decision: 'release' });
     expect(resolved.json().status).toBe('completed');
     expect(await prisma.ledgerEntry.count({ where: { bookingId: id, account: 'professional_payable' } })).toBe(1);
   });

@@ -1,11 +1,12 @@
 /**
- * SERVIX payment provider abstraction (Phase D).
+ * SERVIX payment provider abstraction (Phase D, hardened in Phase E).
  *
  * The booking/ledger domain depends only on this interface. Two
  * implementations:
  *
  *  - PaystackProvider — real Paystack REST calls; active when
- *    PAYSTACK_SECRET_KEY is configured.
+ *    PAYSTACK_SECRET_KEY is configured. Phase E: every call carries a
+ *    15s timeout so a hanging provider can never wedge a request.
  *  - SandboxProvider — used when no key is configured (or PAYMENT_MODE=
  *    sandbox). It serves a clearly-labelled local checkout page whose
  *    "Pay" button emits a webhook through the SAME signature-verified,
@@ -63,6 +64,8 @@ export function signWebhook(rawBody: string): string {
 
 /* ---------------- Paystack (production) ---------------- */
 
+const PROVIDER_TIMEOUT_MS = 15_000;
+
 class PaystackProvider implements PaymentProvider {
   name = 'paystack';
   private base = 'https://api.paystack.co';
@@ -71,6 +74,7 @@ class PaystackProvider implements PaymentProvider {
   private async call(path: string, init?: RequestInit): Promise<Record<string, unknown>> {
     const res = await fetch(`${this.base}${path}`, {
       ...init,
+      signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
       headers: {
         Authorization: `Bearer ${this.key}`,
         'Content-Type': 'application/json',
@@ -133,6 +137,8 @@ class SandboxProvider implements PaymentProvider {
 
   /** Registry of initialized checkouts so verify() has real state. */
   private static sessions = new Map<string, { amountKobo: bigint; settled: 'success' | 'failed' | null }>();
+  /** Test hook: force the next transfer to fail (payout recovery tests). */
+  static failNextTransfer = false;
 
   static settle(reference: string, outcome: 'success' | 'failed'): boolean {
     const s = SandboxProvider.sessions.get(reference);
@@ -157,6 +163,10 @@ class SandboxProvider implements PaymentProvider {
   }
 
   async transfer(p: TransferParams): Promise<TransferResult> {
+    if (SandboxProvider.failNextTransfer) {
+      SandboxProvider.failNextTransfer = false;
+      throw new Error('sandbox transfer failure (test hook)');
+    }
     return { status: 'success', providerRef: `sandbox-trf-${p.reference}` };
   }
 }

@@ -3,15 +3,19 @@
  * Every route requires a server-verified professional (requireProfessional
  * re-reads role + profile from the DB). Ownership is enforced by always
  * scoping queries to req.professionalProfileId.
+ *
+ * Phase E: uploads presign through the real storage provider (R2 when
+ * configured) and are audit-tracked for orphan cleanup.
  */
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/db.js';
 import { requireProfessional } from '../lib/authGuard.js';
-import { ApiError, forbidden, notFound } from '../lib/errors.js';
+import { ApiError, notFound } from '../lib/errors.js';
 import { parseBody } from '../lib/query.js';
 import { serializeProfessionalDetail, serializeServiceDetail } from '../lib/serialize.js';
 import { ALLOWED_IMAGE_TYPES, getStorage, MAX_UPLOAD_BYTES } from '../lib/storage.js';
+import { audit } from '../lib/audit.js';
 
 /* ---------------- schemas ---------------- */
 
@@ -195,11 +199,11 @@ export async function proRoutes(app: FastifyInstance) {
     },
   );
 
-  /* ================= uploads (presign boundary) ================= */
+  /* ---------------- uploads (Phase E: real presign via R2) ---------------- */
 
   app.post(
     '/pro/uploads',
-    { ...guard, schema: { tags: ['professional'], summary: 'Request a presigned upload (R2/S3 boundary)', security: [{ bearerAuth: [] }] } },
+    { ...guard, schema: { tags: ['professional'], summary: 'Request a presigned upload (R2)', security: [{ bearerAuth: [] }] } },
     async (req) => {
       const body = parseBody(
         z.object({
@@ -216,7 +220,16 @@ export async function proRoutes(app: FastifyInstance) {
       if (body.size > MAX_UPLOAD_BYTES) {
         throw new ApiError(422, 'VALIDATION_ERROR', 'Images must be 5 MB or smaller.');
       }
-      return getStorage().presign(body.kind, body.fileName, body.contentType);
+      const result = await getStorage().presign(body.kind, body.fileName, body.contentType);
+      // Track for orphan cleanup (upload requested, not yet attached).
+      await audit(prisma, {
+        actorId: req.auth!.sub,
+        action: 'upload.presigned',
+        entity: 'storage',
+        entityId: result.key,
+        data: { key: result.key, publicUrl: result.publicUrl, kind: body.kind },
+      });
+      return result;
     },
   );
 

@@ -1,23 +1,27 @@
 /**
  * SERVIX API — Phase C professional onboarding integration tests.
  * Real database, real state transitions — nothing mocked.
+ * Phase E migration: application review now goes through authenticated
+ * admin endpoints instead of the retired X-Servix-Review-Key bridge.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../src/app.js';
 import { prisma } from '../src/lib/db.js';
+import { hashPassword } from '../src/lib/password.js';
 
 let app: FastifyInstance;
 const stamp = Date.now();
-const REVIEW_KEY = process.env.SERVIX_REVIEW_KEY ?? 'dev-review-key';
 
-/* Three actors: applicant (becomes professional), rejected user, plain customer. */
+/* Actors: applicant (becomes professional), rejected user, plain customer, second pro, admin. */
 const actors = {
   applicant: { email: `pro-a-${stamp}@test.servix`, password: 'applicant-pass-1', token: '', appId: '' },
   rejected: { email: `pro-r-${stamp}@test.servix`, password: 'rejected-pass-1', token: '', appId: '' },
   customer: { email: `cust-${stamp}@test.servix`, password: 'customer-pass-1', token: '' },
   proB: { email: `pro-b-${stamp}@test.servix`, password: 'pro-b-pass-1', token: '' },
 };
+let adminToken = '';
+const ADMIN_EMAIL = `admin-${stamp}@test.servix`;
 
 beforeAll(async () => {
   process.env.NODE_ENV = 'test';
@@ -31,6 +35,23 @@ beforeAll(async () => {
     });
     a.token = res.json().accessToken;
   }
+  // Server-side admin (role can never be set from the client).
+  await prisma.user.create({
+    data: {
+      email: ADMIN_EMAIL,
+      fullName: 'Test Admin',
+      passwordHash: await hashPassword('admin-test-pass-1'),
+      role: 'admin',
+      status: 'active',
+      emailVerifiedAt: new Date(),
+    },
+  });
+  const login = await app.inject({
+    method: 'POST',
+    url: '/api/v1/auth/login',
+    payload: { email: ADMIN_EMAIL, password: 'admin-test-pass-1' },
+  });
+  adminToken = login.json().accessToken;
 });
 
 afterAll(async () => {
@@ -40,6 +61,7 @@ afterAll(async () => {
   const profileIds = profiles.map((p) => p.id);
   await prisma.service.deleteMany({ where: { professionalId: { in: profileIds } } });
   await prisma.professionalProfile.deleteMany({ where: { id: { in: profileIds } } });
+  await prisma.auditLog.deleteMany({ where: { actorId: { in: ids } } });
   await prisma.user.deleteMany({ where: { id: { in: ids } } });
   await app.close();
 });
@@ -51,6 +73,11 @@ const inject = (method: string, url: string, token?: string, payload?: object, h
     payload,
     headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), ...headers },
   });
+
+const adminApprove = (appId: string) =>
+  inject('POST', `/api/v1/admin/applications/${appId}/approve`, adminToken);
+const adminReject = (appId: string, reason?: string) =>
+  inject('POST', `/api/v1/admin/applications/${appId}/reject`, adminToken, reason ? { reason } : {});
 
 /* ================= application lifecycle ================= */
 
@@ -145,30 +172,30 @@ describe('professional application', () => {
     expect(res.json().error.code).toBe('APPLICATION_LOCKED');
   });
 
-  it('review endpoint rejects a missing/wrong key and pending apps', async () => {
-    const noKey = await inject('POST', `/api/v1/applications/${actors.applicant.appId}/review`, undefined, {
-      decision: 'approved',
-    });
-    expect(noKey.statusCode).toBe(403);
-
-    const wrongKey = await inject(
-      'POST',
-      `/api/v1/applications/${actors.applicant.appId}/review`,
-      undefined,
-      { decision: 'approved' },
-      { 'x-servix-review-key': 'not-the-key' },
-    );
-    expect(wrongKey.statusCode).toBe(403);
-  });
-
-  it('APPROVAL: server promotes role and creates the profile transactionally', async () => {
+  it('the retired review-key endpoint is gone (admin auth is the only path)', async () => {
     const res = await inject(
       'POST',
       `/api/v1/applications/${actors.applicant.appId}/review`,
       undefined,
       { decision: 'approved' },
-      { 'x-servix-review-key': REVIEW_KEY },
+      { 'x-servix-review-key': 'dev-review-key' },
     );
+    expect(res.statusCode).toBe(404);
+  });
+
+  it('admin approval requires authentication and the admin role', async () => {
+    const anon = await inject('POST', `/api/v1/admin/applications/${actors.applicant.appId}/approve`);
+    expect(anon.statusCode).toBe(401);
+    const asCustomer = await inject(
+      'POST',
+      `/api/v1/admin/applications/${actors.applicant.appId}/approve`,
+      actors.customer.token,
+    );
+    expect(asCustomer.statusCode).toBe(403);
+  });
+
+  it('APPROVAL: admin promotes role and creates the profile transactionally (audited)', async () => {
+    const res = await adminApprove(actors.applicant.appId);
     expect(res.statusCode).toBe(200);
     expect(res.json().status).toBe('approved');
 
@@ -179,6 +206,11 @@ describe('professional application', () => {
     expect(profile!.title).toBe('Backend Developer');
     const skills = await prisma.professionalSkill.findMany({ where: { professionalId: profile!.id } });
     expect(skills.map((s) => s.skill)).toContain('Fastify');
+
+    const auditRow = await prisma.auditLog.findFirst({
+      where: { action: 'application.approve', entityId: actors.applicant.appId },
+    });
+    expect(auditRow).not.toBeNull();
   });
 
   it('REJECTION: rejected applicant stays a customer and may re-apply but not edit', async () => {
@@ -187,13 +219,7 @@ describe('professional application', () => {
     });
     const appId = create.json().id;
     await inject('POST', `/api/v1/applications/${appId}/submit`, actors.rejected.token);
-    const rej = await inject(
-      'POST',
-      `/api/v1/applications/${appId}/review`,
-      undefined,
-      { decision: 'rejected', reason: 'Portfolio too thin.' },
-      { 'x-servix-review-key': REVIEW_KEY },
-    );
+    const rej = await adminReject(appId, 'Portfolio too thin.');
     expect(rej.statusCode).toBe(200);
     expect(rej.json().status).toBe('rejected');
     expect(rej.json().rejectionReason).toBe('Portfolio too thin.');
@@ -401,17 +427,11 @@ describe('service management', () => {
   });
 
   it("professional B cannot read, edit, publish or delete professional A's service", async () => {
-    // Promote proB through the real workflow.
+    // Promote proB through the real workflow (admin approval).
     const appRes = await inject('POST', '/api/v1/applications', actors.proB.token, { title: 'Video Editor' });
     const appId = appRes.json().id;
     await inject('POST', `/api/v1/applications/${appId}/submit`, actors.proB.token);
-    await inject(
-      'POST',
-      `/api/v1/applications/${appId}/review`,
-      undefined,
-      { decision: 'approved' },
-      { 'x-servix-review-key': REVIEW_KEY },
-    );
+    await adminApprove(appId);
 
     const read = await inject('GET', `/api/v1/pro/services/${serviceId}`, actors.proB.token);
     expect(read.statusCode).toBe(404); // not-found masking, no enumeration

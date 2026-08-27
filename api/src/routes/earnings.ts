@@ -1,13 +1,14 @@
 /**
  * SERVIX Phase D — professional earnings & payouts (ledger-derived).
+ * Phase E: payout execution goes through payoutService, which reverses
+ * the ledger hold EXACTLY ONCE on provider failure (CAS-guarded) and
+ * supports admin/job retries without duplicating money.
  */
 import type { FastifyInstance } from 'fastify';
-import { randomUUID } from 'node:crypto';
 import { prisma } from '../lib/db.js';
 import { requireProfessional } from '../lib/authGuard.js';
-import { ApiError } from '../lib/errors.js';
-import { accountBalance, payoutLegs, postTransaction } from '../lib/ledger.js';
-import { getPaymentProvider } from '../lib/payments.js';
+import { accountBalance } from '../lib/ledger.js';
+import { requestPayout } from '../lib/payoutService.js';
 
 export async function earningsRoutes(app: FastifyInstance) {
   app.get(
@@ -46,62 +47,14 @@ export async function earningsRoutes(app: FastifyInstance) {
     '/pro/payouts',
     { preHandler: requireProfessional, schema: { tags: ['payments'], summary: 'Request payout of the full payable balance', security: [{ bearerAuth: [] }] } },
     async (req, reply) => {
-      const proId = req.professionalProfileId!;
-
-      // Serialize per professional: the partial unique index on
-      // (professional_id) WHERE status='processing' makes double
-      // requests impossible at the DB level; balance is recomputed
-      // inside the transaction.
-      const reference = `po-${randomUUID()}`;
-      let payout;
-      try {
-        payout = await prisma.$transaction(async (tx) => {
-          const payable = await accountBalance('professional_payable', proId, tx);
-          if (payable <= 0n) {
-            throw new ApiError(409, 'NOTHING_PAYABLE', 'No funds available for payout.');
-          }
-          const created = await tx.payout.create({
-            data: { professionalId: proId, reference, amountKobo: payable },
-          });
-          await postTransaction(tx, payoutLegs(payable, proId), {
-            payoutId: created.id,
-            memo: 'payout requested',
-          });
-          return created;
-        });
-      } catch (err) {
-        if ((err as { code?: string }).code === 'P2002') {
-          throw new ApiError(409, 'PAYOUT_IN_FLIGHT', 'A payout is already being processed.');
-        }
-        throw err;
-      }
-
-      // Provider transfer AFTER the ledger hold; reference stored either way.
-      try {
-        const transfer = await getPaymentProvider().transfer({
-          reference,
-          amountKobo: payout.amountKobo,
-          recipientName: proId,
-        });
-        const updated = await prisma.payout.update({
-          where: { id: payout.id },
-          data: {
-            status: transfer.status === 'failed' ? 'failed' : 'paid',
-            providerRef: transfer.providerRef,
-            paidAt: transfer.status === 'failed' ? null : new Date(),
-          },
-        });
-        return reply.code(201).send({
-          id: updated.id,
-          reference: updated.reference,
-          amount: Number(updated.amountKobo / 100n),
-          status: updated.status,
-          providerRef: updated.providerRef,
-        });
-      } catch (err) {
-        await prisma.payout.update({ where: { id: payout.id }, data: { status: 'failed' } });
-        throw new ApiError(502, 'TRANSFER_FAILED', 'The payout transfer failed. Support has been notified.');
-      }
+      const updated = await requestPayout(req.professionalProfileId!);
+      return reply.code(201).send({
+        id: updated.id,
+        reference: updated.reference,
+        amount: Number(updated.amountKobo / 100n),
+        status: updated.status,
+        providerRef: updated.providerRef,
+      });
     },
   );
 }

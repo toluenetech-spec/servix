@@ -53,6 +53,10 @@ ignored.
   correct: menu closes via a `useEffect` on `location.pathname`.
 - **Testing result:** 3/3 PASS at 390px viewport.
 
+---
+
+_No open bugs at the end of Phase 1._
+
 ## BUG-007
 
 - **Date:** 2026-08-26
@@ -123,6 +127,23 @@ ignored.
 - **Status:** Fixed
 - **Fix:** Added the missing import.
 - **Testing result:** 11-step Phase D browser E2E passes end to end.
+
+## BUG-012
+
+- **Date:** 2026-08-27
+- **Page:** Frontend live-API provider (`src/lib/httpApi.js`)
+- **Description:** The services/professionals pages pass their search text
+  as `query` (the demo provider's contract), but the live API validates
+  `q`. `getServices`/`getProfessionals` forwarded the params untouched,
+  so with the live API attached, every catalogue search silently returned
+  the full unfiltered list. Discovered by the Phase E browser E2E when
+  the freshly published service could not be found via search.
+- **Severity:** Medium (search unusable in live mode; no data damage)
+- **Status:** Fixed
+- **Fix:** `httpApi` now maps `query` → `q` before building the query
+  string (demo provider behaviour unchanged).
+- **Testing result:** Phase E browser E2E finds services through the real
+  search box; API-side filter tests remain green (128/128).
 
 ---
 

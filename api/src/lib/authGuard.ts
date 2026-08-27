@@ -3,8 +3,10 @@
  *
  *   requireAuth          — valid Bearer access token
  *   requireProfessional  — token AND server-verified professional role.
- *     The role is re-read from the DATABASE, never trusted from the JWT
- *     alone, so a stale/forged claim cannot grant professional access.
+ *   requireAdmin         — role re-read from the DATABASE (Phase E).
+ *
+ * Roles are re-read from the DATABASE, never trusted from the JWT alone,
+ * so a stale or forged claim can never grant professional or admin access.
  */
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { verifyAccessToken, type AccessClaims } from './tokens.js';
@@ -38,4 +40,12 @@ export async function requireProfessional(req: FastifyRequest, reply: FastifyRep
     throw forbidden('Professional access required.');
   }
   req.professionalProfileId = user.professionalProfile.id;
+}
+
+export async function requireAdmin(req: FastifyRequest, reply: FastifyReply): Promise<void> {
+  await requireAuth(req, reply);
+  // Server-side truth only — never trust the JWT's role claim for admin.
+  const user = await prisma.user.findUnique({ where: { id: req.auth!.sub } });
+  if (!user || user.deletedAt || user.status === 'suspended') throw unauthorized();
+  if (user.role !== 'admin') throw forbidden('Admin access required.');
 }

@@ -1,13 +1,18 @@
 /**
- * SERVIX Phase D — booking routes.
+ * SERVIX Phase D — booking routes (Phase E update).
  * Customer + professional actions; every transition server-validated.
+ *
+ * Phase E: the X-Servix-Review-Key dispute-resolution endpoint is
+ * REMOVED — resolution now happens only through the authenticated,
+ * audited admin endpoint (routes/admin.ts). Notification emails are
+ * queued jobs, never request-path sends.
  */
 import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { prisma } from '../lib/db.js';
 import { requireAuth, requireProfessional } from '../lib/authGuard.js';
-import { ApiError, forbidden, notFound } from '../lib/errors.js';
+import { ApiError, notFound } from '../lib/errors.js';
 import { parseBody } from '../lib/query.js';
 import {
   assertSlotAvailable,
@@ -17,9 +22,10 @@ import {
   completeBooking,
   transition,
 } from '../lib/bookingService.js';
-import { platformFeeKobo, refundAmount } from '../lib/refundPolicy.js';
+import { platformFeeKobo } from '../lib/refundPolicy.js';
 import { getPaymentProvider } from '../lib/payments.js';
-import { postTransaction, refundLegs, releaseLegs } from '../lib/ledger.js';
+import { enqueueMail } from '../lib/jobs.js';
+import { bookingCancelledMail, disputeOpenedMail } from '../lib/mailer.js';
 
 const createSchema = z.object({
   serviceId: z.string().min(1), // public slug
@@ -263,6 +269,7 @@ export async function bookingRoutes(app: FastifyInstance) {
       const { id } = req.params as { id: string };
       const { reason } = parseBody(reasonSchema, req.body ?? {});
       const booking = await ownBookingAsCustomer(id, req.auth!.sub);
+      const wasPaid = booking.status !== 'pending_payment';
       const updated = await cancelBooking(
         booking.id,
         req.auth!.sub,
@@ -271,6 +278,10 @@ export async function bookingRoutes(app: FastifyInstance) {
         ['pending_payment', 'requested', 'accepted'],
         'cancelled',
       );
+      const customer = await prisma.user.findUnique({ where: { id: req.auth!.sub } });
+      if (customer) {
+        await enqueueMail(bookingCancelledMail(customer.email, booking.reference, wasPaid), `cancel-mail-${id}`);
+      }
       return serializeBooking({ ...updated, ...includeNulls() });
     },
   );
@@ -292,7 +303,7 @@ export async function bookingRoutes(app: FastifyInstance) {
     async (req) => {
       const { id } = req.params as { id: string };
       const { reason } = parseBody(disputeSchema, req.body);
-      await ownBookingAsCustomer(id, req.auth!.sub);
+      const booking = await ownBookingAsCustomer(id, req.auth!.sub);
       const updated = await transition({
         bookingId: id,
         from: ['in_progress', 'delivered'],
@@ -302,6 +313,10 @@ export async function bookingRoutes(app: FastifyInstance) {
         data: { reason },
         extra: { disputeReason: reason, disputedAt: new Date() },
       });
+      const customer = await prisma.user.findUnique({ where: { id: req.auth!.sub } });
+      if (customer) {
+        await enqueueMail(disputeOpenedMail(customer.email, booking.reference), `dispute-mail-${id}`);
+      }
       return serializeBooking({ ...updated, ...includeNulls() });
     },
   );
@@ -433,8 +448,12 @@ export async function bookingRoutes(app: FastifyInstance) {
     async (req) => {
       const { id } = req.params as { id: string };
       const { reason } = parseBody(reasonSchema, req.body ?? {});
-      await ownBookingAsPro(id, req.professionalProfileId!);
+      const booking = await ownBookingAsPro(id, req.professionalProfileId!);
       const updated = await cancelBooking(id, req.auth!.sub, 'professional', reason, ['requested'], 'declined');
+      const customer = await prisma.user.findUnique({ where: { id: booking.customerId } });
+      if (customer) {
+        await enqueueMail(bookingCancelledMail(customer.email, booking.reference, true), `decline-mail-${id}`);
+      }
       return serializeBooking({ ...updated, ...includeNulls() });
     },
   );
@@ -445,7 +464,7 @@ export async function bookingRoutes(app: FastifyInstance) {
     async (req) => {
       const { id } = req.params as { id: string };
       const { reason } = parseBody(reasonSchema, req.body ?? {});
-      await ownBookingAsPro(id, req.professionalProfileId!);
+      const booking = await ownBookingAsPro(id, req.professionalProfileId!);
       const updated = await cancelBooking(
         id,
         req.auth!.sub,
@@ -454,59 +473,13 @@ export async function bookingRoutes(app: FastifyInstance) {
         ['requested', 'accepted', 'in_progress'],
         'cancelled',
       );
+      const customer = await prisma.user.findUnique({ where: { id: booking.customerId } });
+      if (customer) {
+        await enqueueMail(bookingCancelledMail(customer.email, booking.reference, true), `procancel-mail-${id}`);
+      }
       return serializeBooking({ ...updated, ...includeNulls() });
     },
   );
-
-  /* ============ internal: dispute resolution (Phase E dashboard later) ============ */
-
-  app.post('/bookings/:id/resolve', { schema: { hide: true } }, async (req) => {
-    const key = req.headers['x-servix-review-key'];
-    if (!key || key !== (process.env.SERVIX_REVIEW_KEY ?? 'dev-review-key')) {
-      throw forbidden('Resolution access denied.');
-    }
-    const { id } = req.params as { id: string };
-    const body = parseBody(
-      z.object({ decision: z.enum(['release', 'refund']), note: z.string().max(1000).optional() }),
-      req.body,
-    );
-    const booking = await prisma.booking.findUnique({ where: { id } });
-    if (!booking) throw notFound('BOOKING_NOT_FOUND', 'Booking not found');
-
-    if (body.decision === 'release') {
-      const updated = await transition({
-        bookingId: id,
-        from: ['disputed'],
-        to: 'completed',
-        actorId: null,
-        event: 'dispute_released',
-        data: { note: body.note ?? null },
-        extra: { completedAt: new Date() },
-        sideEffects: async (tx) => {
-          await postTransaction(tx, releaseLegs(booking.amountKobo, booking.platformFeeKobo, booking.professionalId), {
-            bookingId: id,
-            memo: 'dispute resolved: release',
-          });
-        },
-      });
-      return serializeBooking({ ...updated, ...includeNulls() });
-    }
-
-    const refund = refundAmount(booking.amountKobo, 100);
-    const updated = await transition({
-      bookingId: id,
-      from: ['disputed'],
-      to: 'refunded',
-      actorId: null,
-      event: 'dispute_refunded',
-      data: { note: body.note ?? null },
-      sideEffects: async (tx) => {
-        await postTransaction(tx, refundLegs(refund), { bookingId: id, memo: 'dispute resolved: refund' });
-        await tx.payment.updateMany({ where: { bookingId: id, status: 'captured' }, data: { status: 'refunded' } });
-      },
-    });
-    return serializeBooking({ ...updated, ...includeNulls() });
-  });
 }
 
 function includeNulls() {

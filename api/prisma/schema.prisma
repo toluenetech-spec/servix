@@ -1,4 +1,4 @@
-// SERVIX — Phase A catalogue + Phase B accounts/authentication.
+// SERVIX — Phases A–E.
 // Money as bigint minor units. Slugs are the public IDs used by frontend URLs.
 
 generator client {
@@ -64,6 +64,7 @@ model User {
   applications  ProfessionalApplication[]
   professionalProfile ProfessionalProfile?
   bookings      Booking[] @relation("customerBookings")
+  auditEntries  AuditLog[]
 
   @@map("users")
 }
@@ -315,6 +316,45 @@ model AvailabilityException {
 
   @@unique([professionalId, date])
   @@map("availability_exceptions")
+}
+
+/* ===================== Phase E: administration & jobs ===================== */
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  actorId   String?  @map("actor_id")
+  action    String
+  entity    String
+  entityId  String?  @map("entity_id")
+  data      Json     @default("{}")
+  ip        String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  actor User? @relation(fields: [actorId], references: [id])
+
+  @@index([entity, entityId])
+  @@index([actorId, createdAt])
+  @@map("audit_log")
+}
+
+model Job {
+  id           String    @id @default(uuid())
+  queue        String
+  name         String
+  payload      Json      @default("{}")
+  idempotencyKey String? @map("idempotency_key")
+  status       String    @default("pending") // pending | running | done | failed | dead
+  attempts     Int       @default(0)
+  maxAttempts  Int       @default(5) @map("max_attempts")
+  runAt        DateTime  @default(now()) @map("run_at")
+  lockedAt     DateTime? @map("locked_at")
+  lastError    String?   @map("last_error")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@unique([queue, idempotencyKey])
+  @@index([status, runAt])
+  @@map("jobs")
 }
 
 /* ===================== Phase A: catalogue ===================== */

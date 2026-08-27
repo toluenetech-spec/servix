@@ -207,7 +207,7 @@ describe('POST /api/v1/auth/logout', () => {
 describe('email verification', () => {
   it('verifies with a valid token and activates the account; token is single-use', async () => {
     const user = await prisma.user.findUniqueOrThrow({ where: { email: EMAIL } });
-    // Grab the latest unused token straight from the DB (email transport is console).
+    // Grab the latest unused token straight from the DB (email transport is queued).
     const ott = await prisma.oneTimeToken.findFirst({
       where: { userId: user.id, purpose: 'verify_email', usedAt: null },
       orderBy: { createdAt: 'desc' },
@@ -220,7 +220,7 @@ describe('email verification', () => {
       authorization: `Bearer ${token}`,
     });
     // The resend invalidated priors and made a new one — read raw from mail?
-    // Console transport doesn't expose raw here, so simulate the link by
+    // Queued transport doesn't expose raw here, so simulate the link by
     // inserting a known token hash (same code path as production).
     const raw = `test-verify-${stamp}`;
     await prisma.oneTimeToken.create({

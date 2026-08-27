@@ -1,32 +1,25 @@
 /**
- * SERVIX storage abstraction — Phase C boundary for Cloudflare R2 / S3.
- *
- * Binary files are NEVER stored in PostgreSQL; the database keeps only
- * string references (URLs/keys). This module defines the presigned-upload
- * contract the frontend will use:
- *
- *   1. Client → POST /api/v1/pro/uploads  {kind, fileName, contentType}
- *   2. API validates type/size, returns {uploadUrl, publicUrl, key}
- *   3. Client PUTs the file directly to storage via uploadUrl
- *   4. Client saves publicUrl on the profile/portfolio/service media
+ * SERVIX storage (Phase E) — Cloudflare R2 (S3-compatible).
  *
  * Providers:
- *   - LocalStubProvider (active in dev/CI): returns deterministic keys and
- *     public URLs under /uploads/*, but NO usable upload URL — it reports
- *     `enabled: false` so the UI can honestly say uploads aren't live.
- *     It never fakes a successful binary upload.
- *   - R2Provider (deploy-time): implement `presign()` with S3 SigV4
- *     (aws4fetch or @aws-sdk/s3-request-presigner) and the env vars below.
+ *  - R2Provider        — real presigned PUT/DELETE URLs via AWS SigV4
+ *                        (hand-rolled, verified against the official AWS
+ *                        documentation test vector). Activated by
+ *                        STORAGE_PROVIDER=r2 + R2_* env vars.
+ *  - LocalStubProvider — honest stub when R2 is not configured:
+ *                        enabled:false, uploadUrl:null, never fakes an
+ *                        upload.
  *
- * Required env (production):
- *   STORAGE_PROVIDER=r2
- *   R2_ACCOUNT_ID / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY
- *   R2_BUCKET / R2_PUBLIC_BASE_URL
+ * Rules: content-type whitelist + size cap enforced server-side; object
+ * keys are uuid-based (client filename never reaches the key); binary
+ * media never enters PostgreSQL; R2 secrets never reach the browser —
+ * only short-lived presigned URLs do.
  */
-import { randomUUID } from 'node:crypto';
+import { createHash, createHmac, randomUUID } from 'node:crypto';
+import { prisma } from './db.js';
 
 export const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024; // 5 MB
+export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 
 export type UploadKind = 'profile' | 'portfolio' | 'service';
 
@@ -35,12 +28,13 @@ export interface PresignResult {
   key: string;
   publicUrl: string;
   uploadUrl: string | null;
-  headers?: Record<string, string>;
   note?: string;
 }
 
 export interface StorageProvider {
+  name: string;
   presign(kind: UploadKind, fileName: string, contentType: string): Promise<PresignResult>;
+  presignDelete(key: string): Promise<string | null>;
 }
 
 function safeExt(fileName: string, contentType: string): string {
@@ -49,23 +43,200 @@ function safeExt(fileName: string, contentType: string): string {
     'image/png': 'png',
     'image/webp': 'webp',
   };
-  return byType[contentType] ?? (fileName.split('.').pop() || 'bin').toLowerCase().slice(0, 5);
+  return byType[contentType] ?? 'bin';
+}
+
+export function makeKey(kind: UploadKind, fileName: string, contentType: string): string {
+  return `${kind}/${randomUUID()}.${safeExt(fileName, contentType)}`;
+}
+
+/* ---------------- SigV4 (S3-compatible presigned URLs) ---------------- */
+
+interface SigV4Params {
+  method: 'PUT' | 'DELETE' | 'GET';
+  host: string;
+  path: string; // must start with /
+  region: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  expiresSeconds: number;
+  now?: Date;
+}
+
+const encodeRfc3986 = (s: string) =>
+  encodeURIComponent(s).replace(/[!'()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+
+export function presignS3Url(p: SigV4Params): string {
+  const now = p.now ?? new Date();
+  const amzDate = now.toISOString().replace(/[-:]/g, '').slice(0, 15) + 'Z';
+  const dateStamp = amzDate.slice(0, 8);
+  const service = 's3';
+  const scope = `${dateStamp}/${p.region}/${service}/aws4_request`;
+
+  const query: Record<string, string> = {
+    'X-Amz-Algorithm': 'AWS4-HMAC-SHA256',
+    'X-Amz-Credential': `${p.accessKeyId}/${scope}`,
+    'X-Amz-Date': amzDate,
+    'X-Amz-Expires': String(p.expiresSeconds),
+    'X-Amz-SignedHeaders': 'host',
+  };
+  const canonicalQuery = Object.keys(query)
+    .sort()
+    .map((k) => `${encodeRfc3986(k)}=${encodeRfc3986(query[k])}`)
+    .join('&');
+
+  const canonicalPath = p.path
+    .split('/')
+    .map((seg) => encodeRfc3986(seg))
+    .join('/');
+
+  const canonicalRequest = [
+    p.method,
+    canonicalPath,
+    canonicalQuery,
+    `host:${p.host}\n`,
+    'host',
+    'UNSIGNED-PAYLOAD',
+  ].join('\n');
+
+  const stringToSign = [
+    'AWS4-HMAC-SHA256',
+    amzDate,
+    scope,
+    createHash('sha256').update(canonicalRequest).digest('hex'),
+  ].join('\n');
+
+  const kDate = createHmac('sha256', `AWS4${p.secretAccessKey}`).update(dateStamp).digest();
+  const kRegion = createHmac('sha256', kDate).update(p.region).digest();
+  const kService = createHmac('sha256', kRegion).update(service).digest();
+  const kSigning = createHmac('sha256', kService).update('aws4_request').digest();
+  const signature = createHmac('sha256', kSigning).update(stringToSign).digest('hex');
+
+  return `https://${p.host}${canonicalPath}?${canonicalQuery}&X-Amz-Signature=${signature}`;
+}
+
+/* ---------------- providers ---------------- */
+
+class R2Provider implements StorageProvider {
+  name = 'r2';
+  private accountId = process.env.R2_ACCOUNT_ID!;
+  private accessKeyId = process.env.R2_ACCESS_KEY_ID!;
+  private secretAccessKey = process.env.R2_SECRET_ACCESS_KEY!;
+  private bucket = process.env.R2_BUCKET!;
+  private publicBase = (process.env.R2_PUBLIC_BASE_URL ?? '').replace(/\/$/, '');
+
+  private get host(): string {
+    return `${this.accountId}.r2.cloudflarestorage.com`;
+  }
+
+  async presign(kind: UploadKind, fileName: string, contentType: string): Promise<PresignResult> {
+    const key = makeKey(kind, fileName, contentType);
+    const uploadUrl = presignS3Url({
+      method: 'PUT',
+      host: this.host,
+      path: `/${this.bucket}/${key}`,
+      region: 'auto',
+      accessKeyId: this.accessKeyId,
+      secretAccessKey: this.secretAccessKey,
+      expiresSeconds: 300,
+    });
+    return {
+      enabled: true,
+      key,
+      publicUrl: `${this.publicBase}/${key}`,
+      uploadUrl,
+    };
+  }
+
+  async presignDelete(key: string): Promise<string | null> {
+    return presignS3Url({
+      method: 'DELETE',
+      host: this.host,
+      path: `/${this.bucket}/${key}`,
+      region: 'auto',
+      accessKeyId: this.accessKeyId,
+      secretAccessKey: this.secretAccessKey,
+      expiresSeconds: 300,
+    });
+  }
 }
 
 class LocalStubProvider implements StorageProvider {
+  name = 'stub';
   async presign(kind: UploadKind, fileName: string, contentType: string): Promise<PresignResult> {
-    const key = `${kind}/${randomUUID()}.${safeExt(fileName, contentType)}`;
+    const key = makeKey(kind, fileName, contentType);
     return {
       enabled: false,
       key,
       publicUrl: `/uploads/${key}`,
       uploadUrl: null,
-      note: 'Object storage is not configured in this environment. Direct uploads activate when R2 credentials are provided at deploy time.',
+      note: 'Object storage is not configured in this environment. Uploads activate when R2 credentials are provided.',
     };
+  }
+  async presignDelete(): Promise<string | null> {
+    return null;
   }
 }
 
 export function getStorage(): StorageProvider {
-  // R2Provider is added at deploy time; the stub keeps the contract testable.
-  return new LocalStubProvider();
+  const configured =
+    process.env.STORAGE_PROVIDER === 'r2' &&
+    process.env.R2_ACCOUNT_ID &&
+    process.env.R2_ACCESS_KEY_ID &&
+    process.env.R2_SECRET_ACCESS_KEY &&
+    process.env.R2_BUCKET;
+  return configured ? new R2Provider() : new LocalStubProvider();
+}
+
+/* ---------------- orphan cleanup ---------------- */
+
+/**
+ * Deletes uploaded keys that no DB row references and that are older
+ * than 24h. Presign requests are tracked via `upload.presigned` audit
+ * rows; anything presigned long ago and never attached (profile image,
+ * portfolio media, service media) is orphaned. With the stub provider
+ * this is a no-op.
+ */
+export async function sweepOrphans(): Promise<number> {
+  const storage = getStorage();
+  if (storage.name !== 'r2') return 0;
+  const publicBase = (process.env.R2_PUBLIC_BASE_URL ?? '').replace(/\/$/, '');
+
+  // Referenced URLs across all media-bearing tables:
+  const [profiles, portfolio, media] = await Promise.all([
+    prisma.professionalProfile.findMany({ where: { imageUrl: { startsWith: publicBase } }, select: { imageUrl: true } }),
+    prisma.portfolioItem.findMany({ where: { mediaUrl: { startsWith: publicBase } }, select: { mediaUrl: true } }),
+    prisma.serviceMedia.findMany({ where: { url: { startsWith: publicBase } }, select: { url: true } }),
+  ]);
+  const referenced = new Set<string>();
+  for (const p of profiles) if (p.imageUrl) referenced.add(p.imageUrl);
+  for (const p of portfolio) if (p.mediaUrl) referenced.add(p.mediaUrl);
+  for (const m of media) referenced.add(m.url);
+
+  const pending = await prisma.auditLog.findMany({
+    where: {
+      action: 'upload.presigned',
+      createdAt: { lte: new Date(Date.now() - 24 * 3600 * 1000) },
+    },
+    take: 200,
+  });
+
+  let deleted = 0;
+  for (const row of pending) {
+    const publicUrl = (row.data as { publicUrl?: string }).publicUrl;
+    const key = (row.data as { key?: string }).key;
+    if (!publicUrl || !key || referenced.has(publicUrl)) continue;
+    const deleteUrl = await storage.presignDelete(key);
+    if (!deleteUrl) continue;
+    try {
+      const res = await fetch(deleteUrl, { method: 'DELETE', signal: AbortSignal.timeout(15_000) });
+      if (res.ok || res.status === 404) {
+        deleted += 1;
+        await prisma.auditLog.delete({ where: { id: row.id } });
+      }
+    } catch {
+      // Transient network failure — the next sweep retries.
+    }
+  }
+  return deleted;
 }

@@ -1,8 +1,10 @@
-# Servix API — Phase A (catalogue) + Phase B (accounts & authentication)
+# Servix API — Phases A–E
 
 Fastify + TypeScript + Prisma + PostgreSQL backend for the Servix
 marketplace. Phase A: public read-only catalogue. Phase B: real accounts
-and authentication for the existing frontend auth UI.
+and authentication. Phase C: professional onboarding. Phase D: bookings,
+payments, escrow, payouts, reviews. Phase E: admin system, audit logging,
+R2 storage, production email, background jobs, hardening.
 
 ## Requirements
 
@@ -38,72 +40,77 @@ npm run dev            # http://localhost:8080  · docs at /api/v1/docs
 | `DATABASE_URL` | local servix DB | PostgreSQL connection string |
 | `PORT` / `HOST` | 8080 / 0.0.0.0 | HTTP bind |
 | `CORS_ORIGINS` | Vercel prod + localhost | Allowed origins (`servix*.vercel.app` previews always allowed) |
-| `AUTH_JWT_SECRET` | dev value | **Required in production** (≥32 chars, `openssl rand -hex 64`) |
-| `AUTH_ACCESS_TTL_MIN` | 15 | Access-token lifetime (minutes) |
-| `AUTH_REFRESH_TTL_DAYS` | 30 | Refresh-token lifetime (days) |
-| `APP_BASE_URL` | http://localhost:5173 | Base URL for links in emails |
-| `EMAIL_MODE` | console | `console` logs emails to stdout; real provider is a deploy-time swap in `src/lib/mailer.ts` |
+| `AUTH_JWT_SECRET` | dev value | **Required in production** (≥32 chars) |
+| `AUTH_ACCESS_TTL_MIN` / `AUTH_REFRESH_TTL_DAYS` | 15 / 30 | Token lifetimes |
+| `APP_BASE_URL` | http://localhost:5173 | Base URL for links in emails / redirects |
+| `API_BASE_URL` | http://localhost:8080 | Base URL for provider callbacks |
+| `EMAIL_MODE` | console | `console` (dev) / `resend` (production) / `noop` (tests) |
+| `RESEND_API_KEY` / `EMAIL_FROM` | — | Required when `EMAIL_MODE=resend` |
+| `PAYSTACK_SECRET_KEY` | — | Live Paystack; sandbox provider used when unset |
+| `PLATFORM_FEE_PCT` / `CONFIRM_WINDOW_DAYS` / `REFUND_BEFORE_WORK_PCT` | 10 / 3 / 100 | Business policy |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | — | Idempotent admin bootstrap (password ≥12 chars) |
+| `STORAGE_PROVIDER` + `R2_*` | stub | `r2` enables Cloudflare R2 uploads |
+| `WORKER_MODE` | inline | `external` disables the in-process worker (`npx tsx src/worker.ts`) |
+| `PG_POOL_MAX` | 10 | DB pool size |
 
-## Authentication design (Phase B)
-
-- **Passwords:** scrypt (N=2^17, r=8, p=1, OWASP), timing-safe compare,
-  self-describing hash format (`scrypt$N$r$p$salt$hash`)
-- **Access token:** JWT HS256, 15 min, returned in the response body —
-  the frontend keeps it in memory only (never localStorage)
-- **Refresh token:** 256-bit opaque value in an httpOnly SameSite=Lax
-  cookie scoped to `/api/v1/auth`, stored sha256-hashed, **rotating** with
-  family reuse detection — replaying a rotated token revokes the family
-- **Email verify / password reset:** single-use sha256-hashed tokens
-  (24 h / 30 min TTL); issuing a new token invalidates prior unused ones;
-  password reset revokes **all** active sessions
-- **Anti-enumeration:** identical responses for forgot-password on known
-  and unknown emails; generic "Incorrect email or password."
-- **Rate limits:** global 300/min; login/register/verify/reset 10/min;
-  forgot-password 5/15 min; resend-verification 3/5 min → 429 envelope
+`validateProductionConfig()` refuses to boot `NODE_ENV=production` with
+missing/weak values — see `src/lib/config.ts`.
 
 ## Endpoints
 
-### Catalogue & content (Phase A) — unchanged
-`GET /categories · /services[/:slug[/reviews]] · /professionals[/:slug[/reviews|/services]] · /testimonials · /plans · /faqs · /stats` and `POST /contact`
+### Catalogue & content (Phase A)
+`GET /categories · /services[/:slug[/reviews|/availability]] · /professionals[/:slug[/reviews|/services]] · /testimonials · /plans · /faqs · /stats` and `POST /contact`
 
-### Auth (Phase B) — under `/api/v1`
+### Auth (Phase B) — `/api/v1/auth/*` + `GET /me`
+register, login, refresh (rotating cookie + family reuse detection),
+logout, verify-email (+resend), forgot-password, reset-password.
+
+### Professional (Phase C) — `/api/v1/applications*`, `/api/v1/pro/*`
+Application lifecycle (draft → submit → admin review), profile, skills,
+portfolio, uploads (presigned), service CRUD + publish lifecycle.
+
+### Bookings & payments (Phase D)
+Booking creation (Idempotency-Key), pay (provider checkout), signed
+webhook capture, accept/start/deliver/confirm/cancel/dispute/review,
+earnings + payouts.
+
+### Admin (Phase E) — `/api/v1/admin/*` (DB-verified admin role, fully audited)
 
 | Method | Path | Description |
 |---|---|---|
-| POST | `/auth/register` | Create account → `{user, accessToken}` + refresh cookie |
-| POST | `/auth/login` | Sign in → same shape |
-| POST | `/auth/refresh` | Rotate refresh cookie → new access token |
-| POST | `/auth/logout` | Revoke session family, clear cookie |
-| POST | `/auth/verify-email` | `{token}` → activates account (single-use) |
-| POST | `/auth/verify-email/resend` | Bearer required |
-| POST | `/auth/forgot-password` | `{email}` → uniform `{ok:true}` |
-| POST | `/auth/reset-password` | `{token, password}` → revokes all sessions |
-| GET | `/me` | Bearer required → current user |
+| GET | `/admin/stats` | Operational counters |
+| GET | `/admin/applications?status=` | List applications |
+| POST | `/admin/applications/:id/approve` | Approve (transactional role promotion + profile) |
+| POST | `/admin/applications/:id/reject` | Reject with optional feedback |
+| GET | `/admin/services?status=` | List services incl. drafts/paused |
+| POST | `/admin/services/:slug/pause` / `unpause` | Moderation (CAS) |
+| GET | `/admin/users?q=` | Search users |
+| POST | `/admin/users/:id/suspend` / `reinstate` | Suspend revokes sessions; no self/admin targets |
+| GET | `/admin/bookings[?status=]` · `/admin/bookings/:id` | Monitoring + event timeline |
+| POST | `/admin/bookings/:id/resolve` | Dispute resolution `{decision: release\|refund}` |
+| GET | `/admin/payouts?status=` · POST `/admin/payouts/:id/retry` | Payout monitoring + retry |
+| GET | `/admin/audit?entity=` | Read-only audit log |
 
 Error envelope everywhere: `{error:{code,message,status[,errors]}}`.
+
+### Meta
+`/healthz` (liveness) · `/readyz` (readiness: db + queue + storage, 503
+when degraded) · `/api/v1/docs` (OpenAPI).
 
 ## Tests
 
 ```bash
-npm test        # 61 integration tests (catalogue + auth + rate limiting)
+npm test        # 128 integration tests (catalogue + auth + professional + bookings + admin + hardening)
 ```
-
-Auth coverage: register (happy/duplicate/validation/roles), login
-(valid/wrong password/unknown email parity), `/me` (valid/missing/garbage
-token), refresh rotation + family reuse detection, logout revocation,
-email verification (valid/single-use/unknown/expired), password reset
-(full flow, session revocation, token single-use, strength), CORS with
-credentials, and 429 rate-limit envelope.
 
 ## Production notes
 
-- Set a real `AUTH_JWT_SECRET`; the server refuses to boot in production
-  without one.
-- `secure: true` is applied to cookies automatically when
-  `NODE_ENV=production` — the API must be served over HTTPS.
-- Cross-site deployments (frontend on Vercel, API elsewhere) work because
-  the refresh cookie is scoped to the API origin and requests use
-  `credentials: 'include'` with the CORS allowlist above. If the API is
-  hosted on a different registrable domain, browsers require HTTPS +
-  `SameSite=None; Secure` — flip `sameSite` in `src/routes/auth.ts` at
-  deploy time.
+- See `docs/PRODUCTION_HARDENING.md` (design) and `docs/LAUNCH_AUDIT.md`
+  (honest launch-readiness audit — what is code-verified vs. what still
+  needs infrastructure/third-party verification).
+- The server refuses to boot in production with missing/weak config.
+- Cookies get `secure: true` automatically in production; HTTPS required.
+- Run the worker as a separate process in production
+  (`WORKER_MODE=external` + `npx tsx src/worker.ts`); point `REDIS_URL`
+  at Redis to swap PgQueue for BullMQ (documented driver seam in
+  `src/lib/jobs.ts`).

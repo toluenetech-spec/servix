@@ -17,6 +17,13 @@ const NAV_LINKS = [
 /* Must mirror the desktop breakpoint in layout.css (max-width: 900px). */
 const DESKTOP_NAV_QUERY = '(min-width: 901px)';
 
+/** The signed-in user's primary destination (Phase E adds the admin console). */
+function homeFor(user) {
+  if (user.role === 'admin') return { to: '/admin', label: 'Admin' };
+  if (user.role === 'professional') return { to: '/pro', label: 'Workspace' };
+  return { to: '/bookings', label: 'My Bookings' };
+}
+
 export function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const toggleRef = useRef(null);
@@ -100,15 +107,9 @@ export function Navbar() {
         <div className="navbar__actions">
           {user ? (
             <>
-              {user.role === 'professional' ? (
-                <Button variant="ghost" to="/pro">
-                  Workspace
-                </Button>
-              ) : (
-                <Button variant="ghost" to="/bookings">
-                  My Bookings
-                </Button>
-              )}
+              <Button variant="ghost" to={homeFor(user).to}>
+                {homeFor(user).label}
+              </Button>
               <span className="navbar__user" title={user.email}>
                 {user.fullName.split(' ')[0]}
               </span>
@@ -165,15 +166,9 @@ export function Navbar() {
             <div className="mobile-nav__actions">
               {user ? (
                 <>
-                  {user.role === 'professional' ? (
-                    <Button variant="primary" to="/pro" block>
-                      Workspace
-                    </Button>
-                  ) : (
-                    <Button variant="primary" to="/bookings" block>
-                      My Bookings
-                    </Button>
-                  )}
+                  <Button variant="primary" to={homeFor(user).to} block>
+                    {homeFor(user).label}
+                  </Button>
                   <Button variant="secondary" block onClick={onSignOut}>
                     Sign Out ({user.fullName.split(' ')[0]})
                   </Button>

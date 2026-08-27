@@ -1,5 +1,6 @@
 /**
- * SERVIX Phase B — authentication routes.
+ * SERVIX Phase B — authentication routes (Phase E: email via job queue,
+ * admin bootstrap).
  *
  * Security model:
  *  - scrypt password hashes (OWASP parameters, timing-safe compare)
@@ -13,7 +14,7 @@
  *    generic "invalid credentials" on login failures
  *  - Per-route rate limits on top of the global limiter
  */
-import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/db.js';
 import { loadConfig } from '../lib/config.js';
@@ -28,7 +29,8 @@ import {
   sha256,
   signAccessToken,
 } from '../lib/tokens.js';
-import { sendMail, verifyEmailMail, resetPasswordMail } from '../lib/mailer.js';
+import { verifyEmailMail, resetPasswordMail } from '../lib/mailer.js';
+import { enqueueMail } from '../lib/jobs.js';
 import { serializeUser } from '../lib/serialize.js';
 import { requireAuth } from '../lib/authGuard.js';
 
@@ -135,7 +137,7 @@ export async function authRoutes(app: FastifyInstance) {
       });
 
       const token = await createOneTimeToken(user.id, 'verify_email', 24 * 60);
-      await sendMail(verifyEmailMail(user.email, token));
+      await enqueueMail(verifyEmailMail(user.email, token), `verify-${user.id}-${sha256(token).slice(0, 16)}`);
 
       const accessToken = await issueSession(reply, user, req.headers['user-agent']);
       return reply.code(201).send({ user: serializeUser(user), accessToken });
@@ -264,7 +266,7 @@ export async function authRoutes(app: FastifyInstance) {
       if (!user) throw unauthorized();
       if (user.emailVerifiedAt) return { ok: true, alreadyVerified: true };
       const token = await createOneTimeToken(user.id, 'verify_email', 24 * 60);
-      await sendMail(verifyEmailMail(user.email, token));
+      await enqueueMail(verifyEmailMail(user.email, token), `verify-${user.id}-${sha256(token).slice(0, 16)}`);
       return { ok: true };
     },
   );
@@ -278,7 +280,7 @@ export async function authRoutes(app: FastifyInstance) {
       const user = await prisma.user.findUnique({ where: { email } });
       if (user && !user.deletedAt) {
         const token = await createOneTimeToken(user.id, 'reset_password', 30);
-        await sendMail(resetPasswordMail(user.email, token));
+        await enqueueMail(resetPasswordMail(user.email, token), `reset-${user.id}-${sha256(token).slice(0, 16)}`);
       }
       // Uniform response regardless of account existence.
       return { ok: true };
@@ -323,4 +325,29 @@ export async function authRoutes(app: FastifyInstance) {
       return { user: serializeUser(user) };
     },
   );
+}
+
+/** Phase E: idempotent admin bootstrap from env (server-side only). */
+export async function bootstrapAdmin(): Promise<void> {
+  const email = process.env.ADMIN_EMAIL?.toLowerCase();
+  const password = process.env.ADMIN_PASSWORD;
+  if (!email) return;
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing) {
+    if (existing.role !== 'admin') {
+      await prisma.user.update({ where: { id: existing.id }, data: { role: 'admin' } });
+    }
+    return;
+  }
+  if (!password || password.length < 12) return; // refuse weak bootstrap creds
+  await prisma.user.create({
+    data: {
+      email,
+      fullName: 'Servix Admin',
+      passwordHash: await hashPassword(password),
+      role: 'admin',
+      status: 'active',
+      emailVerifiedAt: new Date(),
+    },
+  });
 }

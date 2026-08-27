@@ -1,5 +1,5 @@
 /**
- * SERVIX Phase D — Paystack webhook + sandbox checkout.
+ * SERVIX Phase D — Paystack webhook + sandbox checkout (Phase E update).
  *
  * Security: HMAC-SHA512 signature over the RAW body must match
  * x-paystack-signature (401 otherwise, nothing persisted). Events are
@@ -7,12 +7,16 @@
  * re-verified server-to-server before any credit. All financial state
  * changes are CAS transactions — duplicates and out-of-order deliveries
  * no-op safely.
+ *
+ * Phase E: processing errors record the error AND enqueue an idempotent
+ * webhooks.retry job that reprocesses the stored event with backoff.
  */
 import type { FastifyInstance } from 'fastify';
 import { timingSafeEqual } from 'node:crypto';
 import { prisma } from '../lib/db.js';
-import { capturePayment } from '../lib/bookingService.js';
-import { getPaymentProvider, SandboxControl, signWebhook } from '../lib/payments.js';
+import { SandboxControl, signWebhook } from '../lib/payments.js';
+import { processWebhookEvent } from '../lib/webhookService.js';
+import { enqueue } from '../lib/jobs.js';
 
 interface PaystackEvent {
   id?: string | number;
@@ -70,36 +74,17 @@ export async function webhookRoutes(app: FastifyInstance) {
       }
 
       try {
-        if (event.event === 'charge.success' && event.data.reference) {
-          const payment = await prisma.payment.findUnique({ where: { reference: event.data.reference } });
-          if (!payment) throw new Error(`No payment for reference ${event.data.reference}`);
-
-          // Never trust the webhook body — verify with the provider.
-          const verification = await getPaymentProvider().verify(payment.reference);
-          if (verification.status !== 'success') {
-            throw new Error(`Verification returned ${verification.status}`);
-          }
-          if (verification.amountKobo !== payment.amountKobo || verification.currency !== payment.currency) {
-            throw new Error(
-              `Amount mismatch: expected ${payment.amountKobo} ${payment.currency}, got ${verification.amountKobo} ${verification.currency}`,
-            );
-          }
-          await capturePayment(payment.id, payment.bookingId, payment.amountKobo);
-        } else if (event.event === 'charge.failed' && event.data.reference) {
-          await prisma.payment.updateMany({
-            where: { reference: event.data.reference, status: 'initiated' },
-            data: { status: 'failed' },
-          });
-        }
-        await prisma.webhookEvent.update({ where: { id: stored.id }, data: { processedAt: new Date() } });
+        await processWebhookEvent(stored.id, event as { event: string; data: { reference?: string } });
         return reply.code(200).send({ ok: true });
       } catch (err) {
         await prisma.webhookEvent.update({
           where: { id: stored.id },
           data: { error: (err as Error).message.slice(0, 500) },
         });
+        // Phase E: schedule an idempotent retry job with backoff.
+        await enqueue('webhooks.retry', { eventId: stored.id }, { idempotencyKey: `wh-retry-${stored.id}` });
         // 200 so the provider doesn't hammer retries for a permanent error;
-        // the stored error supports replay/alerting.
+        // the stored error + retry job handle recovery.
         return reply.code(200).send({ ok: false });
       }
     },
