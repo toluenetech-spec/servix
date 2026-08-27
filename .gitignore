@@ -1,0 +1,12 @@
+node_modules
+dist
+.DS_Store
+*.local
+
+# API
+api/node_modules
+api/dist
+api/.pgdata
+api/.env
+api/src/generated
+.env.local

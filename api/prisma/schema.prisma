@@ -1,0 +1,538 @@
+// SERVIX — Phase A catalogue + Phase B accounts/authentication.
+// Money as bigint minor units. Slugs are the public IDs used by frontend URLs.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum VerificationStatus {
+  unverified
+  pending
+  verified
+  rejected
+}
+
+enum AvailabilityState {
+  available
+  limited
+  unavailable
+}
+
+enum ServiceStatus {
+  draft
+  pending_review
+  active
+  paused
+  archived
+}
+
+/* ===================== Phase B: identity ===================== */
+
+enum UserRole {
+  customer
+  professional
+  admin
+}
+
+enum UserStatus {
+  pending_verification
+  active
+  suspended
+  deactivated
+}
+
+model User {
+  id              String     @id @default(uuid())
+  email           String     @unique
+  passwordHash    String     @map("password_hash")
+  fullName        String     @map("full_name")
+  role            UserRole   @default(customer)
+  status          UserStatus @default(pending_verification)
+  emailVerifiedAt DateTime?  @map("email_verified_at")
+  lastLoginAt     DateTime?  @map("last_login_at")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+  deletedAt       DateTime?  @map("deleted_at")
+
+  refreshTokens RefreshToken[]
+  oneTimeTokens OneTimeToken[]
+  applications  ProfessionalApplication[]
+  professionalProfile ProfessionalProfile?
+  bookings      Booking[] @relation("customerBookings")
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  tokenHash String    @map("token_hash")
+  familyId  String    @map("family_id")
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  userAgent String?   @map("user_agent")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, familyId])
+  @@index([tokenHash])
+  @@map("refresh_tokens")
+}
+
+model OneTimeToken {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  purpose   String // 'verify_email' | 'reset_password'
+  tokenHash String    @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tokenHash])
+  @@index([userId, purpose])
+  @@map("one_time_tokens")
+}
+
+/* ===================== Phase C: professional onboarding ===================== */
+
+enum ApplicationStatus {
+  pending
+  under_review
+  approved
+  rejected
+}
+
+model ProfessionalApplication {
+  id              String            @id @default(uuid())
+  userId          String            @map("user_id")
+  status          ApplicationStatus @default(pending)
+  title           String
+  about           String?
+  locationCity    String?           @map("location_city")
+  categorySlug    String?           @map("category_slug")
+  skills          Json              @default("[]")
+  portfolio       Json              @default("[]")
+  submittedAt     DateTime?         @map("submitted_at")
+  reviewedAt      DateTime?         @map("reviewed_at")
+  rejectionReason String?           @map("rejection_reason")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@map("professional_applications")
+}
+
+/* ===================== Phase D: bookings & payments ===================== */
+
+enum BookingStatus {
+  pending_payment
+  requested
+  accepted
+  in_progress
+  delivered
+  completed
+  declined
+  cancelled
+  disputed
+  refunded
+}
+
+enum PaymentStatus {
+  initiated
+  captured
+  failed
+  refunded
+}
+
+enum PayoutStatus {
+  processing
+  paid
+  failed
+}
+
+enum LedgerAccount {
+  provider_cash
+  customer_escrow
+  professional_payable
+  platform_revenue
+  refunds_paid
+}
+
+model Booking {
+  id              String        @id @default(uuid())
+  reference       String        @unique
+  customerId      String        @map("customer_id")
+  professionalId  String        @map("professional_id")
+  serviceId       String        @map("service_id")
+  status          BookingStatus @default(pending_payment)
+  scheduledAt     DateTime      @map("scheduled_at")
+  // Immutable price snapshot (kobo) taken at creation:
+  amountKobo      BigInt        @map("amount_kobo")
+  platformFeeKobo BigInt        @map("platform_fee_kobo")
+  currency        String        @default("NGN")
+  serviceTitle    String        @map("service_title")
+  priceUnit       String        @map("price_unit")
+  notes           String?
+  idempotencyKey  String?       @map("idempotency_key")
+  cancelledBy     String?       @map("cancelled_by") // 'customer' | 'professional'
+  cancelReason    String?       @map("cancel_reason")
+  disputeReason   String?       @map("dispute_reason")
+  disputedAt      DateTime?     @map("disputed_at")
+  deliveredAt     DateTime?     @map("delivered_at")
+  completedAt     DateTime?     @map("completed_at")
+  autoConfirmed   Boolean       @default(false) @map("auto_confirmed")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  customer     User                @relation("customerBookings", fields: [customerId], references: [id])
+  professional ProfessionalProfile @relation("proBookings", fields: [professionalId], references: [id])
+  service      Service             @relation(fields: [serviceId], references: [id])
+  payments     Payment[]
+  events       BookingEvent[]
+  review       Review?
+
+  @@unique([customerId, idempotencyKey])
+  @@index([customerId, status])
+  @@index([professionalId, status, scheduledAt])
+  @@index([status, deliveredAt])
+  @@map("bookings")
+}
+
+model BookingEvent {
+  id        String   @id @default(uuid())
+  bookingId String   @map("booking_id")
+  actorId   String?  @map("actor_id") // null = system
+  event     String
+  data      Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId, createdAt])
+  @@map("booking_events")
+}
+
+model Payment {
+  id          String        @id @default(uuid())
+  bookingId   String        @map("booking_id")
+  provider    String        @default("paystack")
+  reference   String        @unique
+  status      PaymentStatus @default(initiated)
+  amountKobo  BigInt        @map("amount_kobo")
+  currency    String        @default("NGN")
+  verifiedAt  DateTime?     @map("verified_at")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId, status])
+  @@map("payments")
+}
+
+model WebhookEvent {
+  id          String    @id @default(uuid())
+  provider    String
+  providerId  String    @map("provider_id")
+  type        String
+  payload     Json
+  processedAt DateTime? @map("processed_at")
+  error       String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@unique([provider, providerId])
+  @@map("webhook_events")
+}
+
+model LedgerEntry {
+  id         String        @id @default(uuid())
+  txnId      String        @map("txn_id")
+  bookingId  String?       @map("booking_id")
+  paymentId  String?       @map("payment_id")
+  payoutId   String?       @map("payout_id")
+  // professional_payable entries carry the owning professional:
+  subjectId  String?       @map("subject_id")
+  account    LedgerAccount
+  direction  String // 'debit' | 'credit'
+  amountKobo BigInt        @map("amount_kobo")
+  currency   String        @default("NGN")
+  memo       String?
+  createdAt  DateTime      @default(now()) @map("created_at")
+
+  @@index([txnId])
+  @@index([account, subjectId])
+  @@index([bookingId])
+  @@map("ledger_entries")
+}
+
+model Payout {
+  id             String       @id @default(uuid())
+  professionalId String       @map("professional_id")
+  reference      String       @unique
+  amountKobo     BigInt       @map("amount_kobo")
+  currency       String       @default("NGN")
+  status         PayoutStatus @default(processing)
+  providerRef    String?      @map("provider_ref")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  paidAt         DateTime?    @map("paid_at")
+
+  professional ProfessionalProfile @relation(fields: [professionalId], references: [id])
+
+  @@index([professionalId, status])
+  @@map("payouts")
+}
+
+model AvailabilityRule {
+  id             String @id @default(uuid())
+  professionalId String @map("professional_id")
+  weekday        Int // 0=Sunday … 6=Saturday
+  startHour      Int    @map("start_hour")
+  endHour        Int    @map("end_hour")
+
+  professional ProfessionalProfile @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  @@unique([professionalId, weekday])
+  @@map("availability_rules")
+}
+
+model AvailabilityException {
+  id             String   @id @default(uuid())
+  professionalId String   @map("professional_id")
+  date           DateTime @db.Date
+  reason         String?
+
+  professional ProfessionalProfile @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  @@unique([professionalId, date])
+  @@map("availability_exceptions")
+}
+
+/* ===================== Phase A: catalogue ===================== */
+
+model Category {
+  id           String   @id @default(uuid())
+  slug         String   @unique
+  name         String
+  description  String?
+  icon         String?
+  serviceCount Int      @default(0) @map("service_count")
+  position     Int      @default(0)
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  services      Service[]
+  professionals ProfessionalProfile[]
+
+  @@map("categories")
+}
+
+model ProfessionalProfile {
+  id                String             @id @default(uuid())
+  userId            String?            @unique @map("user_id")
+  slug              String             @unique
+  name              String
+  title             String
+  about             String?
+  locationCity      String?            @map("location_city")
+  locationCountry   String             @default("NG") @map("location_country")
+  categoryId        String?            @map("category_id")
+  verification      VerificationStatus @default(unverified)
+  availability      AvailabilityState  @default(available)
+  responseTimeLabel String?            @map("response_time_label")
+  memberSince       String?            @map("member_since")
+  imageUrl          String?            @map("image_url")
+  ratingAvg         Decimal            @default(0) @map("rating_avg") @db.Decimal(3, 2)
+  reviewCount       Int                @default(0) @map("review_count")
+  completedProjects Int                @default(0) @map("completed_projects")
+  startingPrice     BigInt?            @map("starting_price")
+  currency          String             @default("NGN")
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+
+  user      User?               @relation(fields: [userId], references: [id])
+  category  Category?           @relation(fields: [categoryId], references: [id])
+  skills    ProfessionalSkill[]
+  portfolio PortfolioItem[]
+  services  Service[]
+  reviews   Review[]
+  bookings  Booking[] @relation("proBookings")
+  payouts   Payout[]
+  availabilityRules      AvailabilityRule[]
+  availabilityExceptions AvailabilityException[]
+
+  @@index([categoryId, verification, availability])
+  @@map("professional_profiles")
+}
+
+model ProfessionalSkill {
+  professionalId String @map("professional_id")
+  skill          String
+  position       Int    @default(0)
+
+  professional ProfessionalProfile @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  @@id([professionalId, skill])
+  @@map("professional_skills")
+}
+
+model PortfolioItem {
+  id             String  @id @default(uuid())
+  professionalId String  @map("professional_id")
+  title          String
+  category       String?
+  description    String?
+  mediaUrl       String? @map("media_url")
+  position       Int     @default(0)
+
+  professional ProfessionalProfile @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  @@index([professionalId])
+  @@map("portfolio_items")
+}
+
+model Service {
+  id               String            @id @default(uuid())
+  slug             String            @unique
+  professionalId   String            @map("professional_id")
+  categoryId       String            @map("category_id")
+  title            String
+  shortDescription String            @map("short_description")
+  description      String
+  price            BigInt
+  currency         String            @default("NGN")
+  priceUnit        String            @default("per project") @map("price_unit")
+  durationLabel    String?           @map("duration_label")
+  locationLabel    String?           @map("location_label")
+  isRemote         Boolean           @default(true) @map("is_remote")
+  availability     AvailabilityState @default(available)
+  status           ServiceStatus     @default(active)
+  included         Json              @default("[]")
+  requirements     Json              @default("[]")
+  ratingAvg        Decimal           @default(0) @map("rating_avg") @db.Decimal(3, 2)
+  reviewCount      Int               @default(0) @map("review_count")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+
+  professional ProfessionalProfile @relation(fields: [professionalId], references: [id])
+  category     Category            @relation(fields: [categoryId], references: [id])
+  media        ServiceMedia[]
+  faqs         ServiceFaq[]
+  reviews      Review[]
+  bookings     Booking[]
+
+  @@index([categoryId, status, price])
+  @@index([professionalId, status])
+  @@map("services")
+}
+
+model ServiceMedia {
+  id        String  @id @default(uuid())
+  serviceId String  @map("service_id")
+  url       String
+  altText   String? @map("alt_text")
+  position  Int     @default(0)
+  isCover   Boolean @default(false) @map("is_cover")
+
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@index([serviceId])
+  @@map("service_media")
+}
+
+model ServiceFaq {
+  id        String @id @default(uuid())
+  serviceId String @map("service_id")
+  question  String
+  answer    String
+  position  Int    @default(0)
+
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@index([serviceId])
+  @@map("service_faqs")
+}
+
+model Review {
+  id             String   @id @default(uuid())
+  bookingId      String?  @unique @map("booking_id")
+  serviceId      String   @map("service_id")
+  professionalId String   @map("professional_id")
+  author         String
+  rating         Int
+  text           String?
+  isPublished    Boolean  @default(true) @map("is_published")
+  reviewedAt     DateTime @map("reviewed_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  service      Service             @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  professional ProfessionalProfile @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  booking      Booking?            @relation(fields: [bookingId], references: [id])
+
+  @@index([serviceId, isPublished, reviewedAt(sort: Desc)])
+  @@index([professionalId, isPublished, reviewedAt(sort: Desc)])
+  @@map("reviews")
+}
+
+model Testimonial {
+  id          String  @id @default(uuid())
+  quote       String
+  author      String
+  role        String?
+  isDemo      Boolean @default(false) @map("is_demo")
+  isPublished Boolean @default(true) @map("is_published")
+  position    Int     @default(0)
+
+  @@map("testimonials")
+}
+
+model Plan {
+  id          String  @id @default(uuid())
+  slug        String  @unique
+  name        String
+  tagline     String?
+  price       BigInt  @default(0)
+  currency    String  @default("NGN")
+  period      String  @default("per month")
+  cta         String  @default("Get Started")
+  highlighted Boolean @default(false)
+  features    Json    @default("[]")
+  isActive    Boolean @default(true) @map("is_active")
+  position    Int     @default(0)
+
+  @@map("plans")
+}
+
+model Faq {
+  id          String  @id @default(uuid())
+  context     String
+  question    String
+  answer      String
+  position    Int     @default(0)
+  isPublished Boolean @default(true) @map("is_published")
+
+  @@index([context, isPublished, position])
+  @@map("faqs")
+}
+
+model ContactMessage {
+  id        String   @id @default(uuid())
+  name      String
+  email     String
+  subject   String
+  message   String
+  status    String   @default("new")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("contact_messages")
+}
