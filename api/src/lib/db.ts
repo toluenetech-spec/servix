@@ -7,4 +7,9 @@ const adapter = new PrismaPg({
   max: Number(process.env.PG_POOL_MAX ?? 10),
 });
 
-export const prisma = new PrismaClient({ adapter });
+export const prisma = new PrismaClient({
+  adapter,
+  // Generous transaction windows: tolerate high-latency links to the
+  // managed database (e.g. developing far from the DB region).
+  transactionOptions: { maxWait: 20_000, timeout: 60_000 },
+});
