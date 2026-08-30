@@ -359,9 +359,15 @@ describe('professional profile management', () => {
     expect(ok.statusCode).toBe(200);
     const body = ok.json();
     expect(body.key).toMatch(/^profile\//);
-    // Honest contract: stub reports enabled=false with no upload URL.
-    expect(body.enabled).toBe(false);
-    expect(body.uploadUrl).toBeNull();
+    // Honest contract: stub reports enabled=false with no upload URL -
+    // OR, when real R2 credentials are configured, enabled=true with a
+    // signed URL that never exposes the secret.
+    if (body.enabled) {
+      expect(body.uploadUrl).toContain('X-Amz-Signature=');
+      expect(body.uploadUrl).not.toContain(process.env.R2_SECRET_ACCESS_KEY ?? 'nope');
+    } else {
+      expect(body.uploadUrl).toBeNull();
+    }
   });
 });
 

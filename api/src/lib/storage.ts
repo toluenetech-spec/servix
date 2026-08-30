@@ -17,6 +17,7 @@
  */
 import { createHash, createHmac, randomUUID } from 'node:crypto';
 import { prisma } from './db.js';
+import { resolveStorageEnv } from './config.js';
 
 export const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
@@ -119,14 +120,15 @@ export function presignS3Url(p: SigV4Params): string {
 
 class R2Provider implements StorageProvider {
   name = 'r2';
-  private accountId = process.env.R2_ACCOUNT_ID!;
-  private accessKeyId = process.env.R2_ACCESS_KEY_ID!;
-  private secretAccessKey = process.env.R2_SECRET_ACCESS_KEY!;
-  private bucket = process.env.R2_BUCKET!;
-  private publicBase = (process.env.R2_PUBLIC_BASE_URL ?? '').replace(/\/$/, '');
+  private env = resolveStorageEnv();
+  private accessKeyId = this.env.accessKeyId;
+  private secretAccessKey = this.env.secretAccessKey;
+  private bucket = this.env.bucket;
+  private region = this.env.region || 'auto';
+  private publicBase = this.env.publicBaseUrl.replace(/\/$/, '');
 
   private get host(): string {
-    return `${this.accountId}.r2.cloudflarestorage.com`;
+    return this.env.endpointHost;
   }
 
   async presign(kind: UploadKind, fileName: string, contentType: string): Promise<PresignResult> {
@@ -135,7 +137,7 @@ class R2Provider implements StorageProvider {
       method: 'PUT',
       host: this.host,
       path: `/${this.bucket}/${key}`,
-      region: 'auto',
+      region: this.region,
       accessKeyId: this.accessKeyId,
       secretAccessKey: this.secretAccessKey,
       expiresSeconds: 300,
@@ -143,7 +145,7 @@ class R2Provider implements StorageProvider {
     return {
       enabled: true,
       key,
-      publicUrl: `${this.publicBase}/${key}`,
+      publicUrl: this.publicBase ? `${this.publicBase}/${key}` : `/media/${key}`,
       uploadUrl,
     };
   }
@@ -153,10 +155,23 @@ class R2Provider implements StorageProvider {
       method: 'DELETE',
       host: this.host,
       path: `/${this.bucket}/${key}`,
-      region: 'auto',
+      region: this.region,
       accessKeyId: this.accessKeyId,
       secretAccessKey: this.secretAccessKey,
       expiresSeconds: 300,
+    });
+  }
+
+  /** Short-lived presigned GET (image retrieval when the bucket is private). */
+  async presignGet(key: string, expiresSeconds = 3600): Promise<string> {
+    return presignS3Url({
+      method: 'GET',
+      host: this.host,
+      path: `/${this.bucket}/${key}`,
+      region: this.region,
+      accessKeyId: this.accessKeyId,
+      secretAccessKey: this.secretAccessKey,
+      expiresSeconds,
     });
   }
 }
@@ -179,14 +194,12 @@ class LocalStubProvider implements StorageProvider {
 }
 
 export function getStorage(): StorageProvider {
-  const configured =
-    process.env.STORAGE_PROVIDER === 'r2' &&
-    process.env.R2_ACCOUNT_ID &&
-    process.env.R2_ACCESS_KEY_ID &&
-    process.env.R2_SECRET_ACCESS_KEY &&
-    process.env.R2_BUCKET;
+  const env = resolveStorageEnv();
+  const configured = env.enabled && env.endpointHost && env.accessKeyId && env.secretAccessKey && env.bucket;
   return configured ? new R2Provider() : new LocalStubProvider();
 }
+
+export { R2Provider };
 
 /* ---------------- orphan cleanup ---------------- */
 
@@ -200,13 +213,13 @@ export function getStorage(): StorageProvider {
 export async function sweepOrphans(): Promise<number> {
   const storage = getStorage();
   if (storage.name !== 'r2') return 0;
-  const publicBase = (process.env.R2_PUBLIC_BASE_URL ?? '').replace(/\/$/, '');
+  const publicBase = resolveStorageEnv().publicBaseUrl.replace(/\/$/, '');
 
   // Referenced URLs across all media-bearing tables:
   const [profiles, portfolio, media] = await Promise.all([
-    prisma.professionalProfile.findMany({ where: { imageUrl: { startsWith: publicBase } }, select: { imageUrl: true } }),
-    prisma.portfolioItem.findMany({ where: { mediaUrl: { startsWith: publicBase } }, select: { mediaUrl: true } }),
-    prisma.serviceMedia.findMany({ where: { url: { startsWith: publicBase } }, select: { url: true } }),
+    prisma.professionalProfile.findMany({ where: { imageUrl: { startsWith: publicBase || '/media/' } }, select: { imageUrl: true } }),
+    prisma.portfolioItem.findMany({ where: { mediaUrl: { startsWith: publicBase || '/media/' } }, select: { mediaUrl: true } }),
+    prisma.serviceMedia.findMany({ where: { url: { startsWith: publicBase || '/media/' } }, select: { url: true } }),
   ]);
   const referenced = new Set<string>();
   for (const p of profiles) if (p.imageUrl) referenced.add(p.imageUrl);

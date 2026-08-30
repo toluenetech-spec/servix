@@ -14,7 +14,7 @@ import formbody from '@fastify/formbody';
 import rateLimit from '@fastify/rate-limit';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
-import { loadConfig } from './lib/config.js';
+import { loadConfig, resolveStorageEnv } from './lib/config.js';
 import { ApiError } from './lib/errors.js';
 import { prisma } from './lib/db.js';
 import { queueHealthy } from './lib/jobs.js';
@@ -107,7 +107,7 @@ export async function buildApp() {
         title: 'Servix API',
         description:
           'Servix marketplace API. Catalogue, accounts, professional onboarding, bookings & payments, administration.',
-        version: '0.6.0',
+        version: '0.6.1',
       },
       servers: [{ url: '/api/v1' }],
       tags: [
@@ -179,7 +179,8 @@ export async function buildApp() {
       checks.database = false;
     }
     checks.queue = await queueHealthy();
-    checks.storage = process.env.STORAGE_PROVIDER !== 'r2' || Boolean(process.env.R2_BUCKET);
+    const storageEnv = resolveStorageEnv();
+    checks.storage = !storageEnv.enabled || Boolean(storageEnv.bucket && storageEnv.accessKeyId);
     const ready = Object.values(checks).every(Boolean);
     return reply.code(ready ? 200 : 503).send({ ready, checks });
   });

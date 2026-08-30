@@ -12,7 +12,7 @@
  * In Phase E all sends go through the job queue (lib/jobs.ts) so SMTP/API
  * latency and retries never sit on the HTTP request path.
  */
-import { loadConfig } from './config.js';
+import { loadConfig, resolveEmailMode } from './config.js';
 
 const config = loadConfig();
 
@@ -27,9 +27,50 @@ export interface SendResult {
   providerId: string | null;
 }
 
+const PROVIDER_TIMEOUT_MS = 15_000;
+
+function fromParts(): { name: string; email: string } {
+  const combined = process.env.EMAIL_FROM;
+  if (combined) {
+    const m = combined.match(/^(.*)<([^>]+)>\s*$/);
+    if (m) return { name: m[1].trim().replace(/^"|"$/g, '') || 'Servix', email: m[2].trim() };
+    return { name: process.env.EMAIL_FROM_NAME ?? 'Servix', email: combined.trim() };
+  }
+  return {
+    name: process.env.EMAIL_FROM_NAME ?? 'Servix',
+    email: process.env.EMAIL_FROM_EMAIL ?? 'no-reply@servix.app',
+  };
+}
+
 export async function deliverMail(mail: Mail): Promise<SendResult> {
-  const mode = (process.env.EMAIL_MODE as 'console' | 'resend' | 'noop') ?? config.emailMode;
+  const mode = resolveEmailMode();
   if (mode === 'noop') return { accepted: true, providerId: 'noop' };
+
+  if (mode === 'brevo') {
+    const from = fromParts();
+    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
+      headers: {
+        'api-key': process.env.BREVO_API_KEY ?? '',
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({
+        sender: { name: from.name, email: from.email },
+        to: [{ email: mail.to }],
+        subject: mail.subject,
+        textContent: mail.text,
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      // Provider did NOT accept - throw so the job retries; never claim delivery.
+      throw new Error(`brevo rejected (${res.status}): ${body.slice(0, 200)}`);
+    }
+    const data = (await res.json().catch(() => ({}))) as { messageId?: string };
+    return { accepted: true, providerId: data.messageId ?? null };
+  }
 
   if (mode === 'resend') {
     const res = await fetch('https://api.resend.com/emails', {

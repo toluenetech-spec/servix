@@ -199,9 +199,13 @@ describe('storage (R2 SigV4 + stub honesty)', () => {
       size: 50_000,
     });
     expect(res.statusCode).toBe(200);
-    expect(res.json().enabled).toBe(false);
-    expect(res.json().uploadUrl).toBeNull();
-    expect(res.json().note).toContain('not configured');
+    if (res.json().enabled) {
+      // Real R2 credentials configured in this environment: honest presign.
+      expect(res.json().uploadUrl).toContain('X-Amz-Signature=');
+    } else {
+      expect(res.json().uploadUrl).toBeNull();
+      expect(res.json().note).toContain('not configured');
+    }
 
     // presign requests are audit-tracked for orphan cleanup
     const row = await prisma.auditLog.findFirst({
@@ -326,6 +330,20 @@ describe('validateProductionConfig', () => {
     expect(validateProductionConfig(goodProd)).toEqual([]);
   });
 
+  it('accepts a Brevo production configuration (EMAIL_MODE=brevo / EMAIL_PROVIDER alias)', () => {
+    const brevo = {
+      ...goodProd,
+      EMAIL_MODE: undefined,
+      EMAIL_PROVIDER: 'brevo',
+      BREVO_API_KEY: 'xkeysib-xxx',
+      EMAIL_FROM_EMAIL: 'no-reply@servix.app',
+      RESEND_API_KEY: undefined,
+    } as unknown as NodeJS.ProcessEnv;
+    expect(validateProductionConfig(brevo)).toEqual([]);
+    const missing = { ...brevo, BREVO_API_KEY: undefined } as unknown as NodeJS.ProcessEnv;
+    expect(validateProductionConfig(missing).join('\n')).toContain('BREVO_API_KEY');
+  });
+
   it('refuses to bless production with missing/weak configuration', () => {
     const bad = validateProductionConfig({
       NODE_ENV: 'production',
@@ -347,6 +365,22 @@ describe('validateProductionConfig', () => {
     const bad = validateProductionConfig({ ...goodProd, STORAGE_PROVIDER: 'r2' });
     expect(bad.some((p) => p.includes('R2_ACCOUNT_ID'))).toBe(true);
     expect(bad.some((p) => p.includes('R2_SECRET_ACCESS_KEY'))).toBe(true);
+  });
+
+  it('requires S3-style variables when STORAGE_DRIVER=s3 (alias names)', () => {
+    const bad = validateProductionConfig({ ...goodProd, STORAGE_DRIVER: 's3' });
+    expect(bad.length).toBeGreaterThan(0);
+    const complete = validateProductionConfig({
+      ...goodProd,
+      STORAGE_DRIVER: 's3',
+      STORAGE_S3_ENDPOINT: 'https://acc123.r2.cloudflarestorage.com',
+      STORAGE_S3_REGION: 'auto',
+      STORAGE_S3_BUCKET: 'servix-storage',
+      STORAGE_S3_ACCESS_KEY_ID: 'key',
+      STORAGE_S3_SECRET_ACCESS_KEY: 'secret',
+      STORAGE_PUBLIC_BASE_URL: 'https://media.servix.app',
+    });
+    expect(complete).toEqual([]);
   });
 
   it('development is never blocked', () => {
