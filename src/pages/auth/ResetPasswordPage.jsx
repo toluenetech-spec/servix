@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { AuthShell } from './AuthShell.jsx';
 import { Button } from '../../components/ui/Button.jsx';
 import { Field } from '../../components/ui/Field.jsx';
 import { Icon } from '../../components/ui/Icon.jsx';
 import { useToast } from '../../components/ui/Toast.jsx';
+import { useAuth } from '../../lib/AuthContext.jsx';
 import { useDocumentMeta } from '../../lib/useDocumentMeta.js';
 
 export default function ResetPasswordPage() {
@@ -14,21 +15,49 @@ export default function ResetPasswordPage() {
   });
 
   const showToast = useToast();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get('token') ?? '';
+  const { resetPassword, authAvailable } = useAuth();
   const [values, setValues] = useState({ password: '', confirm: '' });
   const [errors, setErrors] = useState({});
   const [show, setShow] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  function onSubmit(e) {
+  async function onSubmit(e) {
     e.preventDefault();
     const next = {};
     if (!values.password) next.password = 'Please create a new password.';
-    else if (values.password.length < 8)
-      next.password = 'Password must be at least 8 characters.';
-    if (values.confirm !== values.password)
-      next.confirm = 'Passwords do not match.';
+    else if (values.password.length < 8) next.password = 'Password must be at least 8 characters.';
+    if (values.confirm !== values.password) next.confirm = 'Passwords do not match.';
     setErrors(next);
     if (Object.keys(next).length > 0) return;
-    showToast('Password reset launches with the Servix platform. Accounts are not live yet.', 'info');
+
+    if (!authAvailable) {
+      showToast('Password reset launches with the Servix platform. Accounts are not live yet.', 'info');
+      return;
+    }
+    if (!token) {
+      showToast('This reset link is incomplete. Use the link from your email.', 'error');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await resetPassword({ token, password: values.password });
+      showToast('Password updated. Sign in with your new password.', 'success');
+      navigate('/login');
+    } catch (err) {
+      if (err.code === 'INVALID_TOKEN') {
+        showToast('This reset link is invalid or has expired. Request a new one.', 'error');
+      } else if (err.errors) {
+        setErrors(err.errors);
+      } else {
+        showToast('Password reset is temporarily unavailable. Please try again.', 'error');
+      }
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -71,8 +100,8 @@ export default function ResetPasswordPage() {
             />
           )}
         </Field>
-        <Button type="submit" variant="primary" size="lg" block>
-          Reset Password
+        <Button type="submit" variant="primary" size="lg" block disabled={submitting}>
+          {submitting ? 'Updating…' : 'Reset Password'}
         </Button>
       </form>
       <p className="auth__meta">

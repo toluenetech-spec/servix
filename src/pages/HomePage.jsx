@@ -6,7 +6,10 @@ import { SectionHeader } from '../components/ui/SectionHeader.jsx';
 import { Badge } from '../components/ui/Badge.jsx';
 import { CategoryCard } from '../components/cards/CategoryCard.jsx';
 import { ProfessionalCard } from '../components/cards/ProfessionalCard.jsx';
+import { Skeleton } from '../components/ui/States.jsx';
 import { useDocumentMeta } from '../lib/useDocumentMeta.js';
+import { useFetch } from '../lib/useFetch.js';
+import { getStats } from '../lib/api.js';
 import { categories } from '../data/categories.js';
 import { professionals } from '../data/professionals.js';
 import { testimonials } from '../data/testimonials.js';
@@ -20,14 +23,21 @@ const SEARCH_SUGGESTIONS = [
   'Consulting',
 ];
 
-/* Trust metrics — demo values, clearly labelled below the strip.
-   Wired for replacement by `GET /api/stats`. */
+/* Trust metrics — demo display values, replaced 1:1 by live numbers
+   from GET /api/v1/stats when the API is configured and reachable. */
 const TRUST_STATS = [
-  { value: '500+', label: 'Verified professionals' },
-  { value: '2,400+', label: 'Completed services' },
-  { value: '8', label: 'Service categories' },
-  { value: '4.8/5', label: 'Customer satisfaction' },
+  { key: 'verifiedProfessionals', value: '500+', label: 'Verified professionals' },
+  { key: 'activeServices', value: '2,400+', label: 'Completed services' },
+  { key: 'serviceCategories', value: '8', label: 'Service categories' },
+  { key: 'averageRating', value: '4.8/5', label: 'Customer satisfaction' },
 ];
+
+/** Format a live stats value for display; null → keep demo value. */
+function formatStat(key, raw, demoValue) {
+  if (raw == null) return demoValue;
+  if (key === 'averageRating') return `${raw}/5`;
+  return Number(raw).toLocaleString('en-NG');
+}
 
 const STEPS = [
   { num: '01', title: 'Discover', desc: 'Find the right service or professional for what you need.' },
@@ -150,6 +160,37 @@ function DashboardPreview() {
   );
 }
 
+function TrustStrip() {
+  const { data: stats, loading } = useFetch(() => getStats(), []);
+  const isLive = Boolean(stats) && !stats.demo;
+
+  return (
+    <section className="trust-strip" aria-label="Platform statistics">
+      <div className="container">
+        <div className="trust-strip__grid">
+          {TRUST_STATS.map((stat) => (
+            <div className="trust-stat" key={stat.label}>
+              {loading ? (
+                <Skeleton height="1.75rem" width="4.5rem" />
+              ) : (
+                <span className="trust-stat__value">
+                  {formatStat(stat.key, stats?.[stat.key], stat.value)}
+                </span>
+              )}
+              <span className="trust-stat__label">{stat.label}</span>
+            </div>
+          ))}
+        </div>
+        <p className="trust-strip__note">
+          {isLive
+            ? 'Live figures from the pre-launch Servix catalogue.'
+            : 'Figures shown are demonstration values for the pre-launch platform.'}
+        </p>
+      </div>
+    </section>
+  );
+}
+
 export default function HomePage() {
   useDocumentMeta({
     title: 'Professional Services, Simplified',
@@ -186,21 +227,7 @@ export default function HomePage() {
       </section>
 
       {/* ---------- TRUST ---------- */}
-      <section className="trust-strip" aria-label="Platform statistics">
-        <div className="container">
-          <div className="trust-strip__grid">
-            {TRUST_STATS.map((stat) => (
-              <div className="trust-stat" key={stat.label}>
-                <span className="trust-stat__value">{stat.value}</span>
-                <span className="trust-stat__label">{stat.label}</span>
-              </div>
-            ))}
-          </div>
-          <p className="trust-strip__note">
-            Figures shown are demonstration values for the pre-launch platform.
-          </p>
-        </div>
-      </section>
+      <TrustStrip />
 
       {/* ---------- POPULAR SERVICES ---------- */}
       <section className="section" aria-labelledby="popular-services">

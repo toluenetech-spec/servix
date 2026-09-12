@@ -253,3 +253,21 @@
   font-size: var(--text-md);
   max-width: 40rem;
 }
+
+/* Signed-in user name in the navbar (Phase B) */
+.navbar__user {
+  font-size: var(--text-sm);
+  font-weight: 650;
+  color: var(--color-deep-forest);
+  padding-inline: var(--space-2);
+  white-space: nowrap;
+  max-width: 10rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 900px) {
+  .navbar__user {
+    display: none;
+  }
+}

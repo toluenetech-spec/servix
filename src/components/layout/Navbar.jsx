@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { NavLink, Link, useLocation } from 'react-router-dom';
 import { Logo } from '../brand/Logo.jsx';
 import { Button } from '../ui/Button.jsx';
 import { Icon } from '../ui/Icon.jsx';
+import { useAuth } from '../../lib/AuthContext.jsx';
 
 const NAV_LINKS = [
   { to: '/services', label: 'Services' },
@@ -15,11 +17,27 @@ const NAV_LINKS = [
 /* Must mirror the desktop breakpoint in layout.css (max-width: 900px). */
 const DESKTOP_NAV_QUERY = '(min-width: 901px)';
 
+/** The signed-in user's primary destination (Phase E adds the admin console). */
+function homeFor(user) {
+  if (user.role === 'admin') return { to: '/admin', label: 'Admin' };
+  if (user.role === 'professional') return { to: '/pro', label: 'Workspace' };
+  return { to: '/bookings', label: 'My Bookings' };
+}
+
 export function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const toggleRef = useRef(null);
   const panelRef = useRef(null);
   const location = useLocation();
+  const { user, logout } = useAuth();
+
+  async function onSignOut() {
+    try {
+      await logout();
+    } catch {
+      /* session already gone */
+    }
+  }
 
   // Close the mobile menu on navigation.
   useEffect(() => {
@@ -52,8 +70,7 @@ export function Navbar() {
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [menuOpen]);
 
-  // Close the menu if the viewport grows into the desktop layout, so the
-  // fixed panel and the body scroll lock can never trap the desktop page.
+  // Close the menu if the viewport grows into the desktop layout.
   useEffect(() => {
     if (!menuOpen) return undefined;
     const media = window.matchMedia(DESKTOP_NAV_QUERY);
@@ -88,12 +105,28 @@ export function Navbar() {
         </nav>
 
         <div className="navbar__actions">
-          <Button variant="ghost" to="/login">
-            Sign In
-          </Button>
-          <Button variant="primary" to="/register">
-            Get Started
-          </Button>
+          {user ? (
+            <>
+              <Button variant="ghost" to={homeFor(user).to}>
+                {homeFor(user).label}
+              </Button>
+              <span className="navbar__user" title={user.email}>
+                {user.fullName.split(' ')[0]}
+              </span>
+              <Button variant="ghost" onClick={onSignOut}>
+                Sign Out
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="ghost" to="/login">
+                Sign In
+              </Button>
+              <Button variant="primary" to="/register">
+                Get Started
+              </Button>
+            </>
+          )}
           <button
             ref={toggleRef}
             className="navbar__toggle"
@@ -107,35 +140,53 @@ export function Navbar() {
         </div>
       </div>
 
-      {menuOpen && (
-        <nav
-          ref={panelRef}
-          className="mobile-nav"
-          id="mobile-nav"
-          aria-label="Mobile navigation"
-          tabIndex={-1}
-        >
-          {NAV_LINKS.map((link) => (
-            <NavLink
-              key={link.to}
-              to={link.to}
-              end={link.to === '/professionals'}
-              className="mobile-nav__link"
-            >
-              {link.label}
-              <Icon name="chevron-right" size={18} />
-            </NavLink>
-          ))}
-          <div className="mobile-nav__actions">
-            <Button variant="secondary" to="/login" block>
-              Sign In
-            </Button>
-            <Button variant="primary" to="/register" block>
-              Get Started
-            </Button>
-          </div>
-        </nav>
-      )}
+      {menuOpen &&
+        /* Portaled to <body>: the navbar's backdrop-filter creates a
+           containing block that would otherwise clip this fixed panel
+           to the navbar's height. */
+        createPortal(
+          <nav
+            ref={panelRef}
+            className="mobile-nav"
+            id="mobile-nav"
+            aria-label="Mobile navigation"
+            tabIndex={-1}
+          >
+            {NAV_LINKS.map((link) => (
+              <NavLink
+                key={link.to}
+                to={link.to}
+                end={link.to === '/professionals'}
+                className="mobile-nav__link"
+              >
+                {link.label}
+                <Icon name="chevron-right" size={18} />
+              </NavLink>
+            ))}
+            <div className="mobile-nav__actions">
+              {user ? (
+                <>
+                  <Button variant="primary" to={homeFor(user).to} block>
+                    {homeFor(user).label}
+                  </Button>
+                  <Button variant="secondary" block onClick={onSignOut}>
+                    Sign Out ({user.fullName.split(' ')[0]})
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button variant="secondary" to="/login" block>
+                    Sign In
+                  </Button>
+                  <Button variant="primary" to="/register" block>
+                    Get Started
+                  </Button>
+                </>
+              )}
+            </div>
+          </nav>,
+          document.body
+        )}
     </header>
   );
 }

@@ -4,6 +4,7 @@ import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 import { Layout } from './components/layout/Layout.jsx';
 import { ToastProvider } from './components/ui/Toast.jsx';
+import { AuthProvider } from './lib/AuthContext.jsx';
 import HomePage from './pages/HomePage.jsx';
 
 /* Code-split every non-landing route. */
@@ -12,6 +13,11 @@ const ServiceDetailPage = lazy(() => import('./pages/ServiceDetailPage.jsx'));
 const ProfessionalsPage = lazy(() => import('./pages/ProfessionalsPage.jsx'));
 const ProfessionalProfilePage = lazy(() => import('./pages/ProfessionalProfilePage.jsx'));
 const ProfessionalsJoinPage = lazy(() => import('./pages/ProfessionalsJoinPage.jsx'));
+const ApplyPage = lazy(() => import('./pages/pro/ApplyPage.jsx'));
+const WorkspacePage = lazy(() => import('./pages/pro/WorkspacePage.jsx'));
+const BookingsPage = lazy(() => import('./pages/bookings/BookingsPage.jsx'));
+const BookingDetailPage = lazy(() => import('./pages/bookings/BookingDetailPage.jsx'));
+const AdminPage = lazy(() => import('./pages/admin/AdminPage.jsx'));
 const HowItWorksPage = lazy(() => import('./pages/HowItWorksPage.jsx'));
 const PricingPage = lazy(() => import('./pages/PricingPage.jsx'));
 const AboutPage = lazy(() => import('./pages/AboutPage.jsx'));
@@ -36,6 +42,7 @@ function RouteFallback() {
 
 export default function App() {
   return (
+    <AuthProvider>
     <ToastProvider>
       <Suspense fallback={<RouteFallback />}>
         <Routes>
@@ -45,6 +52,11 @@ export default function App() {
             <Route path="/services/:id" element={<ServiceDetailPage />} />
             <Route path="/professionals" element={<ProfessionalsPage />} />
             <Route path="/professionals/join" element={<ProfessionalsJoinPage />} />
+            <Route path="/professionals/apply" element={<ApplyPage />} />
+            <Route path="/pro" element={<WorkspacePage />} />
+            <Route path="/bookings" element={<BookingsPage />} />
+            <Route path="/bookings/:id" element={<BookingDetailPage />} />
+            <Route path="/admin" element={<AdminPage />} />
             <Route path="/professionals/:id" element={<ProfessionalProfilePage />} />
             <Route path="/how-it-works" element={<HowItWorksPage />} />
             <Route path="/pricing" element={<PricingPage />} />
@@ -64,5 +76,6 @@ export default function App() {
       <Analytics />
       <SpeedInsights />
     </ToastProvider>
+    </AuthProvider>
   );
 }

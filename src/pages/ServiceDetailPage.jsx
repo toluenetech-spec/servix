@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Breadcrumb } from '../components/ui/Breadcrumb.jsx';
 import { Button } from '../components/ui/Button.jsx';
 import { Icon } from '../components/ui/Icon.jsx';
@@ -11,6 +11,10 @@ import { Modal } from '../components/ui/Modal.jsx';
 import { Skeleton, ErrorState, EmptyState } from '../components/ui/States.jsx';
 import { useFetch } from '../lib/useFetch.js';
 import { useDocumentMeta } from '../lib/useDocumentMeta.js';
+import { useAuth } from '../lib/AuthContext.jsx';
+import { useToast } from '../components/ui/Toast.jsx';
+import { Field } from '../components/ui/Field.jsx';
+import * as bookingApi from '../lib/bookingApi.js';
 import { getService, getServiceReviews } from '../lib/api.js';
 import { formatPrice, formatDate } from '../lib/format.js';
 import { categories } from '../data/categories.js';
@@ -45,6 +49,110 @@ function DetailSkeleton() {
       </div>
       <div className="detail__aside">
         <Skeleton height="18rem" />
+      </div>
+    </div>
+  );
+}
+
+function BookingForm({ service, onClose }) {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const showToast = useToast();
+  const [slots, setSlots] = useState(null);
+  const [selected, setSelected] = useState('');
+  const [notes, setNotes] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    bookingApi
+      .getAvailability(service.id, 14)
+      .then((r) => setSlots(r.slots))
+      .catch(() => setSlots([]));
+  }, [service.id]);
+
+  if (!user) {
+    return (
+      <div style={{ display: 'grid', gap: 'var(--space-4)' }}>
+        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
+          Sign in to book this service.
+        </p>
+        <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
+          <Button to="/login" variant="primary">Sign In</Button>
+          <Button to="/register" variant="secondary">Create Account</Button>
+        </div>
+      </div>
+    );
+  }
+
+  const days = new Map();
+  for (const iso of slots ?? []) {
+    const d = new Date(iso);
+    const key = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+    if (!days.has(key)) days.set(key, []);
+    days.get(key).push(iso);
+  }
+
+  async function book() {
+    setBusy(true);
+    try {
+      const booking = await bookingApi.createBooking(
+        { serviceId: service.id, scheduledAt: selected, notes: notes || undefined },
+        `book-${service.id}-${selected}`,
+      );
+      const { authorizationUrl } = await bookingApi.payBooking(booking.id);
+      window.location.href = authorizationUrl; // provider-hosted checkout
+    } catch (err) {
+      showToast(err.message ?? 'Could not create the booking.', 'error');
+      if (err.code === 'SLOT_TAKEN') {
+        const r = await bookingApi.getAvailability(service.id, 14).catch(() => null);
+        if (r) setSlots(r.slots);
+        setSelected('');
+      }
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div style={{ display: 'grid', gap: 'var(--space-4)' }}>
+      <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
+        {formatPrice(service.price)} {service.priceUnit} — the price is locked
+        when you book. Payment is held securely and only released after you
+        confirm completion.
+      </p>
+
+      {slots === null && <p className="text-muted" style={{ fontSize: 'var(--text-sm)' }}>Loading availability…</p>}
+      {slots !== null && slots.length === 0 && (
+        <p className="text-muted" style={{ fontSize: 'var(--text-sm)' }}>No open slots in the next two weeks.</p>
+      )}
+
+      {slots !== null && slots.length > 0 && (
+        <Field label="Choose a time" required>
+          {(props) => (
+            <select {...props} className="select" value={selected} onChange={(e) => setSelected(e.target.value)}>
+              <option value="">Select a slot…</option>
+              {[...days.entries()].map(([day, iso]) => (
+                <optgroup key={day} label={day}>
+                  {iso.map((slot) => (
+                    <option key={slot} value={slot}>
+                      {new Date(slot).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          )}
+        </Field>
+      )}
+
+      <Field label="Notes for the professional (optional)">
+        {(props) => <textarea {...props} className="textarea" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />}
+      </Field>
+
+      <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
+        <Button variant="primary" disabled={!selected || busy} onClick={book}>
+          {busy ? 'Redirecting to payment…' : `Book & Pay ${formatPrice(service.price)}`}
+        </Button>
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
       </div>
     </div>
   );
@@ -272,28 +380,26 @@ export default function ServiceDetailPage() {
         </aside>
       </div>
 
-      <Modal open={bookingOpen} onClose={() => setBookingOpen(false)} title="Booking coming soon">
-        <div style={{ display: 'grid', gap: 'var(--space-4)' }}>
-          <Badge variant="demo">Pre-launch preview</Badge>
-          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
-            Online booking is part of the upcoming Servix platform launch and is
-            not connected to a live backend yet. When it launches, you&rsquo;ll be
-            able to pick a date, confirm the scope and manage the entire service
-            from your Servix account.
-          </p>
-          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
-            In the meantime, you can explore more services or learn how the
-            platform will work.
-          </p>
-          <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
-            <Button to="/how-it-works" variant="primary" onClick={() => setBookingOpen(false)}>
-              How Servix works
-            </Button>
-            <Button variant="secondary" onClick={() => setBookingOpen(false)}>
-              Close
-            </Button>
+      <Modal open={bookingOpen} onClose={() => setBookingOpen(false)} title={bookingApi.bookingAvailable ? 'Book this service' : 'Booking coming soon'}>
+        {bookingApi.bookingAvailable ? (
+          <BookingForm service={service} onClose={() => setBookingOpen(false)} />
+        ) : (
+          <div style={{ display: 'grid', gap: 'var(--space-4)' }}>
+            <Badge variant="demo">Pre-launch preview</Badge>
+            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
+              Online booking is part of the upcoming Servix platform launch and is
+              not connected to a live backend yet.
+            </p>
+            <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
+              <Button to="/how-it-works" variant="primary" onClick={() => setBookingOpen(false)}>
+                How Servix works
+              </Button>
+              <Button variant="secondary" onClick={() => setBookingOpen(false)}>
+                Close
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
       </Modal>
     </div>
   );

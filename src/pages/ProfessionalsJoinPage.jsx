@@ -158,7 +158,7 @@ export default function ProfessionalsJoinPage() {
               bookings and connect with customers through Servix.
             </p>
             <div className="hero__ctas">
-              <Button to="/register" variant="primary" size="lg">
+              <Button to="/professionals/apply" variant="primary" size="lg">
                 Become a Professional
               </Button>
               <Button to="/pricing" variant="secondary" size="lg">
@@ -330,7 +330,7 @@ export default function ProfessionalsJoinPage() {
           <h2 id="join-cta">Your next customer is already searching.</h2>
           <p>Create your professional profile and be ready when Servix launches.</p>
           <div className="cta-final__actions">
-            <Button to="/register" variant="on-dark" size="lg">
+            <Button to="/professionals/apply" variant="on-dark" size="lg">
               Become a Professional
             </Button>
             <Button to="/contact" variant="outline-dark" size="lg">
