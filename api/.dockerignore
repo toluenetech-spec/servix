@@ -1,0 +1,10 @@
+node_modules
+dist
+.pgdata
+.env
+.env.*
+!.env.example
+!.env.production.example
+src/generated
+npm-debug.log*
+*.patch

@@ -16,7 +16,10 @@ const scrypt = promisify(_scrypt) as (
   options: { N: number; r: number; p: number; maxmem: number },
 ) => Promise<Buffer>;
 
-const N = 1 << 17; // 131072
+// Cost factor: configurable so low-CPU hosts (free tiers) stay responsive.
+// 2^17 = OWASP interactive default; 2^15 remains a strong setting and is
+// ~4x faster. Old hashes still verify: parameters are read from the hash.
+const N = 1 << Number(process.env.SCRYPT_LOG2_N ?? 17);
 const r = 8;
 const p = 1;
 const KEYLEN = 64;
