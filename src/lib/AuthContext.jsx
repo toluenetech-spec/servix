@@ -35,13 +35,13 @@ export function AuthProvider({ children }) {
 
   const login = useCallback(async (credentials) => {
     const u = await authApi.login(credentials);
-    setUser(u);
+    setUser(u?.security ? null : u);
     return u;
   }, []);
 
   const register = useCallback(async (details) => {
     const u = await authApi.register(details);
-    setUser(u);
+    setUser(u?.security ? null : u);
     return u;
   }, []);
 

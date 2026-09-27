@@ -5,9 +5,11 @@ import { Button } from '../../components/ui/Button.jsx';
 import { Icon } from '../../components/ui/Icon.jsx';
 import { useToast } from '../../components/ui/Toast.jsx';
 import { useAuth } from '../../lib/AuthContext.jsx';
+import { getVerificationMethod } from '../../lib/authApi.js';
+import { EmailCodeVerification } from './EmailCodeVerification.jsx';
 import { useDocumentMeta } from '../../lib/useDocumentMeta.js';
 
-export default function VerifyEmailPage() {
+function LegacyVerifyEmailPage() {
   useDocumentMeta({
     title: 'Verify Email',
     description: 'Verify the email address for your Servix account.',
@@ -135,4 +137,32 @@ export default function VerifyEmailPage() {
       </p>
     </AuthShell>
   );
+}
+
+
+export default function VerifyEmailPage() {
+  const { authAvailable } = useAuth();
+  const [method, setMethod] = useState(null);
+  const [failed, setFailed] = useState(false);
+  const [retry, setRetry] = useState(0);
+  useEffect(() => {
+    if (!authAvailable) return;
+    let cancelled = false;
+    setFailed(false);
+    getVerificationMethod().then((data) => {
+      if (!['otp', 'link'].includes(data.method)) throw new Error('Unknown method');
+      if (!cancelled) setMethod(data.method);
+    }).catch((error) => {
+      // Compatibility with an API deployed before this additive endpoint.
+      if (!cancelled && error.status === 404) setMethod('link');
+      else if (!cancelled) setFailed(true);
+    });
+    return () => { cancelled = true; };
+  }, [authAvailable, retry]);
+  if (!authAvailable || method === 'link') return <LegacyVerifyEmailPage />;
+  if (method === 'otp') return <EmailCodeVerification />;
+  return <AuthShell><h1>{failed ? 'Unable to connect' : 'Preparing verification…'}</h1>
+    <p role="status">{failed ? 'Your progress is safe. Check your connection, then try again.' : 'Checking how to verify your email securely.'}</p>
+    {failed && <Button onClick={() => setRetry((v) => v + 1)}>Try again</Button>}
+  </AuthShell>;
 }

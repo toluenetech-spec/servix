@@ -1,0 +1,11 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { PASSWORD_RULES, normalizeEmail, passwordsMatch, validateRegistration } from '../src/lib/registrationValidation.js';
+const valid = { name: 'Test User', email: 'person@example.com', password: 'Example-Only123!', confirmPassword: 'Example-Only123!' };
+test('accepts a complete registration', () => assert.deepEqual(validateRegistration(valid), {}));
+test('email matching follows backend case normalization', () => assert.equal(normalizeEmail(' Person@example.com '), 'person@example.com'));
+test('empty confirmations never match', () => { assert.equal(passwordsMatch('', ''), false); });
+test('password matching is exact, never trimmed or case folded', () => { assert.equal(passwordsMatch('Password!', 'password!'), false); assert.equal(passwordsMatch('Password!', 'Password! '), false); });
+test('rejects mismatched confirmations', () => { const e = validateRegistration({ ...valid, confirmPassword: 'other' }); assert.ok(e.confirmPassword); });
+test('rejects weak and overlong passwords', () => { for (const password of ['short', 'abcdefghijklmnop', 'ABCDEFGHIJKLM123!', 'Abcdefghijklmnop!', 'Abcdefghijklmn123', 'Aa1!' + 'x'.repeat(200)]) assert.ok(validateRegistration({ ...valid, password }).password); });
+test('each rule has a stable unique id', () => assert.equal(new Set(PASSWORD_RULES.map(r => r.id)).size, PASSWORD_RULES.length));

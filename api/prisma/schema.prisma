@@ -59,6 +59,13 @@ model User {
   updatedAt       DateTime   @updatedAt @map("updated_at")
   deletedAt       DateTime?  @map("deleted_at")
 
+  authVersion Int @default(0) @map("auth_version")
+  oauthIdentities OAuthIdentity[]
+  security AccountSecurity?
+  securityFlows SecurityFlow[]
+  passkeys PasskeyCredential[]
+  recoveryCodes RecoveryCode[]
+  emailVerificationOtp EmailVerificationOtp?
   refreshTokens RefreshToken[]
   oneTimeTokens OneTimeToken[]
   applications  ProfessionalApplication[]
@@ -74,6 +81,8 @@ model RefreshToken {
   userId    String    @map("user_id")
   tokenHash String    @map("token_hash")
   familyId  String    @map("family_id")
+  mfaVerified Boolean @default(false) @map("mfa_verified")
+  authVersion Int @default(0) @map("auth_version")
   expiresAt DateTime  @map("expires_at")
   revokedAt DateTime? @map("revoked_at")
   userAgent String?   @map("user_agent")
@@ -575,4 +584,105 @@ model ContactMessage {
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("contact_messages")
+}
+
+// Additive migration; apply manually only after review. No startup migration.
+model EmailVerificationOtp {
+  userId       String   @id @map("user_id")
+  nonce        String
+  digest       String
+  expiresAt    DateTime @map("expires_at")
+  sentAt       DateTime @map("sent_at")
+  windowStart  DateTime @map("window_start")
+  sends        Int      @default(1)
+  attempts     Int      @default(0)
+  usedAt       DateTime? @map("used_at")
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@map("email_verification_otps")
+}
+
+
+// Security flows are restricted challenges, never application sessions.
+model AccountSecurity {
+  userId String @id @map("user_id")
+  method String? // totp | passkey; null until enrollment proof succeeds
+  totpSecret String? @map("totp_secret") // AES-GCM encrypted
+  lastTotpStep Int @default(-1) @map("last_totp_step")
+  windowStart DateTime @default(now()) @map("window_start")
+  failures Int @default(0)
+  sends Int @default(0)
+  lastSentAt DateTime? @map("last_sent_at")
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@map("account_security")
+}
+
+model SecurityFlow {
+  pendingIdentity String? @map("pending_identity")
+  id String @id @default(uuid())
+  tokenHash String @unique @map("token_hash")
+  userId String? @map("user_id")
+  purpose String // registration | login | reset
+  stage String // email | enroll | factor | recovery | reset_password | complete
+  emailDigest String? @map("email_digest")
+  emailExpiresAt DateTime? @map("email_expires_at")
+  challenge String?
+  challengeType String? @map("challenge_type")
+  pendingSecret String? @map("pending_secret")
+  recoveryEnvelope String? @map("recovery_envelope")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, purpose])
+  @@index([expiresAt])
+  @@map("security_flows")
+}
+
+model PasskeyCredential {
+  id String @id // base64url credential ID
+  userId String @map("user_id")
+  publicKey Bytes @map("public_key")
+  counter BigInt @default(0)
+  transports String[]
+  deviceType String @map("device_type")
+  backedUp Boolean @map("backed_up")
+  createdAt DateTime @default(now()) @map("created_at")
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+  @@map("passkey_credentials")
+}
+
+model RecoveryCode {
+  id String @id @default(uuid())
+  userId String @map("user_id")
+  digest String
+  usedAt DateTime? @map("used_at")
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId, digest])
+  @@map("recovery_codes")
+}
+
+// Provider subjects, never email addresses, identify social accounts.
+model OAuthIdentity {
+  id String @id @default(uuid())
+  provider String
+  subject String
+  userId String @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([provider, subject])
+  @@unique([userId, provider])
+  @@map("oauth_identities")
+}
+
+model OAuthAttempt {
+  id String @id @default(uuid())
+  stateHash String @unique @map("state_hash")
+  browserHash String @map("browser_hash")
+  provider String
+  envelope String?
+  expiresAt DateTime @map("expires_at")
+  usedAt DateTime? @map("used_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  @@index([expiresAt])
+  @@map("oauth_attempts")
 }

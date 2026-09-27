@@ -11,6 +11,7 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { verifyAccessToken, type AccessClaims } from './tokens.js';
 import { forbidden, unauthorized } from './errors.js';
+import { mfaEnabled } from './securityCrypto.js';
 import { prisma } from './db.js';
 
 declare module 'fastify' {
@@ -25,6 +26,19 @@ export async function requireAuth(req: FastifyRequest, _reply: FastifyReply): Pr
   if (!header?.startsWith('Bearer ')) throw unauthorized();
   const claims = await verifyAccessToken(header.slice(7));
   if (!claims) throw unauthorized('Invalid or expired token');
+  if (mfaEnabled() || claims.sid) {
+    if (!claims.sid || (mfaEnabled() && !claims.mfaVerified)) throw unauthorized('Complete security verification.');
+    const user = await prisma.user.findUnique({ where: { id: claims.sub }, include: { security: true } });
+    if (!user || user.deletedAt || ['suspended', 'deactivated'].includes(user.status) ||
+        (mfaEnabled() && !user.security?.method) || user.authVersion !== claims.authVersion) {
+      throw unauthorized('Session no longer valid.');
+    }
+    const session = await prisma.refreshToken.findFirst({ where: { userId: user.id, familyId: claims.sid,
+      revokedAt: null, expiresAt: { gt: new Date() }, authVersion: user.authVersion,
+      ...(mfaEnabled() ? { mfaVerified: true } : {}) }, select: { id: true } });
+    if (!session) throw unauthorized('Session has been signed out.');
+  }
+
   req.auth = claims;
 }
 

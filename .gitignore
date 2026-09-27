@@ -10,3 +10,7 @@ api/.pgdata
 api/.env
 api/src/generated
 .env.local
+
+# Browser test artifacts
+/test-results/
+/playwright-report/

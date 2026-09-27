@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { AuthShell } from './AuthShell.jsx';
 import { Button } from '../../components/ui/Button.jsx';
 import { Field } from '../../components/ui/Field.jsx';
@@ -16,6 +16,7 @@ export default function ForgotPasswordPage() {
   });
 
   const showToast = useToast();
+  const navigate = useNavigate();
   const { forgotPassword, authAvailable } = useAuth();
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
@@ -35,7 +36,8 @@ export default function ForgotPasswordPage() {
 
     setSubmitting(true);
     try {
-      await forgotPassword(email);
+      const result = await forgotPassword(email);
+      if (result?.security) { navigate('/security-check', { state: result.security }); return; }
       setSent(true);
     } catch (err) {
       if (err.status === 429) showToast('Too many requests. Please wait a few minutes.', 'error');
@@ -63,7 +65,7 @@ export default function ForgotPasswordPage() {
   return (
     <AuthShell>
       <h1>Reset your password</h1>
-      <p>Enter your account email and we&rsquo;ll send you a reset link.</p>
+      <p>Enter your account email to begin secure password recovery.</p>
       <form className="auth__form" onSubmit={onSubmit} noValidate>
         <Field label="Email" required error={error}>
           {(props) => (
@@ -81,7 +83,7 @@ export default function ForgotPasswordPage() {
           )}
         </Field>
         <Button type="submit" variant="primary" size="lg" block disabled={submitting}>
-          {submitting ? 'Sending…' : 'Send Reset Link'}
+          {submitting ? 'Sending…' : 'Continue recovery'}
         </Button>
       </form>
       <p className="auth__meta">

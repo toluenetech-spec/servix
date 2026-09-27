@@ -1,0 +1,19 @@
+.security-progress { display:flex; gap:8px; margin:0 0 28px; padding:0; list-style:none; }
+.security-progress li { flex:1; border-top:3px solid var(--border-strong); padding-top:9px; color:var(--text-secondary); font-size:12px; }
+.security-progress li[data-active=true] { border-color:var(--color-forest); color:var(--color-forest); font-weight:700; }
+.security-eyebrow { text-transform:uppercase; font-size:11px; font-weight:750; letter-spacing:.13em; color:var(--color-forest); margin-bottom:12px; }
+.security-methods { display:grid; gap:12px; margin:24px 0; }
+.security-method { display:block; text-align:left; padding:20px; border:1px solid var(--border-strong); border-radius:12px; background:var(--bg-surface); cursor:pointer; }
+.security-method:hover, .security-method:focus-visible { border-color:var(--color-forest); background:#f0f6f1; }
+.security-method strong { display:block; margin-bottom:6px; }
+.security-method span { display:block; font-size:13px; line-height:1.6; color:var(--text-secondary); }
+.security-note { font-size:13px; line-height:1.65; border-left:3px solid var(--color-forest); background:#eef5ef; padding:14px 16px; margin:18px 0; }
+.security-error { border-left:3px solid var(--danger); background:#fff0ec; padding:14px 16px; margin:18px 0; color:var(--danger); font-size:14px; }
+.security-code { font-size:28px; letter-spacing:.3em; text-align:center; }
+.security-qr { display:block; max-width:220px; width:100%; height:auto; margin:20px auto; border:1px solid var(--border-strong); border-radius:12px; }
+.security-secret { display:block; overflow-wrap:anywhere; font-family:monospace; padding:12px; background:#f2f4ef; border-radius:8px; margin:12px 0; user-select:all; }
+.security-codes { display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:0; list-style:none; margin:16px 0; }
+.security-codes li { font-family:monospace; font-size:12px; padding:10px; background:#eef3ee; overflow-wrap:anywhere; border-radius:6px; }
+.security-actions { display:grid; gap:12px; margin-top:20px; }
+.security-success { width:64px; height:64px; border-radius:50%; display:grid; place-items:center; color:var(--color-forest); background:#e8f3e9; margin-bottom:24px; }
+@media (max-width:420px) { .security-codes { grid-template-columns:1fr; } }

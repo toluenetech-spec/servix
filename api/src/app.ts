@@ -40,6 +40,8 @@ export async function buildApp() {
       config.nodeEnv !== 'test'
         ? {
             level: 'info',
+            // OAuth callbacks contain temporary codes/state in the query string.
+            serializers: { req: (req) => ({ method: req.method, url: req.url?.split('?')[0], hostname: req.hostname, remoteAddress: req.ip }) },
             redact: {
               paths: [
                 'req.headers.authorization',

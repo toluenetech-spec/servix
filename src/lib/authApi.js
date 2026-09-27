@@ -61,14 +61,14 @@ async function post(path, body, { auth = false } = {}) {
 
 export async function register({ fullName, email, password, accountType }) {
   const data = await post('/auth/register', { fullName, email, password, accountType });
-  accessToken = data.accessToken;
-  return data.user;
+  accessToken = data.accessToken ?? null;
+  return data.security ? { security: data.security } : data.user;
 }
 
 export async function login({ email, password }) {
   const data = await post('/auth/login', { email, password });
-  accessToken = data.accessToken;
-  return data.user;
+  accessToken = data.accessToken ?? null;
+  return data.security ? { security: data.security } : data.user;
 }
 
 export async function logout() {
@@ -133,4 +133,45 @@ export async function fetchMe() {
   if (!res.ok) return null;
   const data = await res.json();
   return data.user;
+}
+
+export async function getVerificationMethod() {
+  const res = await fetch(`${V1}/auth/verification-method`, { credentials: 'include' });
+  if (!res.ok) throw await toApiError(res);
+  return res.json();
+}
+
+export async function verifyEmailCode(code) {
+  const data = await post('/auth/verify-email/code', { code }, { auth: true });
+  return data.user;
+}
+
+
+export const securityAction = (action, body) => post(`/auth/security/${action}`, body);
+export async function finishSecurity(savedRecovery = false) {
+  const data = await securityAction('finish', { savedRecovery });
+  accessToken = data.accessToken;
+  return data.user;
+}
+
+export async function oauthProviders() {
+  if (!authAvailable) return [];
+  const res = await fetch(`${V1}/auth/oauth/config`, { credentials: 'include' });
+  if (!res.ok) return [];
+  return (await res.json()).providers ?? [];
+}
+export async function startProvider(provider, linking = false) {
+  const result = await post(`/auth/${provider}/${linking ? 'link' : 'start'}`, undefined, { auth: linking });
+  // Defense-in-depth: only navigate to these provider authorization endpoints.
+  const url = new URL(result.url);
+  const expected = provider === 'google' ? 'https://accounts.google.com/o/oauth2/v2/auth' : 'https://github.com/login/oauth/authorize';
+  if (`${url.origin}${url.pathname}` !== expected) throw new Error('Invalid provider redirect');
+  clearAccessToken();
+  window.location.assign(url.href);
+}
+
+export async function oauthConnections() {
+  const res = await fetch(`${V1}/auth/oauth/connections`, { credentials: 'include', headers: { Authorization: `Bearer ${accessToken ?? ''}` } });
+  if (!res.ok) throw await toApiError(res);
+  return (await res.json()).providers ?? [];
 }

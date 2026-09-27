@@ -1,3 +1,4 @@
+import { ProviderButtons } from './ProviderButtons.jsx';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AuthShell } from './AuthShell.jsx';
@@ -41,7 +42,8 @@ export default function LoginPage() {
 
     setSubmitting(true);
     try {
-      await login({ email: values.email, password: values.password });
+      const result = await login({ email: values.email, password: values.password });
+      if (result?.security) { navigate('/security-check', { state: result.security }); return; }
       showToast('Welcome back.', 'success');
       navigate('/');
     } catch (err) {
@@ -58,7 +60,9 @@ export default function LoginPage() {
   return (
     <AuthShell>
       <h1>Welcome back</h1>
+      <p><Link to="/connected-sign-in">Connected sign-in settings</Link></p>
       <p>Sign in to manage your bookings and services.</p>
+      <ProviderButtons />
       <form className="auth__form" onSubmit={onSubmit} noValidate>
         <Field label="Email" required error={errors.email}>
           {(props) => (

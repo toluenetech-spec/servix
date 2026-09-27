@@ -2,8 +2,7 @@ import { Icon } from '../../components/ui/Icon.jsx';
 
 /**
  * Shared two-panel shell for authentication pages.
- * NOTE: No authentication backend exists yet. Forms validate on the
- * frontend and clearly state that account features arrive at launch.
+ * Shared layout for live authentication and guided security checks.
  */
 export function AuthShell({ children }) {
   return (
@@ -34,7 +33,7 @@ export function AuthShell({ children }) {
           </ul>
         </div>
         <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-on-dark-muted)' }}>
-          Accounts activate with the Servix platform launch.
+          Your account. Your services. Protected at every step.
         </p>
       </div>
     </div>

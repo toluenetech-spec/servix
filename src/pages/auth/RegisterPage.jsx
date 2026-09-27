@@ -1,3 +1,4 @@
+import { ProviderButtons } from './ProviderButtons.jsx';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AuthShell } from './AuthShell.jsx';
@@ -8,7 +9,7 @@ import { useToast } from '../../components/ui/Toast.jsx';
 import { useAuth } from '../../lib/AuthContext.jsx';
 import { useDocumentMeta } from '../../lib/useDocumentMeta.js';
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+import { PASSWORD_RULES, normalizeEmail, passwordsMatch, validateRegistration } from '../../lib/registrationValidation.js';
 
 export default function RegisterPage() {
   useDocumentMeta({
@@ -20,19 +21,17 @@ export default function RegisterPage() {
   const navigate = useNavigate();
   const { register, authAvailable } = useAuth();
   const [accountType, setAccountType] = useState('customer');
-  const [values, setValues] = useState({ name: '', email: '', password: '' });
+  const [values, setValues] = useState({ name: '', email: '', password: '', confirmPassword: '' });
   const [errors, setErrors] = useState({});
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   async function onSubmit(e) {
     e.preventDefault();
-    const next = {};
-    if (!values.name.trim()) next.name = 'Please enter your full name.';
-    if (!values.email.trim()) next.email = 'Please enter your email address.';
-    else if (!EMAIL_RE.test(values.email)) next.email = 'Please enter a valid email address.';
-    if (!values.password) next.password = 'Please create a password.';
-    else if (values.password.length < 8) next.password = 'Password must be at least 8 characters.';
+    if (submitting) return;
+    setSubmitError('');
+    const next = validateRegistration(values);
     setErrors(next);
     if (Object.keys(next).length > 0) return;
 
@@ -43,12 +42,13 @@ export default function RegisterPage() {
 
     setSubmitting(true);
     try {
-      await register({
+      const result = await register({
         fullName: values.name,
-        email: values.email,
+        email: normalizeEmail(values.email),
         password: values.password,
         accountType,
       });
+      if (result?.security) { navigate('/security-check', { state: result.security }); return; }
       showToast('Account created. Check your inbox to verify your email.', 'success');
       navigate('/verify-email');
     } catch (err) {
@@ -58,9 +58,9 @@ export default function RegisterPage() {
         if (mapped.fullName) mapped.name = mapped.fullName;
         setErrors(mapped);
       } else if (err.status === 429) {
-        showToast('Too many attempts. Please wait a minute.', 'error');
+        setSubmitError('Too many attempts. Please wait a minute before trying again. Your details are still here.');
       } else {
-        showToast('Registration is temporarily unavailable. Please try again.', 'error');
+        setSubmitError('We could not finish creating your account. Check your connection and try again. If you already registered, try signing in.');
       }
     } finally {
       setSubmitting(false);
@@ -93,7 +93,8 @@ export default function RegisterPage() {
     <AuthShell>
       <h1>Create your account</h1>
       <p>Join Servix as a customer or a professional.</p>
-      <form className="auth__form" onSubmit={onSubmit} noValidate>
+      <ProviderButtons />
+      <form className="auth__form" onSubmit={onSubmit} noValidate aria-busy={submitting}>
         <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
           <legend className="field__label" style={{ marginBottom: 'var(--space-2)' }}>
             I want to
@@ -128,7 +129,7 @@ export default function RegisterPage() {
             />
           )}
         </Field>
-        <Field label="Password" required error={errors.password} hint="At least 8 characters.">
+        <Field label="Password" required error={errors.password} hint="Choose a unique password you do not use elsewhere.">
           {(props) => (
             <div className="input-wrap input-wrap--action" style={{ position: 'relative' }}>
               <input
@@ -151,6 +152,21 @@ export default function RegisterPage() {
             </div>
           )}
         </Field>
+        <ul aria-label="Password requirements" style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: 'var(--text-sm)' }}>
+          {PASSWORD_RULES.map((rule) => {
+            const met = Boolean(values.password) && rule.test(values.password);
+            return <li key={rule.id} style={{ color: met ? 'var(--color-deep-forest)' : 'var(--text-secondary)', marginBottom: 'var(--space-1)' }}>
+              <span aria-hidden="true">{met ? '✓' : '○'} </span>
+              <span className="sr-only">{met ? 'Met: ' : 'Not met: '}</span>{rule.label}
+            </li>;
+          })}
+        </ul>
+        <Field label="Confirm password" required error={errors.confirmPassword}
+          hint={values.confirmPassword ? (passwordsMatch(values.password, values.confirmPassword) ? '✓ Passwords match' : 'Passwords do not match yet') : 'Enter your password again.'}>
+          {(props) => <input {...props} className="input" type={showPassword ? 'text' : 'password'} autoComplete="new-password"
+            value={values.confirmPassword} onChange={(e) => setValues((v) => ({ ...v, confirmPassword: e.target.value }))} />}
+        </Field>
+        {submitError && <p role="alert" className="field__error">{submitError}</p>}
         <Button type="submit" variant="primary" size="lg" block disabled={submitting}>
           {submitting ? 'Creating account…' : 'Create Account'}
         </Button>

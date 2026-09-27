@@ -20,6 +20,7 @@ export interface Mail {
   to: string;
   subject: string;
   text: string;
+  html?: string;
 }
 
 export interface SendResult {
@@ -61,12 +62,12 @@ export async function deliverMail(mail: Mail): Promise<SendResult> {
         to: [{ email: mail.to }],
         subject: mail.subject,
         textContent: mail.text,
+        ...(mail.html ? { htmlContent: mail.html } : {}),
       }),
     });
     if (!res.ok) {
-      const body = await res.text().catch(() => '');
-      // Provider did NOT accept - throw so the job retries; never claim delivery.
-      throw new Error(`brevo rejected (${res.status}): ${body.slice(0, 200)}`);
+      // Do not retain provider bodies that may reflect recipient details or OTPs.
+      throw new Error(`brevo rejected (${res.status})`);
     }
     const data = (await res.json().catch(() => ({}))) as { messageId?: string };
     return { accepted: true, providerId: data.messageId ?? null };
@@ -85,11 +86,11 @@ export async function deliverMail(mail: Mail): Promise<SendResult> {
         to: [mail.to],
         subject: mail.subject,
         text: mail.text,
+        ...(mail.html ? { html: mail.html } : {}),
       }),
     });
     if (!res.ok) {
-      const body = await res.text().catch(() => '');
-      throw new Error(`resend rejected (${res.status}): ${body.slice(0, 200)}`);
+      throw new Error(`resend rejected (${res.status})`);
     }
     const data = (await res.json()) as { id?: string };
     return { accepted: true, providerId: data.id ?? null };
@@ -169,5 +170,24 @@ export function payoutSentMail(to: string, reference: string, amount: string): M
     to,
     subject: `Payout ${reference} sent`,
     text: `Your payout of ${amount} has been sent (reference ${reference}). Depending on your bank it may take a short while to arrive.`,
+  };
+}
+
+/** Branded body, not a mailbox-provider-controlled sender avatar. */
+export function emailOtpMail(to: string, code: string): Mail {
+  if (!/^\d{6}$/.test(code)) throw new Error('Invalid email code format');
+  const logo = process.env.EMAIL_LOGO_URL ?? `${appBase().replace(/\/$/, '')}/brand/servix-email-logo.png`;
+  let image = '';
+  try {
+    const url = new URL(logo);
+    if (url.protocol === 'https:' && !url.username && !url.password) {
+      const safe = url.href.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
+      image = `<img src="${safe}" alt="Servix" width="160" style="display:block;max-width:160px;height:auto;margin-bottom:24px">`;
+    }
+  } catch { /* A readable wordmark remains when no logo is configured. */ }
+  return {
+    to, subject: 'Your Servix email verification code',
+    text: `Your Servix verification code is ${code}.\n\nEnter it on the Servix verification page. It expires in 10 minutes and works once. Never share this code. If you did not request it, ignore this email.`,
+    html: `<!doctype html><html><body style="margin:0;background:#f7f5ed;color:#163b2e;font-family:Arial,sans-serif"><table role="presentation" width="100%"><tr><td align="center" style="padding:32px 16px"><table role="presentation" width="100%" style="max-width:520px;background:#fff;border:1px solid #e5e7df;border-radius:16px"><tr><td style="padding:32px">${image || '<p style="font-size:24px;font-weight:bold">SERVIX</p>'}<h1 style="font-size:26px">Verify your email</h1><p style="color:#52625a;line-height:1.6">One quick check to confirm this email belongs to you. Enter this code on your Servix verification page.</p><p style="font-size:36px;letter-spacing:8px;font-weight:bold;background:#eef5ef;padding:20px;text-align:center">${code}</p><p>Expires in <strong>10 minutes</strong>. Use only once.</p><hr style="border:0;border-top:1px solid #e5e7df"><p style="font-size:13px;color:#52625a">Never share this code. Servix support will never ask for it. If you did not request this email, you can ignore it.</p></td></tr></table></td></tr></table></body></html>`,
   };
 }

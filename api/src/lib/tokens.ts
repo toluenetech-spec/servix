@@ -19,10 +19,13 @@ export interface AccessClaims {
   sub: string;
   role: string;
   status: string;
+  sid?: string;
+  mfaVerified?: boolean;
+  authVersion?: number;
 }
 
 export async function signAccessToken(claims: AccessClaims): Promise<string> {
-  return new SignJWT({ role: claims.role, status: claims.status })
+  return new SignJWT({ role: claims.role, status: claims.status, sid: claims.sid, mfaVerified: claims.mfaVerified ?? false, authVersion: claims.authVersion ?? 0 })
     .setProtectedHeader({ alg: 'HS256' })
     .setSubject(claims.sub)
     .setIssuer('servix-api')
@@ -35,11 +38,12 @@ export async function signAccessToken(claims: AccessClaims): Promise<string> {
 export async function verifyAccessToken(token: string): Promise<AccessClaims | null> {
   try {
     const { payload } = await jwtVerify(token, secret, {
+      algorithms: ['HS256'],
       issuer: 'servix-api',
       audience: 'servix-app',
     });
     if (!payload.sub) return null;
-    return { sub: payload.sub, role: String(payload.role), status: String(payload.status) };
+    return { sub: payload.sub, sid: typeof payload.sid === 'string' ? payload.sid : undefined, role: String(payload.role), status: String(payload.status), mfaVerified: payload.mfaVerified === true, authVersion: typeof payload.authVersion === 'number' ? payload.authVersion : 0 };
   } catch {
     return null;
   }

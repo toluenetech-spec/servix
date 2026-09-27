@@ -26,6 +26,8 @@ const LoginPage = lazy(() => import('./pages/auth/LoginPage.jsx'));
 const RegisterPage = lazy(() => import('./pages/auth/RegisterPage.jsx'));
 const ForgotPasswordPage = lazy(() => import('./pages/auth/ForgotPasswordPage.jsx'));
 const ResetPasswordPage = lazy(() => import('./pages/auth/ResetPasswordPage.jsx'));
+const ConnectedSignInPage = lazy(() => import('./pages/auth/ConnectedSignInPage.jsx'));
+const SecurityCheckPage = lazy(() => import('./pages/auth/SecurityCheckPage.jsx'));
 const VerifyEmailPage = lazy(() => import('./pages/auth/VerifyEmailPage.jsx'));
 const LegalPage = lazy(() => import('./pages/LegalPage.jsx'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage.jsx'));
@@ -66,6 +68,8 @@ export default function App() {
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/connected-sign-in" element={<ConnectedSignInPage />} />
+            <Route path="/security-check" element={<SecurityCheckPage />} />
             <Route path="/verify-email" element={<VerifyEmailPage />} />
             <Route path="/privacy" element={<LegalPage kind="privacy" />} />
             <Route path="/terms" element={<LegalPage kind="terms" />} />

@@ -129,5 +129,43 @@ export function validateProductionConfig(env = process.env): string[] {
     problems.push('SERVIX_REVIEW_KEY still set to dev default');
   }
   if (!env.ADMIN_EMAIL) problems.push('ADMIN_EMAIL missing (admin bootstrap)');
+  if (env.AUTH_OAUTH_ENABLED === 'true') {
+    if (env.AUTH_MFA_ENABLED !== 'true') problems.push('OAuth requires AUTH_MFA_ENABLED=true');
+    try {
+      const origin = new URL(env.AUTH_OAUTH_APP_ORIGIN ?? '');
+      if (origin.protocol !== 'https:' || origin.origin !== env.AUTH_OAUTH_APP_ORIGIN || !(env.CORS_ORIGINS ?? '').split(',').map(v => v.trim()).includes(origin.origin)) throw new Error();
+    } catch { problems.push('AUTH_OAUTH_APP_ORIGIN must be an exact HTTPS frontend origin in CORS_ORIGINS'); }
+    let configured = 0;
+    for (const provider of ['GOOGLE', 'GITHUB']) {
+      const id = env[`AUTH_${provider}_CLIENT_ID`], secret = env[`AUTH_${provider}_CLIENT_SECRET`], redirect = env[`AUTH_${provider}_REDIRECT_URI`];
+      if (!id && !secret && !redirect) continue;
+      configured++;
+      if (!id || !secret || !redirect) problems.push(`Complete all AUTH_${provider} client settings`);
+      try {
+        const url = new URL(redirect ?? '');
+        if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash || url.pathname !== `/api/v1/auth/${provider.toLowerCase()}/callback`) throw new Error();
+      } catch { problems.push(`Invalid AUTH_${provider}_REDIRECT_URI`); }
+    }
+    if (!configured) problems.push('OAuth requires at least one configured provider');
+  }
+  if (env.AUTH_MFA_ENABLED === 'true') {
+    if ((env.AUTH_SECURITY_SECRET ?? '').length < 32) problems.push('AUTH_SECURITY_SECRET missing or shorter than 32 characters');
+    if (!env.AUTH_WEBAUTHN_RP_ID) problems.push('AUTH_WEBAUTHN_RP_ID required for MFA');
+    const origins = (env.AUTH_WEBAUTHN_ORIGINS ?? '').split(',').map(v => v.trim()).filter(Boolean);
+    if (!origins.length) problems.push('AUTH_WEBAUTHN_ORIGINS required for MFA');
+    for (const origin of origins) {
+      try {
+        const url = new URL(origin);
+        const rp = env.AUTH_WEBAUTHN_RP_ID ?? '';
+        if (url.protocol !== 'https:' || url.origin !== origin || !rp || !(url.hostname === rp || url.hostname.endsWith('.' + rp))) {
+          problems.push('WebAuthn origins must be exact HTTPS origins under the RP ID');
+        }
+      } catch { problems.push('Invalid AUTH_WEBAUTHN_ORIGINS'); }
+    }
+  }
+
+  if (env.EMAIL_VERIFICATION_OTP === 'true' && (env.EMAIL_OTP_SECRET ?? '').length < 32) {
+    problems.push('EMAIL_OTP_SECRET missing or shorter than 32 characters');
+  }
   return problems;
 }

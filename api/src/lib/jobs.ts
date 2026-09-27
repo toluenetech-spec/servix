@@ -14,6 +14,9 @@
  * twice is a no-op. Handlers must themselves be idempotent; financial
  * handlers act through CAS transitions so replays cannot duplicate money.
  */
+import { unseal } from './securityCrypto.js';
+import { resolveEmailMode } from './config.js';
+import { openOtpMail } from './emailOtpCrypto.js';
 import { prisma } from './db.js';
 import { deliverMail, type Mail } from './mailer.js';
 import { runAutoConfirmSweep } from './bookingService.js';
@@ -57,7 +60,23 @@ type Handler = (payload: Record<string, unknown>) => Promise<void>;
 
 const handlers: Record<JobName, Handler> = {
   'email.send': async (payload) => {
-    const result = await deliverMail(payload as unknown as Mail);
+    let mail = payload as unknown as Mail;
+    if (typeof payload.securityMail === 'string') {
+      if (new Date(String(payload.expiresAt)).getTime() <= Date.now()) return;
+      const flow = await prisma.securityFlow.findUnique({ where: { id: String(payload.flowId) } });
+      if (!flow || flow.stage !== 'email' || flow.emailDigest !== payload.emailDigest || flow.expiresAt <= new Date()) return;
+      mail = unseal<Mail>(payload.securityMail);
+      if (resolveEmailMode() === 'console') throw new Error('Security email requires a non-console transport');
+    }
+    if (typeof payload.encryptedOtpMail === 'string') {
+      if (new Date(String(payload.otpExpiresAt)).getTime() <= Date.now()) return;
+      const current = await prisma.emailVerificationOtp.findUnique({ where: { userId: String(payload.otpUserId) } });
+      if (!current || current.usedAt || current.nonce !== payload.otpNonce) return;
+      mail = openOtpMail(payload.encryptedOtpMail) as Mail;
+      // Do not emit OTPs through development console logging either.
+      if (resolveEmailMode() === 'console') throw new Error('OTP email requires a non-console transport');
+    }
+    const result = await deliverMail(mail);
     if (!result.accepted) throw new Error('provider did not accept the message');
   },
   'bookings.autoconfirm': async () => {
@@ -105,7 +124,8 @@ export async function runOneJob(now = new Date()): Promise<boolean> {
   try {
     if (!handler) throw new Error(`no handler for ${claimed.name}`);
     await handler(claimed.payload as Record<string, unknown>);
-    await prisma.job.update({ where: { id: claimed.id }, data: { status: 'done', lastError: null } });
+    await prisma.job.update({ where: { id: claimed.id }, data: { status: 'done', lastError: null,
+      ...(((claimed.payload as Record<string, unknown>).encryptedOtpMail || (claimed.payload as Record<string, unknown>).securityMail) ? { payload: {} } : {}) } });
   } catch (err) {
     const dead = claimed.attempts >= claimed.maxAttempts;
     const backoff = BACKOFF_BASE_MS * 2 ** (claimed.attempts - 1);
