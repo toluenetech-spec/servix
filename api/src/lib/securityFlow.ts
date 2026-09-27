@@ -6,7 +6,7 @@ import type { Prisma, SecurityFlow, User, AccountSecurity } from '../generated/p
 import { prisma } from './db.js';
 import { ApiError, unauthorized } from './errors.js';
 import { sha256 } from './tokens.js';
-import { emailOtpMail } from './mailer.js';
+import { emailOtpMail, securityNoticeMail } from './mailer.js';
 import { audit } from './audit.js';
 import { seal, unseal, securityDigest, equalDigest, randomCode, newTotp, verifyTotp, recoveryCodes, normalizeRecovery } from './securityCrypto.js';
 
@@ -65,8 +65,7 @@ async function queueCode(c: Context) {
   const expiry = new Date(Date.now() + 10 * 60_000);
   await tx.securityFlow.update({ where: { id: flow.id }, data: { emailDigest: digest, emailExpiresAt: expiry } });
   await tx.accountSecurity.update({ where: { userId: user.id }, data: { sends: { increment: 1 }, lastSentAt: new Date() } });
-  const mail = emailOtpMail(user.email, code);
-  mail.subject = flow.purpose === 'reset' ? 'Your Servix password reset verification code' : 'Your Servix security code';
+  const mail = emailOtpMail(user.email, code, flow.purpose === 'reset' ? 'reset' : flow.purpose === 'login' ? 'login' : 'registration');
   await tx.job.create({ data: { queue: 'email', name: 'email.send', payload: {
     securityMail: seal(mail), flowId: flow.id, emailDigest: digest, expiresAt: expiry.toISOString() }, idempotencyKey: `security-${randomUUID()}` } });
   return { ok: true, retryAfterSeconds: 60 };
@@ -150,10 +149,7 @@ export async function prepareTotp(raw: string) {
 }
 async function securityNotice(c: Context, action: string, text: string) {
   await audit(c.tx, { actorId: c.user.id, action, entity: 'user', entityId: c.user.id });
-  await c.tx.job.create({ data: { queue: 'email', name: 'email.send', payload: {
-    to: c.user.email, subject: 'Servix account security update',
-    text: `${text} If this was not you, contact Servix support immediately. Never share your verification or recovery codes.`,
-  }, idempotencyKey: `security-notice-${randomUUID()}` } });
+  await c.tx.job.create({ data: { queue: 'email', name: 'email.send', payload: { ...securityNoticeMail(c.user.email, action, text) }, idempotencyKey: `security-notice-${randomUUID()}` } });
 }
 async function enrolled(c: Context, method: 'totp' | 'passkey') {
   await securityNotice(c, 'security.enrolled', `A ${method === 'totp' ? 'Google Authenticator-compatible authenticator' : 'passkey'} was enrolled on your Servix account.`);

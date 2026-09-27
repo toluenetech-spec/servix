@@ -12,9 +12,9 @@
  * In Phase E all sends go through the job queue (lib/jobs.ts) so SMTP/API
  * latency and retries never sit on the HTTP request path.
  */
-import { loadConfig, resolveEmailMode } from './config.js';
+import { resolveEmailMode } from './config.js';
+import { emailAppLink, renderEmail, type EmailContent } from './emailTemplate.js';
 
-const config = loadConfig();
 
 export interface Mail {
   to: string;
@@ -107,87 +107,110 @@ export async function deliverMail(mail: Mail): Promise<SendResult> {
 
 /* ---------------- templates ---------------- */
 
-const appBase = () => process.env.APP_BASE_URL ?? 'http://localhost:5173';
+function brandedMail(to: string, subject: string, content: EmailContent): Mail {
+  return { to, subject, ...renderEmail(content) };
+}
 
 export function verifyEmailMail(to: string, token: string): Mail {
-  return {
-    to,
-    subject: 'Verify your Servix email address',
-    text: `Welcome to Servix.\n\nConfirm your email address by opening this link:\n${appBase()}/verify-email?token=${token}\n\nThe link expires in 24 hours. If you did not create a Servix account, ignore this email.`,
-  };
+  return brandedMail(to, 'Verify your Servix email address', {
+    category: 'Account', status: 'One small step', preheader: 'Confirm your email to continue with Servix. This link expires in 24 hours.',
+    title: 'Welcome to Servix.',
+    paragraphs: ['You’re one step closer to finding the right professional—or sharing your expertise. Confirm your email address to continue.'],
+    action: { label: 'Verify email address', url: emailAppLink('/verify-email', { token }) },
+    note: { title: 'This link expires in 24 hours', text: 'If you did not create a Servix account, you can ignore this email. Never share your verification link.' },
+  });
 }
-
 export function resetPasswordMail(to: string, token: string): Mail {
-  return {
-    to,
-    subject: 'Reset your Servix password',
-    text: `A password reset was requested for your Servix account.\n\nChoose a new password here:\n${appBase()}/reset-password?token=${token}\n\nThe link expires in 30 minutes. If you did not request this, ignore this email — your password is unchanged.`,
-  };
+  return brandedMail(to, 'Reset your Servix password', {
+    category: 'Account security', status: 'Password reset requested', preheader: 'Choose a new password using your private reset link. Expires in 30 minutes.',
+    title: 'A fresh start for your password.',
+    paragraphs: ['We received a request to reset your Servix password. Use the button below to choose a new, unique password.'],
+    action: { label: 'Reset my password', url: emailAppLink('/reset-password', { token }) },
+    note: { title: 'Didn’t request this?', text: 'Your password has not changed. Ignore this email if the request wasn’t yours. This private link expires in 30 minutes; never share it.' },
+  });
 }
-
+function scheduledTime(value: string): string {
+  // Only format explicit timestamps; preserve already-human-readable legacy values.
+  if (!/^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/.test(value)) return value;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Africa/Lagos' }).format(date) + ' (Lagos time, WAT)';
+}
+const bookingsAction = () => ({ label: 'View my bookings', url: emailAppLink('/bookings') });
 export function bookingConfirmedMail(to: string, ref: string, serviceTitle: string, when: string): Mail {
-  return {
-    to,
-    subject: `Booking ${ref} confirmed — ${serviceTitle}`,
-    text: `Your payment is confirmed and your booking request has been sent to the professional.\n\nBooking: ${serviceTitle}\nReference: ${ref}\nScheduled: ${when}\n\nTrack it here: ${appBase()}/bookings`,
-  };
+  return brandedMail(to, `Booking ${ref} confirmed — ${serviceTitle}`, {
+    category: 'Bookings', status: 'Payment confirmed', preheader: 'Your payment is confirmed and your booking request has been sent to the professional.',
+    title: 'Your booking request is in.',
+    paragraphs: ['Your payment is confirmed. We’ve sent your booking request to the professional. You can follow its progress from your bookings page.'],
+    details: [['Service', serviceTitle], ['Booking reference', ref], ['Scheduled for', scheduledTime(when)]], action: bookingsAction(),
+    note: { title: 'Keep everything in one place', text: 'Check your booking page for the latest status and service details.' },
+  });
 }
-
 export function paymentReceivedMail(to: string, ref: string, amount: string): Mail {
-  return {
-    to,
-    subject: `Payment received for booking ${ref}`,
-    text: `We received your payment of ${amount}. It is held securely and only released to the professional after you confirm completion.\n\nReference: ${ref}`,
-  };
+  return brandedMail(to, `Payment received for booking ${ref}`, {
+    category: 'Payments', status: 'Payment received', preheader: 'Your payment has been recorded. View your booking for details.',
+    title: 'Payment received. Thank you.',
+    paragraphs: ['We’ve received your payment for this booking. You can review the booking and track its progress in your Servix account.'],
+    details: [['Amount received', amount], ['Booking reference', ref]], action: bookingsAction(),
+  });
 }
-
 export function bookingCancelledMail(to: string, ref: string, refunded: boolean): Mail {
-  return {
-    to,
-    subject: `Booking ${ref} cancelled`,
-    text: `Booking ${ref} has been cancelled.${refunded ? ' Your refund has been recorded and will be returned via your payment method.' : ''}`,
-  };
+  return brandedMail(to, `Booking ${ref} cancelled`, {
+    category: 'Bookings', status: 'Booking update', preheader: 'Your booking has been cancelled. Review the details inside.',
+    title: 'Your booking has been cancelled.', paragraphs: ['This booking is no longer scheduled to go ahead.'],
+    details: [['Booking reference', ref], ['Status', 'Cancelled']], action: bookingsAction(),
+    note: refunded ? { title: 'About your refund', text: 'Your refund has been recorded and will be returned via your payment method. This notice does not confirm that it has reached your account.' } : { title: 'Need a hand?', text: 'If you have a question about this cancellation, contact our support team with your booking reference.' },
+  });
 }
-
 export function disputeOpenedMail(to: string, ref: string): Mail {
-  return {
-    to,
-    subject: `Dispute opened on booking ${ref}`,
-    text: `A dispute has been opened on booking ${ref}. Funds are on hold while the Servix team reviews it. We may contact you for details.`,
-  };
+  return brandedMail(to, `Dispute opened on booking ${ref}`, {
+    category: 'Booking support', status: 'Under review', preheader: 'A dispute has been opened. Funds are on hold while our team reviews it.',
+    title: 'We’re reviewing your booking.', paragraphs: ['A dispute has been opened on this booking. Funds are on hold while the Servix team reviews it. We may contact you for more details.'],
+    details: [['Booking reference', ref], ['Status', 'Dispute opened']], action: bookingsAction(),
+    note: { title: 'Keep your booking details handy', text: 'Any relevant service details can help our team understand what happened. Never share passwords or verification codes.' },
+  });
 }
-
 export function disputeResolvedMail(to: string, ref: string, outcome: 'released' | 'refunded'): Mail {
-  return {
-    to,
-    subject: `Dispute resolved on booking ${ref}`,
-    text: `The dispute on booking ${ref} has been resolved: payment ${outcome === 'released' ? 'released to the professional' : 'refunded to the customer'}.`,
-  };
+  const result = outcome === 'released' ? 'Payment released to the professional' : 'Payment refunded to the customer';
+  return brandedMail(to, `Dispute resolved on booking ${ref}`, {
+    category: 'Booking support', status: 'Review complete', preheader: 'The dispute on your booking has been resolved. See the outcome inside.',
+    title: 'Your dispute has been resolved.', paragraphs: ['Our review of this booking is complete. The outcome is recorded below.'],
+    details: [['Booking reference', ref], ['Outcome', result]], action: bookingsAction(),
+    note: { title: 'Questions about the outcome?', text: 'Contact Servix support and include your booking reference so we can help.' },
+  });
 }
-
 export function payoutSentMail(to: string, reference: string, amount: string): Mail {
-  return {
-    to,
-    subject: `Payout ${reference} sent`,
-    text: `Your payout of ${amount} has been sent (reference ${reference}). Depending on your bank it may take a short while to arrive.`,
-  };
+  return brandedMail(to, `Payout ${reference} sent`, {
+    category: 'Professional payments', status: 'Payout sent', preheader: 'Your payout has been sent. Bank processing times may vary.',
+    title: 'Your payout is on its way.', paragraphs: ['Your payout has been sent. Depending on your bank, it may take a short while to arrive.'],
+    details: [['Payout amount', amount], ['Payout reference', reference]],
+    action: { label: 'Open my workspace', url: emailAppLink('/pro') },
+  });
 }
-
-/** Branded body, not a mailbox-provider-controlled sender avatar. */
-export function emailOtpMail(to: string, code: string): Mail {
+export function emailOtpMail(to: string, code: string, purpose: 'registration' | 'login' | 'reset' = 'registration'): Mail {
   if (!/^\d{6}$/.test(code)) throw new Error('Invalid email code format');
-  const logo = process.env.EMAIL_LOGO_URL ?? `${appBase().replace(/\/$/, '')}/brand/servix-email-logo.png`;
-  let image = '';
-  try {
-    const url = new URL(logo);
-    if (url.protocol === 'https:' && !url.username && !url.password) {
-      const safe = url.href.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
-      image = `<img src="${safe}" alt="Servix" width="160" style="display:block;max-width:160px;height:auto;margin-bottom:24px">`;
-    }
-  } catch { /* A readable wordmark remains when no logo is configured. */ }
-  return {
-    to, subject: 'Your Servix email verification code',
-    text: `Your Servix verification code is ${code}.\n\nEnter it on the Servix verification page. It expires in 10 minutes and works once. Never share this code. If you did not request it, ignore this email.`,
-    html: `<!doctype html><html><body style="margin:0;background:#f7f5ed;color:#163b2e;font-family:Arial,sans-serif"><table role="presentation" width="100%"><tr><td align="center" style="padding:32px 16px"><table role="presentation" width="100%" style="max-width:520px;background:#fff;border:1px solid #e5e7df;border-radius:16px"><tr><td style="padding:32px">${image || '<p style="font-size:24px;font-weight:bold">SERVIX</p>'}<h1 style="font-size:26px">Verify your email</h1><p style="color:#52625a;line-height:1.6">One quick check to confirm this email belongs to you. Enter this code on your Servix verification page.</p><p style="font-size:36px;letter-spacing:8px;font-weight:bold;background:#eef5ef;padding:20px;text-align:center">${code}</p><p>Expires in <strong>10 minutes</strong>. Use only once.</p><hr style="border:0;border-top:1px solid #e5e7df"><p style="font-size:13px;color:#52625a">Never share this code. Servix support will never ask for it. If you did not request this email, you can ignore it.</p></td></tr></table></td></tr></table></body></html>`,
+  const copy = {
+    registration: { subject: 'Your Servix email verification code', title: 'Let’s verify your email.', intro: 'Enter this code on the Servix verification page to confirm this email address belongs to you.' },
+    login: { subject: 'Your Servix sign-in verification code', title: 'Your sign-in code is here.', intro: 'Enter this code on the Servix sign-in page to continue. Next, verify with your saved security method—or set one up if this is your first time.' },
+    reset: { subject: 'Your Servix password reset verification code', title: 'Let’s get you back in.', intro: 'Enter this code on the Servix password recovery page. Your existing security method or a recovery code is also required before you can change your password.' },
+  }[purpose];
+  return brandedMail(to, copy.subject, {
+    category: 'Account security', status: 'Verify it’s you', preheader: 'Your private verification code is inside. It expires in 10 minutes.',
+    title: copy.title, paragraphs: [copy.intro], code,
+    note: { title: 'Keep this code private', text: 'Never share this code. Servix support will never ask for it. If you did not request this email, ignore it. Return to the Servix page where you started to enter your code.' },
+  });
+}
+export function securityNoticeMail(to: string, action: string, message: string): Mail {
+  const titles: Record<string, string> = {
+    'security.enrolled': 'Your security method is set.',
+    'security.recovery_used': 'A recovery code was used.',
+    'security.password_reset': 'Your password has been updated.',
+    'security.provider_linked': 'A sign-in provider was connected.',
   };
+  const title = titles[action] ?? 'An update to your account security.';
+  return brandedMail(to, `Servix security update: ${title}`, {
+    category: 'Account security', status: 'Important account activity', preheader: 'Review this security change to your Servix account. Contact support if it wasn’t you.',
+    title, paragraphs: [message],
+    note: { title: 'Don’t recognise this activity?', text: 'Contact Servix support immediately using the link below. Never share your password, verification codes or recovery codes—even with someone claiming to be support.' },
+  });
 }
