@@ -166,3 +166,14 @@ test('invalid reset token blocks submission and offers a new link', async ({ pag
   await expect(page.getByRole('alert')).toContainText('expired');
   await expect(page.getByRole('button', { name: 'Reset Password', exact: true })).toBeDisabled();
 });
+
+for (const path of ['/login', '/register']) {
+  test(`provider logos accompany accessible labels on ${path}`, async ({ page }) => {
+    await mockApi(page); await page.goto(path);
+    for (const [provider, name] of [['google', 'Google'], ['github', 'GitHub']]) {
+      const button = page.getByRole('button', { name: `Continue with ${name}`, exact: true });
+      await expect(button).toBeVisible();
+      await expect(button.locator(`[data-provider-logo="${provider}"]`)).toHaveAttribute('aria-hidden', 'true');
+    }
+  });
+}

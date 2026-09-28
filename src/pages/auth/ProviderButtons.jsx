@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { oauthProviders, oauthConnections, startProvider } from '../../lib/authApi.js';
+import { ProviderLogo } from '../../components/brand/ProviderLogo.jsx';
 import { Button } from '../../components/ui/Button.jsx';
 
 const messages = {
@@ -31,7 +32,7 @@ export function ProviderButtons({ linking = false }) {
         setBusy(true); setError('');
         try { await startProvider(provider, linking); }
         catch { setError('Could not start provider sign-in. Please try again.'); setBusy(false); }
-      }}>{connected.includes(provider) ? 'Connected:' : linking ? 'Connect' : 'Continue with'} {provider === 'google' ? 'Google' : 'GitHub'}</Button>)}
+      }}><span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}><ProviderLogo provider={provider} /><span>{connected.includes(provider) ? 'Connected:' : linking ? 'Connect' : 'Continue with'} {provider === 'google' ? 'Google' : 'GitHub'}</span></span></Button>)}
       <p style={{ fontSize: 13 }}>By continuing, you agree to the <Link to="/terms">Terms</Link> and acknowledge the <Link to="/privacy">Privacy Policy</Link>. New accounts are for users aged 18 or over.</p>
       <p style={{ fontSize: 13 }}>Your saved security method is still required. New accounts must set one up.</p>
     </div>}
