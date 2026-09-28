@@ -175,3 +175,5 @@ export async function oauthConnections() {
   if (!res.ok) throw await toApiError(res);
   return (await res.json()).providers ?? [];
 }
+
+export const getResetPasswordPolicy = (token) => post('/auth/reset-password/policy', { token });

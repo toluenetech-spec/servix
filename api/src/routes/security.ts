@@ -4,7 +4,8 @@ import type { User } from '../generated/prisma/client.js';
 import type { RegistrationResponseJSON, AuthenticationResponseJSON } from '@simplewebauthn/server';
 import { ApiError, unauthorized } from '../lib/errors.js';
 import { parseBody } from '../lib/query.js';
-import { hashPassword } from '../lib/password.js';
+import { basicPasswordSchema } from '../lib/passwordPolicy.js';
+export { strongPasswordSchema } from '../lib/passwordPolicy.js';
 import { serializeUser } from '../lib/serialize.js';
 import { mfaEnabled } from '../lib/securityCrypto.js';
 import * as security from '../lib/securityFlow.js';
@@ -23,9 +24,6 @@ export function sendSecurityFlow(reply: FastifyReply, flow: Awaited<ReturnType<t
   reply.clearCookie('servix_refresh', flowCookieOptions());
   return { security: state };
 }
-export const strongPasswordSchema = z.string().min(12, 'Use at least 12 characters.').max(200)
-  .regex(/[A-Z]/, 'Add an uppercase letter.').regex(/[a-z]/, 'Add a lowercase letter.')
-  .regex(/[0-9]/, 'Add a number.').regex(/[^A-Za-z0-9\s]/, 'Add a symbol.');
 
 export async function securityRoutes(app: FastifyInstance, issue: (reply: FastifyReply, user: User, userAgent?: string) => Promise<string>) {
   app.get('/auth/security/config', async () => ({ enabled: mfaEnabled() }));
@@ -64,11 +62,11 @@ export async function securityRoutes(app: FastifyInstance, issue: (reply: Fastif
       return { user: serializeUser(user), accessToken };
     });
     scoped.post('/auth/security/reset-password', opts, async (req, reply) => {
-      const { password } = parseBody(z.object({ password: strongPasswordSchema }), req.body);
+      const { password } = parseBody(z.object({ password: basicPasswordSchema }), req.body);
       // Validate stage BEFORE expensive password hashing.
       const state = await security.securityStatus(raw(req));
       if (state.next !== 'reset_password') throw new ApiError(400, 'SECURITY_INVALID', 'Complete verification before choosing a new password.');
-      const result = await security.resetSecurityPassword(raw(req), await hashPassword(password));
+      const result = await security.resetSecurityPassword(raw(req), password);
       reply.clearCookie(FLOW_COOKIE, flowCookieOptions());
       reply.clearCookie('servix_refresh', flowCookieOptions());
       return result;

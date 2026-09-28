@@ -133,3 +133,35 @@ test('Chromium virtual passkey returns a registration response before recovery s
   expect(clientData.type).toBe('webauthn.create');
   expect(clientData.origin).toBe('http://localhost:5174');
 });
+
+test('reset password checklist updates live with eight-character minimum', async ({ page }) => {
+  await mockApi(page, { 'auth/reset-password/policy': r => r.fulfill({ json: { passwordPolicy: 'standard' } }) });
+  await page.goto('/reset-password?token=synthetic');
+  const rules = page.getByRole('list', { name: 'Password requirements' });
+  await expect(rules).toContainText('At least 8 characters');
+  await page.getByLabel(/^New password/).fill('Abcdef1!');
+  await expect(rules.getByText('Not met:', { exact: true })).toHaveCount(0);
+  await page.getByLabel(/^Confirm new password/).fill('Abcdef1!');
+  await expect(page.getByText('✓ Passwords match')).toBeVisible();
+});
+test('admin reset shows only basic bounds and accepts a basic password', async ({ page }) => {
+  let sent = false;
+  await mockApi(page, {
+    'auth/reset-password/policy': r => r.fulfill({ json: { passwordPolicy: 'basic' } }),
+    'auth/reset-password': r => { sent = true; return r.fulfill({ json: { ok: true } }); },
+  });
+  await page.goto('/reset-password?token=synthetic');
+  const rules = page.getByRole('list', { name: 'Password requirements' });
+  await expect(rules.getByRole('listitem')).toHaveCount(2);
+  await page.getByLabel(/^New password/).fill('abcdefgh');
+  await page.getByLabel(/^Confirm new password/).fill('abcdefgh');
+  await page.getByRole('button', { name: 'Reset Password', exact: true }).click();
+  await expect(page).toHaveURL(/\/login$/);
+  expect(sent).toBe(true);
+});
+test('invalid reset token blocks submission and offers a new link', async ({ page }) => {
+  await mockApi(page, { 'auth/reset-password/policy': r => r.fulfill({ status: 400, json: { error: { code: 'INVALID_TOKEN' } } }) });
+  await page.goto('/reset-password?token=expired');
+  await expect(page.getByRole('alert')).toContainText('expired');
+  await expect(page.getByRole('button', { name: 'Reset Password', exact: true })).toBeDisabled();
+});

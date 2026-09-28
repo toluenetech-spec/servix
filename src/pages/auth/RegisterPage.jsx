@@ -1,3 +1,4 @@
+import { PasswordRequirements } from './PasswordRequirements.jsx';
 import { ProviderButtons } from './ProviderButtons.jsx';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -9,7 +10,7 @@ import { useToast } from '../../components/ui/Toast.jsx';
 import { useAuth } from '../../lib/AuthContext.jsx';
 import { useDocumentMeta } from '../../lib/useDocumentMeta.js';
 
-import { PASSWORD_RULES, normalizeEmail, passwordsMatch, validateRegistration } from '../../lib/registrationValidation.js';
+import { normalizeEmail, passwordsMatch, validateRegistration } from '../../lib/registrationValidation.js';
 
 export default function RegisterPage() {
   useDocumentMeta({
@@ -152,15 +153,7 @@ export default function RegisterPage() {
             </div>
           )}
         </Field>
-        <ul aria-label="Password requirements" style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: 'var(--text-sm)' }}>
-          {PASSWORD_RULES.map((rule) => {
-            const met = Boolean(values.password) && rule.test(values.password);
-            return <li key={rule.id} style={{ color: met ? 'var(--color-deep-forest)' : 'var(--text-secondary)', marginBottom: 'var(--space-1)' }}>
-              <span aria-hidden="true">{met ? '✓' : '○'} </span>
-              <span className="sr-only">{met ? 'Met: ' : 'Not met: '}</span>{rule.label}
-            </li>;
-          })}
-        </ul>
+        <PasswordRequirements password={values.password} />
         <Field label="Confirm password" required error={errors.confirmPassword}
           hint={values.confirmPassword ? (passwordsMatch(values.password, values.confirmPassword) ? '✓ Passwords match' : 'Passwords do not match yet') : 'Enter your password again.'}>
           {(props) => <input {...props} className="input" type={showPassword ? 'text' : 'password'} autoComplete="new-password"

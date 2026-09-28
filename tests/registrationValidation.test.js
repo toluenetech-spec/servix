@@ -9,3 +9,5 @@ test('password matching is exact, never trimmed or case folded', () => { assert.
 test('rejects mismatched confirmations', () => { const e = validateRegistration({ ...valid, confirmPassword: 'other' }); assert.ok(e.confirmPassword); });
 test('rejects weak and overlong passwords', () => { for (const password of ['short', 'abcdefghijklmnop', 'ABCDEFGHIJKLM123!', 'Abcdefghijklmnop!', 'Abcdefghijklmn123', 'Aa1!' + 'x'.repeat(200)]) assert.ok(validateRegistration({ ...valid, password }).password); });
 test('each rule has a stable unique id', () => assert.equal(new Set(PASSWORD_RULES.map(r => r.id)).size, PASSWORD_RULES.length));
+test('accepts exactly eight characters with all requirements', () => assert.deepEqual(validateRegistration({ ...valid, password: 'Abcdef1!', confirmPassword: 'Abcdef1!' }), {}));
+test('rejects seven characters even with complexity', () => assert.ok(validateRegistration({ ...valid, password: 'Abcde1!', confirmPassword: 'Abcde1!' }).password));

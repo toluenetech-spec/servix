@@ -1,3 +1,4 @@
+import { PasswordRequirements } from './PasswordRequirements.jsx';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { startRegistration, startAuthentication, browserSupportsWebAuthn } from '@simplewebauthn/browser';
@@ -8,7 +9,7 @@ import { Field } from '../../components/ui/Field.jsx';
 import { Icon } from '../../components/ui/Icon.jsx';
 import { useAuth } from '../../lib/AuthContext.jsx';
 import { securityAction, finishSecurity, clearAccessToken } from '../../lib/authApi.js';
-import { PASSWORD_RULES, passwordsMatch } from '../../lib/registrationValidation.js';
+import { resetPasswordRules, passwordsMatch } from '../../lib/registrationValidation.js';
 import { useDocumentMeta } from '../../lib/useDocumentMeta.js';
 import './security.css';
 
@@ -169,11 +170,11 @@ export default function SecurityCheckPage() {
       {stage === 'reset_password' && <>
         <p>Your email and existing security method are verified. Choose a unique password. Your enrolled security method will stay unchanged.</p>
         <form className="auth__form" onSubmit={e => { e.preventDefault();
-          if (!PASSWORD_RULES.every(rule => rule.test(password)) || !passwordsMatch(password, confirmation)) { setError('Meet every password requirement and make sure both passwords match.'); return; }
+          if (!resetPasswordRules(flow?.passwordPolicy).every(rule => rule.test(password)) || !passwordsMatch(password, confirmation)) { setError('Meet every password requirement and make sure both passwords match.'); return; }
           run(async () => { await securityAction('reset-password', { password }); clearAccessToken(); setUser(null); setPassword(''); setConfirmation(''); setSuccess('reset'); });
         }}>
           <Field label="New password" required>{props => <input {...props} className="input" type={showPassword ? 'text' : 'password'} autoComplete="new-password" value={password} onChange={e => setPassword(e.target.value)} />}</Field>
-          <ul style={{ listStyle: 'none', padding: 0 }}>{PASSWORD_RULES.map(rule => <li key={rule.id}>{password && rule.test(password) ? '✓' : '○'} {rule.label}</li>)}</ul>
+          <PasswordRequirements password={password} rules={resetPasswordRules(flow?.passwordPolicy)} />
           <Field label="Confirm password" required hint={confirmation ? passwordsMatch(password, confirmation) ? '✓ Passwords match' : 'Passwords do not match yet' : 'Enter the new password again.'}>{props => <input {...props} className="input" type={showPassword ? 'text' : 'password'} autoComplete="new-password" value={confirmation} onChange={e => setConfirmation(e.target.value)} />}</Field>
           <label><input type="checkbox" checked={showPassword} onChange={e => setShowPassword(e.target.checked)} /> Show passwords</label>
           <Button type="submit" block disabled={busy}>Save new password</Button>

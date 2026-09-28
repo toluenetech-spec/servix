@@ -7,6 +7,10 @@ import { prisma } from './db.js';
 import { ApiError, unauthorized } from './errors.js';
 import { sha256 } from './tokens.js';
 import { emailOtpMail, securityNoticeMail } from './mailer.js';
+import { hashPassword } from './password.js';
+import { resetPasswordPolicy, resetPasswordSchema } from './passwordPolicy.js';
+import { parseBody } from './query.js';
+import { z } from 'zod';
 import { audit } from './audit.js';
 import { seal, unseal, securityDigest, equalDigest, randomCode, newTotp, verifyTotp, recoveryCodes, normalizeRecovery } from './securityCrypto.js';
 
@@ -25,6 +29,7 @@ function assertResult<T>(value: T | Failure): T {
 }
 const active = (user: User) => !user.deletedAt && !['suspended', 'deactivated'].includes(user.status);
 const view = (flow: SecurityFlow, user: User | null, security: AccountSecurity | null) => ({
+  ...(flow.purpose === 'reset' && flow.stage === 'reset_password' && user ? { passwordPolicy: resetPasswordPolicy(user.role) } : {}),
   next: flow.stage, purpose: flow.purpose, method: flow.purpose === 'reset' && flow.stage === 'email' ? null : security?.method ?? null,
   email: user && !(flow.purpose === 'reset' && flow.stage === 'email') ? user.email.replace(/^(.).+(@.*)$/, '$1•••$2') : 'your email address', expiresAt: flow.expiresAt.toISOString(),
 });
@@ -260,9 +265,11 @@ export async function finishSecurity(raw: string, savedRecovery = false) {
     return c.tx.user.update({ where: { id: c.user.id }, data: { status: c.user.status === 'pending_verification' ? 'active' : c.user.status, lastLoginAt: new Date() } });
   });
 }
-export async function resetSecurityPassword(raw: string, passwordHash: string) {
+export async function resetSecurityPassword(raw: string, password: string) {
   return locked(raw, async c => {
     if (c.flow.purpose !== 'reset' || c.flow.stage !== 'reset_password' || !c.security.method) return fail('Verify your email and existing security method before resetting your password.');
+    parseBody(z.object({ password: resetPasswordSchema(c.user.role) }), { password });
+    const passwordHash = await hashPassword(password);
     await securityNotice(c, 'security.password_reset', 'Your Servix password was reset. Existing sessions have been signed out.');
     await c.tx.user.update({ where: { id: c.user.id }, data: { passwordHash, authVersion: { increment: 1 } } });
     await c.tx.refreshToken.updateMany({ where: { userId: c.user.id, revokedAt: null }, data: { revokedAt: new Date() } });

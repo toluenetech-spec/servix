@@ -1,6 +1,6 @@
-/** Registration-only guidance; never apply new rules to existing-account login. */
+/** Password creation/reset guidance; never apply new rules to existing-account login. */
 export const PASSWORD_RULES = [
-  { id: 'length', label: 'At least 12 characters', test: (value) => value.length >= 12 },
+  { id: 'length', label: 'At least 8 characters', test: (value) => value.length >= 8 },
   { id: 'uppercase', label: 'One uppercase letter', test: (value) => /[A-Z]/.test(value) },
   { id: 'lowercase', label: 'One lowercase letter', test: (value) => /[a-z]/.test(value) },
   { id: 'number', label: 'One number', test: (value) => /[0-9]/.test(value) },
@@ -17,3 +17,5 @@ export function validateRegistration(values) {
   if (!passwordsMatch(values.password, values.confirmPassword)) errors.confirmPassword = 'Enter the same password in both fields.';
   return errors;
 }
+
+export const resetPasswordRules = (policy) => policy === 'basic' ? PASSWORD_RULES.filter(rule => ['length', 'maximum'].includes(rule.id)) : PASSWORD_RULES;

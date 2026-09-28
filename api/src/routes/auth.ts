@@ -21,6 +21,7 @@ import { prisma } from '../lib/db.js';
 import { loadConfig } from '../lib/config.js';
 import { ApiError, unauthorized, validationError } from '../lib/errors.js';
 import { parseBody } from '../lib/query.js';
+import { resetPasswordPolicy, resetPasswordSchema } from '../lib/passwordPolicy.js';
 import { hashPassword, verifyPassword } from '../lib/password.js';
 import {
   newFamilyId,
@@ -61,7 +62,7 @@ const passwordSchema = z
 const registerSchema = z.object({
   fullName: z.string().trim().min(1, 'Please enter your full name.').max(200),
   email: z.string().trim().toLowerCase().email('Please enter a valid email address.').max(320),
-  password: passwordSchema,
+  password: strongPasswordSchema,
   accountType: z.enum(['customer', 'professional']).default('customer'),
 });
 
@@ -135,7 +136,7 @@ export async function authRoutes(app: FastifyInstance) {
     { config: strictLimit, schema: { tags: ['auth'], summary: 'Create an account' } },
     async (req, reply) => {
       if (mfaEnabled()) requireSecurityOrigin(req);
-      const data = parseBody(mfaEnabled() ? registerSchema.extend({ password: strongPasswordSchema }) : registerSchema, req.body);
+      const data = parseBody(registerSchema, req.body);
 
       const existing = await prisma.user.findUnique({ where: { email: data.email } });
       if (existing) {
@@ -329,6 +330,18 @@ export async function authRoutes(app: FastifyInstance) {
     },
   );
 
+  // Only a valid, unconsumed reset token can reveal its password policy.
+  app.post('/auth/reset-password/policy', { config: strictLimit }, async (req, reply) => {
+    reply.header('Cache-Control', 'no-store');
+    if (mfaEnabled()) throw new ApiError(400, 'SECURITY_REQUIRED', 'Use the security verification flow.');
+    const { token } = parseBody(z.object({ token: z.string().min(1).max(512) }), req.body);
+    const stored = await prisma.oneTimeToken.findFirst({ where: { tokenHash: sha256(token), purpose: 'reset_password' }, include: { user: true } });
+    if (!stored || stored.usedAt || stored.expiresAt <= new Date() || stored.user.deletedAt) {
+      throw new ApiError(400, 'INVALID_TOKEN', 'This reset link is invalid or has expired.');
+    }
+    return { passwordPolicy: resetPasswordPolicy(stored.user.role) };
+  });
+
   app.post(
     '/auth/reset-password',
     { config: strictLimit, schema: { tags: ['auth'], summary: 'Set a new password with a reset token' } },
@@ -341,6 +354,9 @@ export async function authRoutes(app: FastifyInstance) {
       if (!stored || stored.usedAt || stored.expiresAt < new Date()) {
         throw new ApiError(400, 'INVALID_TOKEN', 'This reset link is invalid or has expired.');
       }
+      const user = await prisma.user.findUnique({ where: { id: stored.userId } });
+      if (!user || user.deletedAt) throw new ApiError(400, 'INVALID_TOKEN', 'This reset link is invalid or has expired.');
+      parseBody(z.object({ password: resetPasswordSchema(user.role) }), { password });
       await prisma.$transaction([
         prisma.oneTimeToken.update({ where: { id: stored.id }, data: { usedAt: new Date() } }),
         prisma.user.update({

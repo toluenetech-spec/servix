@@ -1,5 +1,17 @@
 # Authentication release handoff — 2026-09-27
 
+> **Current rollout update — 2026-09-28:** The production schema upgrade is already
+> complete (8/8 migrations, owner-confirmed). Do NOT rerun migrations or reseed.
+> Railway follows `arena/01a0dc4c-servix`; the auth baseline and branded emails
+> have been deployed, with live readiness and owner-tested email delivery/login.
+> The owner now approves password-policy deployment and staged MFA/OAuth activation.
+> MFA/OAuth are still off until the hosted flags are changed and verified.
+> Password creation/reset now follows PASSWORD_POLICY.md (8–200; admin reset
+> composition exemption). This update supersedes the historical deployment status
+> below, not the listed security limitations. Live provider/device testing and
+> authenticated frontend promotion still require owner participation.
+
+
 The owner has now authorized pushing and deploying the authentication work. This
 supersedes the earlier no-push/no-deploy authorization notes in checkpoint reports,
 but does NOT mean deployment or production migration has occurred.

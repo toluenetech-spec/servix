@@ -1,5 +1,17 @@
 # Restricted MFA increment — local implementation, default off
 
+> **Current rollout update — 2026-09-28:** The production schema upgrade is already
+> complete (8/8 migrations, owner-confirmed). Do NOT rerun migrations or reseed.
+> Railway follows `arena/01a0dc4c-servix`; the auth baseline and branded emails
+> have been deployed, with live readiness and owner-tested email delivery/login.
+> The owner now approves password-policy deployment and staged MFA/OAuth activation.
+> MFA/OAuth are still off until the hosted flags are changed and verified.
+> Password creation/reset now follows PASSWORD_POLICY.md (8–200; admin reset
+> composition exemption). This update supersedes the historical deployment status
+> below, not the listed security limitations. Live provider/device testing and
+> authenticated frontend promotion still require owner participation.
+
+
 ## Implemented
 
 - Registration: password + confirmation UI (one email field), email OTP, choose
