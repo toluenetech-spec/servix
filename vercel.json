@@ -4,19 +4,80 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "rewrites": [
-    { "source": "/((?!assets/|brand/|images/).*)", "destination": "/index.html" }
+    {
+      "source": "/services",
+      "destination": "/meta/services.html"
+    },
+    {
+      "source": "/professionals",
+      "destination": "/meta/professionals.html"
+    },
+    {
+      "source": "/professionals/join",
+      "destination": "/meta/professionals-join.html"
+    },
+    {
+      "source": "/how-it-works",
+      "destination": "/meta/how-it-works.html"
+    },
+    {
+      "source": "/pricing",
+      "destination": "/meta/pricing.html"
+    },
+    {
+      "source": "/about",
+      "destination": "/meta/about.html"
+    },
+    {
+      "source": "/contact",
+      "destination": "/meta/contact.html"
+    },
+    {
+      "source": "/privacy",
+      "destination": "/meta/privacy.html"
+    },
+    {
+      "source": "/terms",
+      "destination": "/meta/terms.html"
+    },
+    {
+      "source": "/cookies",
+      "destination": "/meta/cookies.html"
+    },
+    {
+      "source": "/login",
+      "destination": "/meta/login.html"
+    },
+    {
+      "source": "/register",
+      "destination": "/meta/register.html"
+    },
+    {
+      "source": "/forgot-password",
+      "destination": "/meta/forgot-password.html"
+    },
+    {
+      "source": "/((?!assets/|brand/|images/).*)",
+      "destination": "/index.html"
+    }
   ],
   "headers": [
     {
       "source": "/assets/(.*)",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
       ]
     },
     {
       "source": "/(brand|images)/(.*)",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=86400" }
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400"
+        }
       ]
     }
   ]

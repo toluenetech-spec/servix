@@ -159,6 +159,7 @@ export default function RegisterPage() {
           {(props) => <input {...props} className="input" type={showPassword ? 'text' : 'password'} autoComplete="new-password"
             value={values.confirmPassword} onChange={(e) => setValues((v) => ({ ...v, confirmPassword: e.target.value }))} />}
         </Field>
+        <p className="auth__meta">By selecting Create Account, you agree to the <Link to="/terms">Terms of Service</Link> and acknowledge the <Link to="/privacy">Privacy Policy</Link>. You must be 18 or over. Optional analytics are your separate choice.</p>
         {submitError && <p role="alert" className="field__error">{submitError}</p>}
         <Button type="submit" variant="primary" size="lg" block disabled={submitting}>
           {submitting ? 'Creating account…' : 'Create Account'}

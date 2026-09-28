@@ -1,7 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { Routes, Route } from 'react-router-dom';
-import { Analytics } from '@vercel/analytics/react';
-import { SpeedInsights } from '@vercel/speed-insights/react';
+import { CookiePreferences } from './components/privacy/CookiePreferences.jsx';
 import { Layout } from './components/layout/Layout.jsx';
 import { ToastProvider } from './components/ui/Toast.jsx';
 import { AuthProvider } from './lib/AuthContext.jsx';
@@ -71,14 +70,14 @@ export default function App() {
             <Route path="/connected-sign-in" element={<ConnectedSignInPage />} />
             <Route path="/security-check" element={<SecurityCheckPage />} />
             <Route path="/verify-email" element={<VerifyEmailPage />} />
+            <Route path="/cookies" element={<LegalPage kind="cookies" />} />
             <Route path="/privacy" element={<LegalPage kind="privacy" />} />
             <Route path="/terms" element={<LegalPage kind="terms" />} />
             <Route path="*" element={<NotFoundPage />} />
           </Route>
         </Routes>
       </Suspense>
-      <Analytics />
-      <SpeedInsights />
+      <CookiePreferences />
     </ToastProvider>
     </AuthProvider>
   );

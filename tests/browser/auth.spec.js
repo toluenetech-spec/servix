@@ -2,6 +2,7 @@
 import { test, expect } from '@playwright/test';
 
 async function mockApi(page, overrides = {}) {
+  await page.addInitScript(() => localStorage.setItem('servix_cookie_preferences', JSON.stringify({ version: '2026-09-28', optional: false, savedAt: Date.now() })));
   await page.route('**/*', async route => {
     const url = new URL(route.request().url());
     if (!['127.0.0.1', 'localhost'].includes(url.hostname)) return route.abort();

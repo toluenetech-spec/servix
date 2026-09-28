@@ -32,6 +32,7 @@ const COLUMNS = [
     links: [
       { to: '/privacy', label: 'Privacy' },
       { to: '/terms', label: 'Terms' },
+      { to: '/cookies', label: 'Cookies' },
     ],
   },
 ];
@@ -76,6 +77,7 @@ export function Footer() {
         </div>
 
         <div className="footer__bottom">
+          <button type="button" className="cookie-settings" onClick={() => window.dispatchEvent(new Event('servix:cookie-settings'))}>Cookie settings</button>
           <span>© {new Date().getFullYear()} Servix. All rights reserved.</span>
           <div className="footer__social">
             <SocialIcon
