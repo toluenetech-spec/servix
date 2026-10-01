@@ -11,6 +11,8 @@
  * role against the database. This page only renders what the API returns.
  */
 import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { AnalyticsTab, NotificationsTab, SubscriptionsTab } from './AdminExtraTabs.jsx';
 import { Button } from '../../components/ui/Button.jsx';
 import { Badge } from '../../components/ui/Badge.jsx';
 import { Field } from '../../components/ui/Field.jsx';
@@ -26,13 +28,17 @@ import * as adminApi from '../../lib/adminApi.js';
 
 const TABS = [
   { id: 'overview', label: 'Overview' },
+  { id: 'analytics', label: 'Analytics' },
   { id: 'applications', label: 'Applications' },
   { id: 'services', label: 'Services' },
   { id: 'users', label: 'Users' },
   { id: 'bookings', label: 'Bookings & Disputes' },
   { id: 'payouts', label: 'Payouts' },
+  { id: 'subscriptions', label: 'Plan subscriptions' },
+  { id: 'notifications', label: 'Send notification' },
   { id: 'audit', label: 'Audit Log' },
 ];
+const TAB_IDS = new Set(TABS.map((t) => t.id));
 
 const BOOKING_STATUS = {
   pending_payment: { label: 'Awaiting payment', variant: 'accent' },
@@ -696,7 +702,11 @@ export default function AdminPage() {
   });
 
   const { user, initializing, authAvailable } = useAuth();
-  const [tab, setTab] = useState('overview');
+  // The active tab lives in the URL (?tab=) so the workspace sidebar can deep-link to it.
+  const [params, setParams] = useSearchParams();
+  const requested = params.get('tab');
+  const tab = TAB_IDS.has(requested) ? requested : 'overview';
+  const setTab = (next) => setParams(next === 'overview' ? {} : { tab: next });
 
   if (!authAvailable) {
     return (
@@ -746,6 +756,9 @@ export default function AdminPage() {
 
       <div style={{ paddingTop: 'var(--space-8)' }}>
         {tab === 'overview' && <OverviewTab />}
+        {tab === 'analytics' && <AnalyticsTab />}
+        {tab === 'subscriptions' && <SubscriptionsTab />}
+        {tab === 'notifications' && <NotificationsTab />}
         {tab === 'applications' && <ApplicationsTab />}
         {tab === 'services' && <ServicesTab />}
         {tab === 'users' && <UsersTab />}

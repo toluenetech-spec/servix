@@ -3,3 +3,5 @@ dist
 .pgdata
 .env
 src/generated
+# local preview harness data (throwaway embedded PostgreSQL + local-only secret)
+.local-preview/

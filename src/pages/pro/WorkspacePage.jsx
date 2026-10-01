@@ -674,7 +674,7 @@ function ProfileTab({ categories, profile, onProfileChange }) {
 
 /* ---------------- page ---------------- */
 
-export default function WorkspacePage() {
+export default function WorkspacePage({ section = null }) {
   useDocumentMeta({
     title: 'Professional Workspace',
     description: 'Manage your Servix professional profile and services.',
@@ -682,7 +682,8 @@ export default function WorkspacePage() {
 
   const { user, initializing, authAvailable } = useAuth();
   const navigate = useNavigate();
-  const [tab, setTab] = useState('bookings');
+  const [tab, setTab] = useState(section || 'bookings');
+  useEffect(() => { setTab(section || 'bookings'); }, [section]);
   const [profile, setProfile] = useState(null);
   const [categories, setCategories] = useState([]);
   const [state, setState] = useState('loading'); // loading | ready | denied
@@ -749,7 +750,7 @@ export default function WorkspacePage() {
       <header style={{ marginBottom: 'var(--space-8)' }}>
         <span className="eyebrow">Professional workspace</span>
         <h1 style={{ fontSize: 'var(--text-2xl)', display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
-          {profile.name}
+          {section ? ({ services: 'My gigs', bookings: 'Client bookings', earnings: 'Earnings & payouts', profile: 'Profile & portfolio' }[section]) : profile.name}
           {profile.verified && <VerifiedBadge />}
         </h1>
         <p className="text-muted" style={{ marginTop: 'var(--space-2)' }}>
@@ -758,7 +759,7 @@ export default function WorkspacePage() {
         </p>
       </header>
 
-      <Tabs tabs={TABS} active={tab} onChange={setTab} label="Workspace sections" />
+      {!section && <Tabs tabs={TABS} active={tab} onChange={setTab} label="Workspace sections" />}
 
       <div style={{ paddingTop: 'var(--space-8)' }}>
         {tab === 'bookings' && <ProBookingsTab />}

@@ -2,6 +2,7 @@
  * Serializers: map Prisma rows to the exact JSON shapes the frontend
  * consumes. Slugs are exposed as `id`.
  */
+import { effectivePlan } from './plans.js';
 import type {
   Category,
   ProfessionalProfile,
@@ -97,6 +98,7 @@ export function serializeProfessionalSummary(p: ProWithRels) {
     memberSince: p.memberSince ?? '',
     availability: p.availability,
     image: p.imageUrl ?? null,
+    plan: effectivePlan(p),
   };
 }
 

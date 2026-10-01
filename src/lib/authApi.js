@@ -177,3 +177,10 @@ export async function oauthConnections() {
 }
 
 export const getResetPasswordPolicy = (token) => post('/auth/reset-password/policy', { token });
+
+export async function getAccountOverview() {
+  const res = await fetch(`${V1}/account/overview`, { headers: { Authorization: `Bearer ${accessToken ?? ''}` }, credentials: 'include' });
+  if (!res.ok) throw await toApiError(res);
+  return res.json();
+}
+export const completeOnboarding = (intent) => post('/account/onboarding', { intent }, { auth: true });

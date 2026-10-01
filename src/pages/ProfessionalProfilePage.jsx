@@ -1,5 +1,7 @@
-import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import { useAuth } from '../lib/AuthContext.jsx';
+import { getSaved, saveProfessional, unsaveProfessional } from '../lib/workspaceApi.js';
 import { Breadcrumb } from '../components/ui/Breadcrumb.jsx';
 import { Button } from '../components/ui/Button.jsx';
 import { Icon } from '../components/ui/Icon.jsx';
@@ -100,6 +102,7 @@ export default function ProfessionalProfilePage() {
           <h1>
             {pro.name}
             {pro.verified && <VerifiedBadge />}
+            {pro.plan && pro.plan !== 'free' && <Badge variant="brand"><Icon name="crown" size={13} /> Servix Pro</Badge>}
           </h1>
           <p className="profile-head__title">{pro.title}</p>
           <div className="profile-head__meta">
@@ -118,6 +121,7 @@ export default function ProfessionalProfilePage() {
           <Button variant="primary" onClick={() => setBookingOpen(true)}>
             Request Booking
           </Button>
+          <SaveButton slug={pro.id} />
           <span className="trust-strip__note" style={{ margin: 0, textAlign: 'center' }}>
             {pro.availability === 'available' ? 'Available now' : 'Limited availability'}
           </span>
@@ -252,4 +256,18 @@ export default function ProfessionalProfilePage() {
       </Modal>
     </div>
   );
+}
+
+/* Save/unsave for signed-in accounts; signed-out visitors get a sign-in link. Private: professionals are not told who saved them. */
+function SaveButton({ slug }) {
+  const { user, authAvailable } = useAuth();
+  const [saved, setSaved] = useState(null); const [busy, setBusy] = useState(false); const [error, setError] = useState('');
+  useEffect(() => { if (!user || !authAvailable) return; let alive = true; getSaved().then(list => { if (alive) setSaved(list.some(i => i.professional.slug === slug)); }).catch(() => { if (alive) setSaved(false); }); return () => { alive = false; }; }, [user?.id, slug, authAvailable]);
+  if (!authAvailable) return null;
+  if (!user) return <Link to="/login" className="btn btn--secondary">Sign in to save</Link>;
+  async function toggle() { setBusy(true); setError(''); try { if (saved) { await unsaveProfessional(slug); setSaved(false); } else { await saveProfessional(slug); setSaved(true); } } catch (e) { setError(e.message); } finally { setBusy(false); } }
+  return <>
+    <Button variant="secondary" onClick={toggle} disabled={busy || saved === null} aria-pressed={Boolean(saved)}><Icon name="bookmark" size={15} /> {saved ? 'Saved' : 'Save professional'}</Button>
+    {error && <span role="alert" className="trust-strip__note" style={{ margin: 0 }}>{error}</span>}
+  </>;
 }

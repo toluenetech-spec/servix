@@ -7,6 +7,19 @@ import { AuthProvider } from './lib/AuthContext.jsx';
 import HomePage from './pages/HomePage.jsx';
 
 /* Code-split every non-landing route. */
+const PaymentsPage = lazy(() => import('./pages/dashboard/PaymentsPage.jsx'));
+const SettingsPage = lazy(() => import('./pages/dashboard/SettingsPage.jsx'));
+const VerificationPage = lazy(() => import('./pages/dashboard/VerificationPage.jsx'));
+const SearchPage = lazy(() => import('./pages/dashboard/SearchPage.jsx'));
+const NetworkPage = lazy(() => import('./pages/dashboard/NetworkPage.jsx'));
+const MessagesPage = lazy(() => import('./pages/dashboard/MessagesPage.jsx'));
+const NotificationsPage = lazy(() => import('./pages/dashboard/NotificationsPage.jsx'));
+const SavedPage = lazy(() => import('./pages/dashboard/SavedPage.jsx'));
+const PlanPage = lazy(() => import('./pages/dashboard/PlanPage.jsx'));
+const AnalyticsPage = lazy(() => import('./pages/dashboard/AnalyticsPage.jsx'));
+const AvailabilityPage = lazy(() => import('./pages/dashboard/AvailabilityPage.jsx'));
+const ReviewsPage = lazy(() => import('./pages/dashboard/ReviewsPage.jsx'));
+const DashboardPage = lazy(() => import('./pages/DashboardPage.jsx'));
 const ServicesPage = lazy(() => import('./pages/ServicesPage.jsx'));
 const ServiceDetailPage = lazy(() => import('./pages/ServiceDetailPage.jsx'));
 const ProfessionalsPage = lazy(() => import('./pages/ProfessionalsPage.jsx'));
@@ -49,6 +62,23 @@ export default function App() {
         <Routes>
           <Route element={<Layout />}>
             <Route index element={<HomePage />} />
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/dashboard/payments" element={<PaymentsPage />} />
+            <Route path="/dashboard/settings" element={<SettingsPage />} />
+            <Route path="/dashboard/verification" element={<VerificationPage />} />
+            <Route path="/dashboard/search" element={<SearchPage />} />
+            <Route path="/dashboard/network" element={<NetworkPage />} />
+            <Route path="/dashboard/messages" element={<MessagesPage />} />
+            <Route path="/dashboard/notifications" element={<NotificationsPage />} />
+            <Route path="/dashboard/saved" element={<SavedPage />} />
+            <Route path="/dashboard/plan" element={<PlanPage />} />
+            <Route path="/dashboard/analytics" element={<AnalyticsPage />} />
+            <Route path="/dashboard/availability" element={<AvailabilityPage />} />
+            <Route path="/dashboard/reviews" element={<ReviewsPage />} />
+            <Route path="/dashboard/gigs" element={<WorkspacePage section="services" />} />
+            <Route path="/dashboard/work" element={<WorkspacePage section="bookings" />} />
+            <Route path="/dashboard/earnings" element={<WorkspacePage section="earnings" />} />
+            <Route path="/dashboard/profile" element={<WorkspacePage section="profile" />} />
             <Route path="/services" element={<ServicesPage />} />
             <Route path="/services/:id" element={<ServiceDetailPage />} />
             <Route path="/professionals" element={<ProfessionalsPage />} />

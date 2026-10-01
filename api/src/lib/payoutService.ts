@@ -4,6 +4,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import { prisma } from './db.js';
+import { notify, notifySafely, professionalUserId } from './notifications.js';
 import { ApiError } from './errors.js';
 import { accountBalance, payoutLegs, payoutReversalLegs, postTransaction } from './ledger.js';
 import { getPaymentProvider } from './payments.js';
@@ -68,6 +69,7 @@ export async function executeTransfer(payoutId: string) {
         payoutSentMail(profile.user.email, payout.reference, `₦${(payout.amountKobo / 100n).toLocaleString('en-NG')}`),
         `payout-mail-${payout.id}`,
       );
+      await notifySafely({ userId: profile.user.id, type: 'payout.paid', title: 'Payout sent', body: `₦${(payout.amountKobo / 100n).toLocaleString('en-NG')} (${payout.reference}) was sent to your payout account.`, link: '/dashboard/earnings' });
     }
     return updated;
   } catch {
@@ -82,6 +84,8 @@ export async function executeTransfer(payoutId: string) {
           payoutId,
           memo: 'payout transfer failed — hold reversed',
         });
+        const owner = await professionalUserId(tx, payout.professionalId);
+        if (owner) await notify(tx, { userId: owner, type: 'payout.failed', title: 'Payout could not be sent', body: `Transfer ${payout.reference} failed. Your balance has been restored; Servix will retry or contact you.`, link: '/dashboard/earnings' });
       }
     });
     throw new ApiError(502, 'TRANSFER_FAILED', 'The payout transfer failed. The balance has been restored.');

@@ -88,8 +88,8 @@ function LegacyVerifyEmailPage() {
           <h1>Email verified</h1>
           <p>Your email address is confirmed and your account is active.</p>
           <div style={{ display: 'grid', gap: 'var(--space-3)' }}>
-            <Button variant="primary" size="lg" block to="/">
-              Continue to Servix
+            <Button variant="primary" size="lg" block to="/dashboard">
+              Go to dashboard
             </Button>
           </div>
         </>
@@ -125,8 +125,8 @@ function LegacyVerifyEmailPage() {
             <Button variant="primary" size="lg" block onClick={onResend}>
               Resend Verification Email
             </Button>
-            <Button variant="secondary" size="lg" block to="/">
-              Back to Home
+            <Button variant="secondary" size="lg" block to="/dashboard">
+              Go to dashboard
             </Button>
           </div>
         </>

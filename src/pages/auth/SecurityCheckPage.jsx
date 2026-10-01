@@ -1,6 +1,6 @@
 import { PasswordRequirements } from './PasswordRequirements.jsx';
 import { useEffect, useRef, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { startRegistration, startAuthentication, browserSupportsWebAuthn } from '@simplewebauthn/browser';
 import QRCode from 'qrcode';
 import { AuthShell } from './AuthShell.jsx';
@@ -16,6 +16,7 @@ import './security.css';
 export default function SecurityCheckPage() {
   useDocumentMeta({ title: 'Secure your account', description: 'Complete your Servix security checks.' });
   const location = useLocation();
+  const navigate = useNavigate();
   const { setUser } = useAuth();
   const [flow, setFlow] = useState(location.state ?? null);
   const [loading, setLoading] = useState(true);
@@ -98,7 +99,9 @@ export default function SecurityCheckPage() {
   };
   const complete = () => run(async () => {
     const user = await finishSecurity(saved);
-    setUser(user); setCodes([]); setSuccess(flow?.purpose === 'link' ? 'link' : 'login');
+    setUser(user); setCodes([]);
+    if (flow?.purpose === 'link') setSuccess('link');
+    else navigate('/dashboard', { replace: true });
   });
   const downloadCodes = () => {
     const url = URL.createObjectURL(new Blob([`Servix recovery codes\nKeep private. Each code works once after your other verification steps.\n\n${codes.join('\n')}\n`], { type: 'text/plain' }));
@@ -115,7 +118,7 @@ export default function SecurityCheckPage() {
     <div className="security-success"><Icon name="check-circle" size={32} /></div>
     <h1 tabIndex={-1} ref={titleRef}>{success === 'reset' ? 'Password updated' : success === 'link' ? 'Sign-in provider connected' : 'You’re securely signed in'}</h1>
     <p role="status">{success === 'reset' ? 'Your other sessions have been signed out. Use your new password and your existing security method to sign in.' : 'Your required checks are complete. Your security method is saved for future sign-ins.'}</p>
-    <Button block size="lg" to={success === 'reset' ? '/login' : success === 'link' ? '/connected-sign-in' : '/'}>{success === 'reset' ? 'Back to sign in' : success === 'link' ? 'View connected sign-in' : 'Continue to Servix'}</Button>
+    <Button block size="lg" to={success === 'reset' ? '/login' : success === 'link' ? '/connected-sign-in' : '/dashboard'}>{success === 'reset' ? 'Back to sign in' : success === 'link' ? 'View connected sign-in' : 'Go to dashboard'}</Button>
   </AuthShell>;
   return <AuthShell>
     <p className="security-eyebrow">SERVIX · ACCOUNT SECURITY</p>

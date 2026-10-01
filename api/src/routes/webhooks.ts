@@ -102,9 +102,12 @@ export async function webhookRoutes(app: FastifyInstance) {
         where: { reference },
         include: { booking: true },
       });
-      if (!payment) return reply.code(404).type('text/html').send('<h1>Unknown checkout reference</h1>');
-      const amount = (payment.amountKobo / 100n).toString();
+      const subscription = payment ? null : await prisma.planSubscription.findUnique({ where: { reference } });
+      if (!payment && !subscription) return reply.code(404).type('text/html').send('<h1>Unknown checkout reference</h1>');
+      const amount = ((payment?.amountKobo ?? subscription!.amountKobo) / 100n).toString();
       const appBase = process.env.APP_BASE_URL ?? 'http://localhost:5173';
+      const title = payment ? payment.booking.serviceTitle : `Servix plan: ${subscription!.planSlug}`;
+      const backUrl = payment ? `${appBase}/bookings/${payment.bookingId}` : `${appBase}/dashboard/plan?reference=${encodeURIComponent(reference)}`;
       return reply.type('text/html').send(`<!doctype html>
 <html><head><meta charset="utf-8"><title>Sandbox Checkout — Servix</title>
 <style>body{font-family:system-ui;background:#F7F4EC;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0}
@@ -114,12 +117,12 @@ h1{font-size:1.1rem;margin:.2rem 0}.amt{font-size:1.8rem;font-weight:800;color:#
 button{width:100%;padding:.85rem;border:0;border-radius:6px;font-weight:600;cursor:pointer;margin-top:.5rem}
 .pay{background:#12372A;color:#F7F4EC}.fail{background:#eee;color:#333}</style></head>
 <body><div class="card"><span class="badge">SANDBOX — NOT A REAL CHARGE</span>
-<h1>${payment.booking.serviceTitle}</h1><div class="amt">₦${Number(amount).toLocaleString('en-NG')}</div>
+<h1>${title}</h1><div class="amt">₦${Number(amount).toLocaleString('en-NG')}</div>
 <form method="POST" action="/sandbox/checkout/${encodeURIComponent(reference)}/complete">
 <button class="pay" name="outcome" value="success">Pay (test)</button>
 <button class="fail" name="outcome" value="failed">Simulate failure</button></form>
 <p style="font-size:.75rem;color:#68716B">Payment is confirmed only via the signed webhook — exactly like production.</p>
-<p style="font-size:.75rem"><a href="${appBase}/bookings/${payment.bookingId}">Back to Servix</a></p></div></body></html>`);
+<p style="font-size:.75rem"><a href="${backUrl}">Back to Servix</a></p></div></body></html>`);
     });
 
     app.post('/sandbox/checkout/:reference/complete', { schema: { hide: true } }, async (req, reply) => {
@@ -146,6 +149,7 @@ button{width:100%;padding:.85rem;border:0;border-radius:6px;font-weight:600;curs
       });
       const payment = await prisma.payment.findUnique({ where: { reference } });
       const appBase = process.env.APP_BASE_URL ?? 'http://localhost:5173';
+      if (!payment && reference.startsWith('sub-')) return reply.redirect(`${appBase}/dashboard/plan?reference=${encodeURIComponent(reference)}`);
       return reply.redirect(`${appBase}/bookings/${payment?.bookingId ?? ''}`);
     });
   }

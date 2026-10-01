@@ -10,7 +10,7 @@ test('consent fails closed for missing, malformed, expired, future and old-versi
   assert.equal(parsePreference(JSON.stringify({version:PREFERENCE_VERSION,optional:false,savedAt:now}),now).optional,false);
 });
 test('measurement drops private and unknown routes and strips all query/fragment data', () => {
-  for (const p of ['/reset-password?token=secret','/bookings/private','/admin','/security-check','/login','/services/private']) assert.equal(sanitizeMeasurement({url:'https://www.servix.name.ng'+p}),null);
+  for (const p of ['/dashboard', '/reset-password?token=secret','/bookings/private','/admin','/security-check','/login','/services/private']) assert.equal(sanitizeMeasurement({url:'https://www.servix.name.ng'+p}),null);
   assert.equal(sanitizeMeasurement({url:'https://www.servix.name.ng/services?email=private#secret'}).url,'https://www.servix.name.ng/services');
 });
 test('canonical links never contain private IDs or tokens', () => {

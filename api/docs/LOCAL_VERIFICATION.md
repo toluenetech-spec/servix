@@ -67,7 +67,16 @@ npx prisma generate
 npm run typecheck
 npm run build
 RUN_LOCAL_SECURITY_TESTS=1 RUN_LOCAL_OTP_TESTS=1 RUN_LOCAL_OAUTH_TESTS=1 npx vitest run tests/security-local.test.ts tests/security-crypto.test.ts tests/email-otp-crypto.test.ts tests/email-otp-local.test.ts tests/oauth-provider.test.ts tests/oauth-local.test.ts
+RUN_LOCAL_COMMUNITY_TESTS=1 RUN_LOCAL_WORKSPACE_TESTS=1 npx vitest run tests/community-local.test.ts tests/workspace-features-local.test.ts
 npm audit
+
+# Full-stack local preview (no Neon, no live payments or email)
+# Starts an embedded PostgreSQL in api/.local-preview (gitignored), applies every migration once,
+# seeds the public catalogue, creates customer@/pro@/admin@servix.local (password printed in the script)
+# and serves the API on 127.0.0.1:8080 with PAYMENT_MODE=sandbox and EMAIL_MODE=console.
+cd api && npx tsx scripts/localPreview.ts
+# In another terminal: VITE_API_URL=/ npm run dev   (Vite proxies /api and /sandbox to 8080)
+# Delete api/.local-preview to reset the preview data.
 ```
 
 Browser tests manage and stop their own local Vite test server on port 5174, using

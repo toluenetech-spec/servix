@@ -22,6 +22,8 @@ import { refundAmount } from '../lib/refundPolicy.js';
 import { retryPayout } from '../lib/payoutService.js';
 import { enqueueMail } from '../lib/jobs.js';
 import { disputeResolvedMail } from '../lib/mailer.js';
+import { broadcast, notify } from '../lib/notifications.js';
+import { PLAN_LIMITS, effectivePlan } from '../lib/plans.js';
 
 export async function adminRoutes(app: FastifyInstance) {
   const guard = { preHandler: requireAdmin };
@@ -128,6 +130,7 @@ export async function adminRoutes(app: FastifyInstance) {
           data: { userId: application.userId, slug },
           ip: req.ip,
         });
+        await notify(tx, { userId: application.userId, type: 'application.approved', title: 'You’re approved as a professional', body: 'Your Servix professional profile is live. Add your services and availability to start receiving bookings.', link: '/dashboard/gigs' });
         return app2;
       });
       return serializeApplication(updated);
@@ -158,6 +161,7 @@ export async function adminRoutes(app: FastifyInstance) {
           data: { reason: body.reason ?? null },
           ip: req.ip,
         });
+        await notify(tx, { userId: application.userId, type: 'application.rejected', title: 'Your application needs attention', body: body.reason ? `Servix could not approve your application yet: ${body.reason}` : 'Servix could not approve your application yet. Review your details and contact support if you have questions.', link: '/professionals/apply' });
         return app2;
       });
       return serializeApplication(updated);
@@ -454,6 +458,113 @@ export async function adminRoutes(app: FastifyInstance) {
       const result = await retryPayout(id);
       await audit(prisma, { actorId: req.auth!.sub, action: 'payout.retry', entity: 'payout', entityId: id, ip: req.ip });
       return { id: result.id, status: result.status, reference: result.reference };
+    },
+  );
+
+
+  /* ================= analytics (charts from real records) ================= */
+
+  app.get(
+    '/admin/analytics',
+    { ...guard, schema: { tags: ['admin'], summary: 'Platform time series and breakdowns', security: [{ bearerAuth: [] }] } },
+    async (req, reply) => {
+      reply.header('Cache-Control', 'no-store');
+      const { days } = parseQuery(z.object({ days: z.coerce.number().int().min(7).max(365).default(30) }), req.query);
+      const since = new Date(Date.now() - days * 86_400_000); since.setUTCHours(0, 0, 0, 0);
+      const key = (d: Date) => d.toISOString().slice(0, 10);
+      const [users, bookings, payments, applications, ledgerFees, categories, topPros, planCounts, subs] = await Promise.all([
+        prisma.user.findMany({ where: { createdAt: { gte: since }, deletedAt: null }, select: { createdAt: true, role: true } }),
+        prisma.booking.findMany({ where: { createdAt: { gte: since } }, select: { createdAt: true, status: true, amountKobo: true, platformFeeKobo: true, professionalId: true, service: { select: { category: { select: { name: true } } } } } }),
+        prisma.payment.findMany({ where: { status: { in: ['captured', 'refunded'] }, verifiedAt: { gte: since } }, select: { amountKobo: true, status: true, verifiedAt: true } }),
+        prisma.professionalApplication.groupBy({ by: ['status'], _count: true }),
+        prisma.ledgerEntry.aggregate({ where: { account: 'platform_revenue', direction: 'credit', createdAt: { gte: since } }, _sum: { amountKobo: true } }),
+        prisma.booking.groupBy({ by: ['serviceId'], where: { createdAt: { gte: since } }, _count: true }),
+        prisma.booking.groupBy({ by: ['professionalId'], where: { createdAt: { gte: since }, status: 'completed' }, _count: true, _sum: { amountKobo: true }, orderBy: { _count: { professionalId: 'desc' } }, take: 5 }),
+        prisma.professionalProfile.findMany({ select: { planSlug: true, planExpiresAt: true } }),
+        prisma.planSubscription.aggregate({ where: { status: 'active', verifiedAt: { gte: since } }, _sum: { amountKobo: true }, _count: true }),
+      ]);
+      const series: Record<string, { signups: number; bookings: number; gmv: number; refunds: number }> = {};
+      for (let i = days - 1; i >= 0; i--) series[key(new Date(Date.now() - i * 86_400_000))] = { signups: 0, bookings: 0, gmv: 0, refunds: 0 };
+      for (const u of users) { const k = key(u.createdAt); if (series[k]) series[k].signups += 1; }
+      for (const b of bookings) { const k = key(b.createdAt); if (series[k]) series[k].bookings += 1; }
+      for (const p of payments) { const k = key(p.verifiedAt!); if (!series[k]) continue; if (p.status === 'refunded') series[k].refunds += Number(p.amountKobo) / 100; else series[k].gmv += Number(p.amountKobo) / 100; }
+      const statusCounts: Record<string, number> = {}; for (const b of bookings) statusCounts[b.status] = (statusCounts[b.status] ?? 0) + 1;
+      const byCategory: Record<string, number> = {}; for (const b of bookings) { const name = b.service.category?.name ?? 'Uncategorised'; byCategory[name] = (byCategory[name] ?? 0) + 1; }
+      const proNames = await prisma.professionalProfile.findMany({ where: { id: { in: topPros.map(p => p.professionalId) } }, select: { id: true, name: true, slug: true } });
+      const plans: Record<string, number> = {}; for (const p of planCounts) { const slug = effectivePlan(p); plans[slug] = (plans[slug] ?? 0) + 1; }
+      return {
+        days, since: since.toISOString(),
+        totals: {
+          signups: users.length, customers: users.filter(u => u.role === 'customer').length, professionals: users.filter(u => u.role === 'professional').length,
+          bookings: bookings.length, completed: statusCounts.completed ?? 0,
+          gmv: payments.filter(p => p.status === 'captured').reduce((sum, p) => sum + Number(p.amountKobo) / 100, 0),
+          refunds: payments.filter(p => p.status === 'refunded').reduce((sum, p) => sum + Number(p.amountKobo) / 100, 0),
+          platformFees: Number(ledgerFees._sum.amountKobo ?? 0n) / 100,
+          planRevenue: Number(subs._sum.amountKobo ?? 0n) / 100, planPurchases: subs._count,
+        },
+        series: Object.entries(series).map(([date, v]) => ({ date, ...v })),
+        statusCounts, categories: Object.entries(byCategory).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count).slice(0, 8),
+        applications: Object.fromEntries(applications.map(a => [a.status, a._count])),
+        plans: Object.entries(plans).map(([slug, count]) => ({ slug, label: PLAN_LIMITS[slug]?.label ?? slug, count })),
+        topProfessionals: topPros.map(p => ({ ...(proNames.find(n => n.id === p.professionalId) ?? { id: p.professionalId, name: 'Unknown', slug: '' }), completed: p._count, volume: Number(p._sum.amountKobo ?? 0n) / 100 })),
+        servicesBooked: categories.length,
+      };
+    },
+  );
+
+  /* ================= notifications (broadcast) ================= */
+
+  app.get(
+    '/admin/notifications',
+    { ...guard, schema: { tags: ['admin'], summary: 'Broadcast history', security: [{ bearerAuth: [] }] } },
+    async (req) => {
+      const q = parseQuery(paginationSchema, req.query);
+      const [total, rows] = await prisma.$transaction([
+        prisma.notificationBroadcast.count(),
+        prisma.notificationBroadcast.findMany({ include: { admin: { select: { email: true } } }, orderBy: { createdAt: 'desc' }, skip: (q.page - 1) * q.pageSize, take: q.pageSize }),
+      ]);
+      const readCounts = await prisma.notification.groupBy({ by: ['broadcastId'], where: { broadcastId: { in: rows.map(r => r.id) }, readAt: { not: null } }, _count: true });
+      return { total, page: q.page, pageSize: q.pageSize, items: rows.map(r => ({ id: r.id, audience: r.audience, title: r.title, body: r.body, link: r.link, recipientCount: r.recipientCount, readCount: readCounts.find(c => c.broadcastId === r.id)?._count ?? 0, sentBy: r.admin.email, createdAt: r.createdAt.toISOString() })) };
+    },
+  );
+  app.post(
+    '/admin/notifications',
+    { ...guard, config: { rateLimit: { max: 10, timeWindow: '1 minute' } }, schema: { tags: ['admin'], summary: 'Send an in-app notification to an audience or one account', security: [{ bearerAuth: [] }] } },
+    async (req, reply) => {
+      reply.header('Cache-Control', 'no-store');
+      const body = parseBody(z.object({
+        audience: z.enum(['all', 'customers', 'professionals', 'user']),
+        email: z.string().trim().toLowerCase().email().optional(),
+        title: z.string().trim().min(3).max(120),
+        body: z.string().trim().min(3).max(2000),
+        link: z.string().trim().max(300).regex(/^\/(?!\/)[^\s]*$/, 'Links must be a Servix path such as /pricing.').optional().or(z.literal('')),
+      }).strict(), req.body);
+      let userId: string | undefined;
+      if (body.audience === 'user') {
+        if (!body.email) throw new ApiError(422, 'VALIDATION_ERROR', 'Enter the account email.');
+        const target = await prisma.user.findUnique({ where: { email: body.email }, select: { id: true, deletedAt: true } });
+        if (!target || target.deletedAt) throw notFound('USER_NOT_FOUND', 'No account with that email.');
+        userId = target.id;
+      }
+      const result = await broadcast(req.auth!.sub, body.audience, { title: body.title, body: body.body, link: body.link || null, userId });
+      await audit(prisma, { actorId: req.auth!.sub, action: 'notification.broadcast', entity: 'notification_broadcast', entityId: result.id, data: { audience: body.audience, recipientCount: result.recipientCount }, ip: req.ip });
+      return reply.code(201).send(result);
+    },
+  );
+
+  /* ================= plan subscriptions ================= */
+
+  app.get(
+    '/admin/subscriptions',
+    { ...guard, schema: { tags: ['admin'], summary: 'Plan purchases (read-only)', security: [{ bearerAuth: [] }] } },
+    async (req) => {
+      const q = parseQuery(paginationSchema.extend({ status: z.enum(['initiated', 'active', 'failed', 'expired', 'cancelled']).optional() }), req.query);
+      const where = q.status ? { status: q.status } : {};
+      const [total, rows] = await prisma.$transaction([
+        prisma.planSubscription.count({ where }),
+        prisma.planSubscription.findMany({ where, include: { professional: { select: { name: true, slug: true, planSlug: true, planExpiresAt: true, user: { select: { email: true } } } } }, orderBy: { createdAt: 'desc' }, skip: (q.page - 1) * q.pageSize, take: q.pageSize }),
+      ]);
+      return { total, page: q.page, pageSize: q.pageSize, items: rows.map(r => ({ id: r.id, reference: r.reference, plan: r.planSlug, status: r.status, amount: Number(r.amountKobo / 100n), currency: r.currency, startsAt: r.startsAt?.toISOString() ?? null, endsAt: r.endsAt?.toISOString() ?? null, createdAt: r.createdAt.toISOString(), professional: { name: r.professional.name, slug: r.professional.slug, email: r.professional.user?.email ?? null, currentPlan: effectivePlan(r.professional) } })) };
     },
   );
 

@@ -72,13 +72,10 @@ export default function ApplyPage() {
       setLoading(false);
       return;
     }
-    if (user.role === 'professional') {
-      navigate('/pro', { replace: true });
-      return;
-    }
     proApi
       .getMyApplication()
       .then((app) => {
+        if (app.status === 'approved') { navigate('/pro', { replace: true }); return; }
         setApplication(app);
         setValues({
           title: app.title ?? '',

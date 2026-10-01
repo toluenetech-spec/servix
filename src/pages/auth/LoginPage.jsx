@@ -45,7 +45,7 @@ export default function LoginPage() {
       const result = await login({ email: values.email, password: values.password });
       if (result?.security) { navigate('/security-check', { state: result.security }); return; }
       showToast('Welcome back.', 'success');
-      navigate('/');
+      navigate('/dashboard', { replace: true });
     } catch (err) {
       if (err.errors) setErrors(err.errors);
       else if (err.status === 401) setErrors({ password: 'Incorrect email or password.' });

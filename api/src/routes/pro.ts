@@ -16,6 +16,7 @@ import { parseBody } from '../lib/query.js';
 import { serializeProfessionalDetail, serializeServiceDetail } from '../lib/serialize.js';
 import { ALLOWED_IMAGE_TYPES, getStorage, MAX_UPLOAD_BYTES } from '../lib/storage.js';
 import { audit } from '../lib/audit.js';
+import { assertListingAllowed } from '../lib/plans.js';
 
 /* ---------------- schemas ---------------- */
 
@@ -253,6 +254,7 @@ export async function proRoutes(app: FastifyInstance) {
     { ...guard, schema: { tags: ['professional'], summary: 'Create a service (draft)', security: [{ bearerAuth: [] }] } },
     async (req, reply) => {
       const data = parseBody(serviceSchema, req.body);
+      await assertListingAllowed(req.professionalProfileId!);
       const category = await prisma.category.findUnique({ where: { slug: data.categorySlug } });
       if (!category) throw new ApiError(422, 'VALIDATION_ERROR', 'Unknown category.');
 

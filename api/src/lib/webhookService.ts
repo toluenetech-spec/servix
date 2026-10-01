@@ -8,6 +8,8 @@ import { capturePayment } from './bookingService.js';
 import { getPaymentProvider } from './payments.js';
 import { enqueueMail } from './jobs.js';
 import { bookingConfirmedMail, paymentReceivedMail } from './mailer.js';
+import { failSubscription, verifySubscription } from './plans.js';
+import { notifySafely, professionalUserId } from './notifications.js';
 
 interface PaystackEventShape {
   event: string;
@@ -17,7 +19,16 @@ interface PaystackEventShape {
 export async function processWebhookEvent(eventId: string, event: PaystackEventShape): Promise<void> {
   if (event.event === 'charge.success' && event.data.reference) {
     const payment = await prisma.payment.findUnique({ where: { reference: event.data.reference } });
-    if (!payment) throw new Error(`No payment for reference ${event.data.reference}`);
+    if (!payment) {
+      // Plan upgrade references share the pipeline (prefix `sub-`); same verification path.
+      if (event.data.reference.startsWith('sub-')) {
+        const status = await verifySubscription(event.data.reference);
+        if (status === 'initiated') throw new Error('Plan payment not yet verifiable');
+        await prisma.webhookEvent.update({ where: { id: eventId }, data: { processedAt: new Date(), error: null } });
+        return;
+      }
+      throw new Error(`No payment for reference ${event.data.reference}`);
+    }
 
     const verification = await getPaymentProvider().verify(payment.reference);
     if (verification.status !== 'success') {
@@ -40,9 +51,13 @@ export async function processWebhookEvent(eventId: string, event: PaystackEventS
           bookingConfirmedMail(customer.email, booking.reference, booking.serviceTitle, booking.scheduledAt.toISOString()),
           `booking-mail-${booking.id}`,
         );
+        await notifySafely({ userId: customer.id, type: 'booking.paid', title: 'Payment received', body: `Your payment for ${booking.serviceTitle} (${booking.reference}) is held securely until the work is confirmed.`, link: `/bookings/${booking.id}` });
       }
+      const proUser = await professionalUserId(prisma, booking.professionalId);
+      if (proUser) await notifySafely({ userId: proUser, type: 'booking.requested', title: 'New booking request', body: `${booking.serviceTitle} (${booking.reference}) is paid and waiting for your response.`, link: `/bookings/${booking.id}` });
     }
   } else if (event.event === 'charge.failed' && event.data.reference) {
+    if (event.data.reference.startsWith('sub-')) await failSubscription(event.data.reference);
     await prisma.payment.updateMany({
       where: { reference: event.data.reference, status: 'initiated' },
       data: { status: 'failed' },

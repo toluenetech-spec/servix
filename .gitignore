@@ -17,3 +17,4 @@ api/src/generated
 
 # Generated, synthetic email review gallery
 /.email-preview/
+.local-previews/

@@ -80,3 +80,9 @@ export const retryPayout = (id) => call('POST', `/admin/payouts/${id}/retry`);
 
 /* audit log */
 export const getAudit = (params) => call('GET', `/admin/audit${qs(params)}`);
+
+/* ---------------- analytics, notifications, plan subscriptions ---------------- */
+export const getAnalytics = (days = 30) => call('GET', `/admin/analytics?days=${days}`);
+export const getBroadcasts = (params) => call('GET', `/admin/notifications${qs(params)}`);
+export const sendBroadcast = (body) => call('POST', '/admin/notifications', body);
+export const getSubscriptions = (params) => call('GET', `/admin/subscriptions${qs(params)}`);

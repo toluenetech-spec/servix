@@ -52,7 +52,7 @@ test('failed status hides step controls and offers retry', async ({ page }) => {
 });
 test('connection settings require an existing session', async ({ page }) => {
   await mockApi(page); await page.goto('/connected-sign-in');
-  await expect(page.getByRole('link', { name: 'Sign in to your existing account first' })).toBeVisible();
+  await expect(page).toHaveURL(/\/login$/);
   await expect(page.getByRole('button', { name: 'Connect GitHub' })).toHaveCount(0);
 });
 test('connected provider is disabled, other provider remains available', async ({ page }) => {
@@ -78,7 +78,7 @@ test('factor verification does not sign in until finish is acknowledged by serve
   await expect(page.getByRole('button', { name: 'Finish signing in' })).toBeVisible();
   expect(finished).toBe(false);
   await page.getByRole('button', { name: 'Finish signing in' }).click();
-  await expect(page.getByRole('heading', { name: 'You’re securely signed in' })).toBeVisible();
+  await expect(page).toHaveURL(/\/dashboard$/);
   expect(finished).toBe(true);
 });
 

@@ -62,7 +62,7 @@ export function EmailCodeVerification() {
     <div style={{ color: 'var(--color-forest)', marginBottom: 'var(--space-4)' }}><Icon name="check-circle" size={40} /></div>
     <h1>Email confirmed</h1><p role="status">Your email address has been verified successfully.</p>
     <p>You can close this verification page. Keep your account password private.</p>
-    <Button to="/" block size="lg">Continue to Servix</Button>
+    <Button to="/dashboard" block size="lg">Go to dashboard</Button>
   </AuthShell>;
   return <AuthShell>
     <p style={{ fontSize: 'var(--text-xs)', fontWeight: 700, letterSpacing: '0.1em', color: 'var(--color-forest)' }}>ACCOUNT VERIFICATION</p>

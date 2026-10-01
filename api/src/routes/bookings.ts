@@ -26,6 +26,7 @@ import { platformFeeKobo } from '../lib/refundPolicy.js';
 import { getPaymentProvider } from '../lib/payments.js';
 import { enqueueMail } from '../lib/jobs.js';
 import { bookingCancelledMail, disputeOpenedMail } from '../lib/mailer.js';
+import { notify, professionalUserId } from '../lib/notifications.js';
 
 const createSchema = z.object({
   serviceId: z.string().min(1), // public slug
@@ -367,6 +368,8 @@ export async function bookingRoutes(app: FastifyInstance) {
             if (scope === 'service') await tx.service.update({ where: { id: booking.serviceId }, data: patch });
             else await tx.professionalProfile.update({ where: { id: booking.professionalId }, data: patch });
           }
+          const proUser = await professionalUserId(tx, booking.professionalId);
+          if (proUser) await notify(tx, { userId: proUser, type: 'review.received', title: `New ${data.rating}-star review`, body: `${user.fullName} reviewed ${booking.serviceTitle} (${booking.reference}).`, link: '/dashboard/reviews' });
           return created;
         });
         return reply.code(201).send({ id: review.id, rating: review.rating, text: review.text ?? '' });

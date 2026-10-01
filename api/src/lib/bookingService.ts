@@ -9,6 +9,48 @@ import { ApiError } from './errors.js';
 import { captureLegs, postTransaction, refundLegs, releaseLegs } from './ledger.js';
 import { platformFeeKobo, refundAmount, refundForCancellation } from './refundPolicy.js';
 import type { BookingStatus } from '../generated/prisma/enums.js';
+import { notify } from './notifications.js';
+
+/* ---------------- in-app notifications for lifecycle events ---------------- */
+
+type Party = 'customer' | 'professional';
+const EVENT_NOTICES: Record<string, Partial<Record<Party, (ref: string, title: string) => { title: string; body: string }>>> = {
+  accepted: { customer: (ref, t) => ({ title: 'Booking accepted', body: `Your professional accepted ${t} (${ref}).` }) },
+  work_started: { customer: (ref, t) => ({ title: 'Work has started', body: `Work on ${t} (${ref}) is now in progress.` }) },
+  delivered: { customer: (ref, t) => ({ title: 'Work delivered — please review', body: `${t} (${ref}) was marked delivered. Confirm completion or raise a problem within the review window.` }) },
+  confirmed: { professional: (ref, t) => ({ title: 'Payment released', body: `The customer confirmed ${t} (${ref}). Your earnings are now payable.` }) },
+  auto_confirmed: {
+    customer: (ref, t) => ({ title: 'Booking completed', body: `${t} (${ref}) was completed automatically after the review window.` }),
+    professional: (ref, t) => ({ title: 'Payment released', body: `${t} (${ref}) was confirmed automatically. Your earnings are now payable.` }),
+  },
+  declined: { customer: (ref, t) => ({ title: 'Booking declined', body: `${t} (${ref}) was declined. Any captured payment is refunded in full.` }) },
+  cancelled: {
+    customer: (ref, t) => ({ title: 'Booking cancelled', body: `${t} (${ref}) was cancelled. Check the booking for refund details.` }),
+    professional: (ref, t) => ({ title: 'Booking cancelled', body: `The customer cancelled ${t} (${ref}).` }),
+  },
+  disputed: { professional: (ref, t) => ({ title: 'A dispute was opened', body: `The customer raised a problem with ${t} (${ref}). Funds are frozen until Servix reviews it.` }) },
+  dispute_released: {
+    customer: (ref, t) => ({ title: 'Dispute resolved', body: `Servix reviewed ${t} (${ref}) and released payment to the professional.` }),
+    professional: (ref, t) => ({ title: 'Dispute resolved in your favour', body: `Payment for ${t} (${ref}) has been released.` }),
+  },
+  dispute_refunded: {
+    customer: (ref, t) => ({ title: 'Dispute resolved — refund issued', body: `Servix reviewed ${t} (${ref}) and refunded your payment.` }),
+    professional: (ref, t) => ({ title: 'Dispute resolved', body: `Servix reviewed ${t} (${ref}) and refunded the customer.` }),
+  },
+};
+
+async function notifyParties(tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0], bookingId: string, event: string, actorId: string | null) {
+  const notices = EVENT_NOTICES[event];
+  if (!notices) return;
+  const booking = await tx.booking.findUniqueOrThrow({ where: { id: bookingId }, include: { professional: { select: { userId: true } } } });
+  const targets: [Party, string | null][] = [['customer', booking.customerId], ['professional', booking.professional.userId]];
+  for (const [party, userId] of targets) {
+    const build = notices[party];
+    if (!build || !userId || userId === actorId) continue;
+    const text = build(booking.reference, booking.serviceTitle);
+    await notify(tx, { userId, type: `booking.${event}`, ...text, link: `/bookings/${bookingId}` });
+  }
+}
 
 export const ACTIVE_SLOT_STATUSES: BookingStatus[] = [
   'pending_payment',
@@ -139,6 +181,7 @@ export async function transition(opts: TransitionOpts) {
       },
     });
     if (opts.sideEffects) await opts.sideEffects(tx);
+    await notifyParties(tx, opts.bookingId, opts.event, opts.actorId);
     return tx.booking.findUniqueOrThrow({ where: { id: opts.bookingId } });
   });
 }

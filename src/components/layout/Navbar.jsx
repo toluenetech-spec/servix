@@ -18,11 +18,7 @@ const NAV_LINKS = [
 const DESKTOP_NAV_QUERY = '(min-width: 901px)';
 
 /** The signed-in user's primary destination (Phase E adds the admin console). */
-function homeFor(user) {
-  if (user.role === 'admin') return { to: '/admin', label: 'Admin' };
-  if (user.role === 'professional') return { to: '/pro', label: 'Workspace' };
-  return { to: '/bookings', label: 'My Bookings' };
-}
+function homeFor() { return { to: '/dashboard', label: 'Dashboard' }; }
 
 export function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);

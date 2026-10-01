@@ -5,7 +5,8 @@
  *   states: pending → under_review → approved | rejected
  *
  * Rules enforced server-side:
- *  - only authenticated customers may apply
+ *  - authenticated applicants without a professional profile may apply
+ *    (includes legacy professional-role accounts awaiting approval)
  *  - one active (pending/under_review/approved) application per user
  *  - applications are editable only while status = pending
  *  - approval is SERVER-controlled: role promotion happens exclusively in
@@ -96,7 +97,7 @@ export async function applicationRoutes(app: FastifyInstance) {
         include: { professionalProfile: { select: { id: true } } },
       });
       if (!user || user.deletedAt) throw forbidden();
-      if (user.role === 'professional' || user.professionalProfile) {
+      if (user.professionalProfile) {
         throw new ApiError(409, 'ALREADY_PROFESSIONAL', 'You are already a professional on Servix.');
       }
       const active = await prisma.professionalApplication.findFirst({

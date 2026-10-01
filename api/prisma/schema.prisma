@@ -59,6 +59,15 @@ model User {
   updatedAt       DateTime   @updatedAt @map("updated_at")
   deletedAt       DateTime?  @map("deleted_at")
 
+  sentConnections CommunityConnection[] @relation("connection_sender")
+  receivedConnections CommunityConnection[] @relation("connection_recipient")
+  threadsA ChatThread[] @relation("thread_a")
+  threadsB ChatThread[] @relation("thread_b")
+  chatMessages ChatMessage[]
+  notifications Notification[]
+  sentBroadcasts NotificationBroadcast[]
+  savedProfessionals SavedProfessional[]
+
   authVersion Int @default(0) @map("auth_version")
   oauthIdentities OAuthIdentity[]
   security AccountSecurity?
@@ -204,6 +213,7 @@ model Booking {
   createdAt       DateTime      @default(now()) @map("created_at")
   updatedAt       DateTime      @updatedAt @map("updated_at")
 
+  chatThread ChatThread?
   customer     User                @relation("customerBookings", fields: [customerId], references: [id])
   professional ProfessionalProfile @relation("proBookings", fields: [professionalId], references: [id])
   service      Service             @relation(fields: [serviceId], references: [id])
@@ -406,9 +416,13 @@ model ProfessionalProfile {
   completedProjects Int                @default(0) @map("completed_projects")
   startingPrice     BigInt?            @map("starting_price")
   currency          String             @default("NGN")
+  planSlug          String             @default("free") @map("plan_slug")
+  planExpiresAt     DateTime?          @map("plan_expires_at")
   createdAt         DateTime           @default(now()) @map("created_at")
   updatedAt         DateTime           @updatedAt @map("updated_at")
 
+  subscriptions PlanSubscription[]
+  savedBy       SavedProfessional[]
   user      User?               @relation(fields: [userId], references: [id])
   category  Category?           @relation(fields: [categoryId], references: [id])
   skills    ProfessionalSkill[]
@@ -685,4 +699,112 @@ model OAuthAttempt {
   createdAt DateTime @default(now()) @map("created_at")
   @@index([expiresAt])
   @@map("oauth_attempts")
+}
+
+model CommunityConnection {
+  id String @id @default(uuid())
+  pairKey String @unique @map("pair_key")
+  requesterId String @map("requester_id")
+  recipientId String @map("recipient_id")
+  status String @default("pending")
+  blockedById String? @map("blocked_by_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  requester User @relation("connection_sender", fields: [requesterId], references: [id], onDelete: Cascade)
+  recipient User @relation("connection_recipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  thread ChatThread?
+  @@index([requesterId, status])
+  @@index([recipientId, status])
+  @@map("community_connections")
+}
+model ChatThread {
+  id String @id @default(uuid())
+  participantAId String @map("participant_a_id")
+  participantBId String @map("participant_b_id")
+  bookingId String? @unique @map("booking_id")
+  connectionId String? @unique @map("connection_id")
+  readAtA DateTime? @map("read_at_a")
+  readAtB DateTime? @map("read_at_b")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  participantA User @relation("thread_a", fields: [participantAId], references: [id], onDelete: Cascade)
+  participantB User @relation("thread_b", fields: [participantBId], references: [id], onDelete: Cascade)
+  booking Booking? @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  connection CommunityConnection? @relation(fields: [connectionId], references: [id], onDelete: Restrict)
+  messages ChatMessage[]
+  @@index([participantAId, updatedAt])
+  @@index([participantBId, updatedAt])
+  @@map("chat_threads")
+}
+model ChatMessage {
+  id String @id @default(uuid())
+  threadId String @map("thread_id")
+  senderId String @map("sender_id")
+  clientId String @map("client_id")
+  body String
+  createdAt DateTime @default(now()) @map("created_at")
+  thread ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  sender User @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  @@unique([senderId, clientId])
+  @@index([threadId, createdAt, id])
+  @@map("chat_messages")
+}
+
+model Notification {
+  id String @id @default(uuid())
+  userId String @map("user_id")
+  type String
+  title String
+  body String
+  link String?
+  broadcastId String? @map("broadcast_id")
+  readAt DateTime? @map("read_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  broadcast NotificationBroadcast? @relation(fields: [broadcastId], references: [id], onDelete: SetNull)
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, readAt])
+  @@map("notifications")
+}
+model NotificationBroadcast {
+  id String @id @default(uuid())
+  adminId String @map("admin_id")
+  audience String
+  title String
+  body String
+  link String?
+  recipientCount Int @default(0) @map("recipient_count")
+  createdAt DateTime @default(now()) @map("created_at")
+  admin User @relation(fields: [adminId], references: [id])
+  notifications Notification[]
+  @@index([createdAt(sort: Desc)])
+  @@map("notification_broadcasts")
+}
+model PlanSubscription {
+  id String @id @default(uuid())
+  professionalId String @map("professional_id")
+  planSlug String @map("plan_slug")
+  status String @default("initiated")
+  reference String @unique
+  provider String @default("paystack")
+  amountKobo BigInt @map("amount_kobo")
+  currency String @default("NGN")
+  startsAt DateTime? @map("starts_at")
+  endsAt DateTime? @map("ends_at")
+  verifiedAt DateTime? @map("verified_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  professional ProfessionalProfile @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  @@index([professionalId, status])
+  @@map("plan_subscriptions")
+}
+model SavedProfessional {
+  id String @id @default(uuid())
+  userId String @map("user_id")
+  professionalId String @map("professional_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  professional ProfessionalProfile @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  @@unique([userId, professionalId])
+  @@map("saved_professionals")
 }
