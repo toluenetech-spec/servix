@@ -71,7 +71,12 @@ export interface StorageProvider {
   /** Server-side upload: the API streams the bytes to the bucket itself, so the
    * browser never talks to R2 directly (no bucket CORS needed). */
   putObject(kind: UploadKind, fileName: string, contentType: string, body: Buffer): Promise<PutResult>;
+  /** Read an object back (used by GET /media/* so a private bucket still serves images). */
+  fetchObject(key: string): Promise<Response | null>;
 }
+
+/** Keys we mint: `<kind>/<uuid>.<ext>` — anything else is refused by GET /media. */
+export const MEDIA_KEY_RE = new RegExp(`^(${UPLOAD_KINDS.join('|')})/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.[a-z0-9]{2,5}$`);
 
 function safeExt(fileName: string, contentType: string): string {
   const byType: Record<string, string> = {
@@ -216,6 +221,13 @@ class R2Provider implements StorageProvider {
     return { key: presigned.key, publicUrl: presigned.publicUrl };
   }
 
+  async fetchObject(key: string): Promise<Response | null> {
+    const res = await fetch(await this.presignGet(key, 300), { method: 'GET' });
+    if (res.status === 404 || res.status === 403) return null;
+    if (!res.ok) throw new Error(`Object storage read failed (${res.status}).`);
+    return res;
+  }
+
   /** Short-lived presigned GET (image retrieval when the bucket is private). */
   async presignGet(key: string, expiresSeconds = 3600): Promise<string> {
     return presignS3Url({
@@ -248,6 +260,9 @@ class LocalStubProvider implements StorageProvider {
   }
   async putObject(): Promise<PutResult> {
     throw new Error('Object storage is not configured in this environment.');
+  }
+  async fetchObject(): Promise<Response | null> {
+    return null;
   }
 }
 

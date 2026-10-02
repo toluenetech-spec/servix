@@ -25,6 +25,7 @@ import { contentRoutes } from './routes/content.js';
 import { communityRoutes } from './routes/community.js';
 import { accountRoutes } from './routes/account.js';
 import { uploadRoutes, UPLOAD_CONTENT_TYPES } from './routes/uploads.js';
+import { mediaRoutes } from './routes/media.js';
 import { authRoutes } from './routes/auth.js';
 import { applicationRoutes } from './routes/applications.js';
 import { proRoutes } from './routes/pro.js';
@@ -196,6 +197,7 @@ export async function buildApp() {
 
   /* ---------------- Routes ---------------- */
   await app.register(webhookRoutes); // /api/v1/webhooks/* + /sandbox/* (see route defs)
+  await app.register(mediaRoutes); // GET /media/<key> — files served from the bucket
 
   await app.register(
     async (v1) => {
