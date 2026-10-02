@@ -62,6 +62,14 @@ All notable changes to the Servix public website.
   script `api/docs/manual-nextgen-upgrade.sql` (verified on a fresh PostgreSQL:
   applies once, idempotent on re-run).
 
+### Fixed
+- Blank page after a deployment: a tab that still had the previous build open
+  could fail to download a page file (new build = new file names) and React
+  unmounted everything. Added `src/components/ui/ErrorBoundary.jsx` (root and
+  per-route): a stale-build failure reloads once; any other render error shows
+  a recovery panel (reload / back / home + the error text) instead of a blank
+  screen. Also handles Vite's `vite:preloadError`.
+
 ### Tests
 - `api/tests/nextgen-local.test.ts` — 7 isolated-PostgreSQL suites (flags,
   request validation/ownership/transitions, proposals incl. duplicate + race +
