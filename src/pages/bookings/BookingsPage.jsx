@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '../../components/ui/Button.jsx';
 import { Badge } from '../../components/ui/Badge.jsx';
-import { Skeleton, EmptyState, ErrorState } from '../../components/ui/States.jsx';
+import { Skeleton, EmptyState, ErrorState, ListSkeleton } from '../../components/ui/States.jsx';
 import { useAuth } from '../../lib/AuthContext.jsx';
 import { useDocumentMeta } from '../../lib/useDocumentMeta.js';
 import { formatPrice } from '../../lib/format.js';
@@ -61,7 +61,7 @@ export default function BookingsPage() {
     return (
       <div className="page container section" aria-busy="true">
         <Skeleton height="2rem" width="30%" style={{ marginBottom: '1.5rem' }} />
-        <Skeleton height="10rem" />
+        <ListSkeleton rows={5} avatar={false} label="Loading your bookings…" />
       </div>
     );
   }

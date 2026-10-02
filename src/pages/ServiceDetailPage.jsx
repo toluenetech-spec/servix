@@ -120,7 +120,7 @@ function BookingForm({ service, onClose }) {
         confirm completion.
       </p>
 
-      {slots === null && <p className="text-muted" style={{ fontSize: 'var(--text-sm)' }}>Loading availability…</p>}
+      {slots === null && <div role="status" aria-busy="true"><span className="sr-only">Loading availability…</span><div aria-hidden="true" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{Array.from({ length: 6 }, (_, i) => <Skeleton key={i} height="2.2rem" width="7rem" style={{ borderRadius: 999 }} />)}</div></div>}
       {slots !== null && slots.length === 0 && (
         <p className="text-muted" style={{ fontSize: 'var(--text-sm)' }}>No open slots in the next two weeks.</p>
       )}

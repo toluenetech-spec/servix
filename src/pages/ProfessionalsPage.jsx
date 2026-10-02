@@ -5,7 +5,7 @@ import { Icon } from '../components/ui/Icon.jsx';
 import { Drawer } from '../components/ui/Drawer.jsx';
 import { Pagination } from '../components/ui/Pagination.jsx';
 import { ProfessionalCard } from '../components/cards/ProfessionalCard.jsx';
-import { CardGridSkeleton, EmptyState, ErrorState } from '../components/ui/States.jsx';
+import { CardGridSkeleton, EmptyState, ErrorState, Skeleton } from '../components/ui/States.jsx';
 import { useFetch } from '../lib/useFetch.js';
 import { useDocumentMeta } from '../lib/useDocumentMeta.js';
 import { getProfessionals } from '../lib/api.js';
@@ -251,7 +251,7 @@ export default function ProfessionalsPage() {
             <div className="results-head">
               <p className="results-head__count" aria-live="polite">
                 {loading
-                  ? 'Loading professionals…'
+                  ? <><span className="sr-only">Loading professionals…</span><Skeleton height="0.9rem" width="10rem" style={{ display: 'inline-block', verticalAlign: 'middle' }} /></>
                   : `${items.length} professional${items.length === 1 ? '' : 's'} found`}
               </p>
               <div className="results-head__controls">

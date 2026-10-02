@@ -8,7 +8,7 @@ export default function SavedPage() {
   useDocumentMeta({ title: 'Saved professionals', description: 'Professionals you saved on Servix.' });
   const r = useResource(getSaved); const [busy, setBusy] = useState(''); const [error, setError] = useState('');
   async function remove(slug) { setBusy(slug); setError(''); try { await unsaveProfessional(slug); r.setData(list => list.filter(i => i.professional.slug !== slug)); } catch (e) { setError(e.message); } finally { setBusy(''); } }
-  return <><PageHead title="Saved professionals" description="Shortlist people you want to work with. Saving is private — professionals are not told who saved them." /><LoadState resource={r}>
+  return <><PageHead title="Saved professionals" description="Shortlist people you want to work with. Saving is private — professionals are not told who saved them." /><LoadState skeleton="cards" label="Loading saved professionals…" resource={r}>
     {error && <div className="ws-alert" role="alert">{error}</div>}
     {!r.data?.length ? <section className="ws-panel"><Empty icon="bookmark" title="No saved professionals yet" description="Use the Save button on any professional's profile to keep them here for later." to="/dashboard/search" label="Browse professionals" /></section> :
       <div className="ws-pro-grid">{r.data.map(({ id, savedAt, professional: p }) => <article className="ws-pro-card" key={id}>

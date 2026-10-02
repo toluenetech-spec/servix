@@ -11,6 +11,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '../../components/ui/Button.jsx';
+import { FormSkeleton, Skeleton } from '../../components/ui/States.jsx';
 import { Field } from '../../components/ui/Field.jsx';
 import { Icon } from '../../components/ui/Icon.jsx';
 import { Avatar } from '../../components/ui/Avatar.jsx';
@@ -219,7 +220,7 @@ export default function ApplyPage() {
     );
   }
   if (initializing || loading) {
-    return <OnboardingLayout exitTo="/dashboard"><div className="ob-status" role="status" aria-busy="true"><p>Loading your application…</p></div></OnboardingLayout>;
+    return <OnboardingLayout exitTo="/dashboard"><div className="ob-section"><Skeleton height="2rem" width="45%" style={{ marginBottom: 12 }} /><Skeleton height="0.9rem" width="70%" style={{ marginBottom: 28 }} /><FormSkeleton fields={5} panel={false} label="Loading your application…" /></div></OnboardingLayout>;
   }
   if (!user) {
     return (

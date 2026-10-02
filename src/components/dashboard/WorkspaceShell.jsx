@@ -6,6 +6,7 @@ import { getNotifications, getUnreadCount, markNotificationsRead } from '../../l
 import { Logo } from '../brand/Logo.jsx';
 import { Icon } from '../ui/Icon.jsx';
 import { Avatar } from '../ui/Avatar.jsx';
+import { DashboardSkeleton, ListSkeleton, Skeleton } from '../ui/States.jsx';
 import './workspace.css';
 const Context = createContext(null);
 export const useWorkspace = () => useContext(Context);
@@ -91,7 +92,7 @@ export function WorkspaceShell({ children }) {
   useEffect(() => { let alive = true; if (user) getAccountOverview().then(value => { if (alive) setOverview(value); }).catch(() => { if (alive) setOverview(null); }); return () => { alive = false; }; }, [user?.id, pathname]);
   useEffect(() => { setMenu(false); }, [pathname]);
   useEffect(() => { const close = e => { if (e.key === 'Escape') setMenu(false); }; window.addEventListener('keydown', close); return () => window.removeEventListener('keydown', close); }, []);
-  if (initializing) return <div className="container section" role="status">Loading your workspace…</div>;
+  if (initializing) return <div className="ws-layout"><aside className="ws-sidebar" aria-hidden="true"><Skeleton height="1.6rem" width="6rem" style={{ margin: '0 12px 30px' }} />{Array.from({ length: 7 }, (_, i) => <Skeleton key={i} height="2.4rem" style={{ marginBottom: 6, borderRadius: 7 }} />)}</aside><div className="ws-body"><header className="ws-topbar" aria-hidden="true"><Skeleton height="2rem" width="40%" /></header><main className="ws-content"><DashboardSkeleton label="Loading your workspace…" /></main></div></div>;
   if (!user) return <Navigate to="/login" replace />;
   const professional = overview?.canManageServices; const role = user.role === 'admin' ? 'Administrator' : professional ? (overview?.plan && overview.plan !== 'free' ? 'Servix Pro professional' : 'Professional') : overview?.kind === 'applicant' ? 'Professional applicant' : 'Customer';
   const sections = buildNavigation({ user, overview });
@@ -120,7 +121,7 @@ function NotificationBell({ userId }) {
     <button type="button" className="ws-bell" aria-label={unread ? `Notifications, ${unread} unread` : 'Notifications'} aria-expanded={open} aria-haspopup="dialog" onClick={() => setOpen(v => !v)}><Icon name="bell" size={20} />{unread > 0 && <span className="ws-bell-badge" aria-hidden="true">{unread > 99 ? '99+' : unread}</span>}</button>
     {open && <div className="ws-notif-pop" role="dialog" aria-label="Recent notifications">
       <div className="ws-notif-head"><strong>Notifications</strong>{unread > 0 && <button type="button" onClick={readAll}>Mark all read</button>}</div>
-      {failed ? <p className="ws-muted" role="alert">Notifications could not be loaded.</p> : items === null ? <p className="ws-muted" role="status">Loading…</p> : items.length === 0 ? <p className="ws-muted">You're all caught up. Booking updates, messages and announcements will appear here.</p> : <ul>{items.map(item => <li key={item.id}><button type="button" className={item.readAt ? '' : 'is-unread'} onClick={() => openItem(item)}><strong>{item.title}</strong><span>{item.body}</span><small>{new Date(item.createdAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</small></button></li>)}</ul>}
+      {failed ? <p className="ws-muted" role="alert">Notifications could not be loaded.</p> : items === null ? <ListSkeleton rows={3} avatar={false} panel={false} label="Loading notifications…" /> : items.length === 0 ? <p className="ws-muted">You're all caught up. Booking updates, messages and announcements will appear here.</p> : <ul>{items.map(item => <li key={item.id}><button type="button" className={item.readAt ? '' : 'is-unread'} onClick={() => openItem(item)}><strong>{item.title}</strong><span>{item.body}</span><small>{new Date(item.createdAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</small></button></li>)}</ul>}
       <Link to="/dashboard/notifications" className="ws-notif-all">View all notifications →</Link>
     </div>}
   </div>;

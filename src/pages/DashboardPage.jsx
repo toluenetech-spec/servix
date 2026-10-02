@@ -8,6 +8,7 @@ import { formatPrice } from '../lib/format.js';
 import { LineChart, BarChart } from '../components/dashboard/Charts.jsx';
 import { useDocumentMeta } from '../lib/useDocumentMeta.js';
 import { Button } from '../components/ui/Button.jsx';
+import { DashboardSkeleton, ListSkeleton, StatsSkeleton } from '../components/ui/States.jsx';
 import { Modal } from '../components/ui/Modal.jsx';
 import './dashboard.css';
 const applicationLabels = { pending: 'Draft', under_review: 'Under review', approved: 'Approved', rejected: 'Needs attention' };
@@ -48,9 +49,9 @@ export default function DashboardPage() {
     } catch { setError('Your choice could not be saved. Please try again.'); }
     finally { setBusy(false); }
   }
-  if (initializing) return <div className="container section" role="status">Loading your account…</div>;
+  if (initializing) return <DashboardSkeleton label="Loading your account…" />;
   if (!user) return <Navigate to="/login" replace />;
-  if (!overview) return <div className="container section"><h1>Your dashboard</h1>{error ? <><p role="alert">{error}</p><Button onClick={() => setRetry(x => x + 1)}>Try again</Button></> : <p role="status">Loading your dashboard…</p>}</div>;
+  if (!overview) return <div className="container section"><h1>Your dashboard</h1>{error ? <><p role="alert">{error}</p><Button onClick={() => setRetry(x => x + 1)}>Try again</Button></> : <DashboardSkeleton label="Loading your dashboard…" />}</div>;
   const kind = overview.kind;
   if (kind === 'admin') return <Navigate to="/admin" replace />;
   const primary = kind === 'admin' ? ['/admin', 'Open admin console'] : kind === 'professional' ? ['/pro', 'Open professional workspace'] : kind === 'applicant' ? ['/professionals/apply', 'Continue professional application'] : ['/dashboard/search', 'Find a professional'];
@@ -68,7 +69,7 @@ export default function DashboardPage() {
       <Link to="/dashboard/verification" className="dashboard-card"><span className="eyebrow">Account security</span><h2>Stay connected. Stay protected.</h2><p>{overview.emailVerified ? 'Email verified.' : 'Email verification needed.'} Manage Google/GitHub connections. Keep your authenticator, passkey and recovery codes private.</p><span className="dashboard-arrow">Manage sign-in →</span></Link>
     </div>
     <section className="dashboard-recent"><div className="dashboard-section-head"><h2>{overview.canManageServices ? "Recent client bookings" : "Recent bookings"}</h2><Link to={overview.canManageServices ? "/dashboard/work" : "/bookings"}>View all →</Link></div>
-      {bookingsError ? <p role="alert">Your bookings could not be loaded. <button onClick={() => setRetry(x => x + 1)}>Try again</button></p> : !bookings ? <p role="status">Loading bookings…</p> : bookings.length === 0 ? <div className="dashboard-empty"><h3>{overview.canManageServices ? "Your next client starts here." : "Your first booking starts here."}</h3><p>{overview.canManageServices ? "Create and publish your services so customers can discover your work." : "Explore services and choose a professional when you’re ready."}</p><Button to={overview.canManageServices ? "/dashboard/gigs" : "/dashboard/search"} variant="secondary">{overview.canManageServices ? "Manage my gigs" : "Explore services"}</Button></div> : <div>{bookings.slice(0, 5).map(booking => <Link className="dashboard-booking" key={booking.id} to={`/bookings/${encodeURIComponent(booking.id)}`}><div><strong>{booking.serviceTitle}</strong><p>{booking.reference}</p></div><span>{booking.status.replaceAll('_', ' ')}</span></Link>)}</div>}
+      {bookingsError ? <p role="alert">Your bookings could not be loaded. <button onClick={() => setRetry(x => x + 1)}>Try again</button></p> : !bookings ? <ListSkeleton rows={3} panel={false} label="Loading bookings…" /> : bookings.length === 0 ? <div className="dashboard-empty"><h3>{overview.canManageServices ? "Your next client starts here." : "Your first booking starts here."}</h3><p>{overview.canManageServices ? "Create and publish your services so customers can discover your work." : "Explore services and choose a professional when you’re ready."}</p><Button to={overview.canManageServices ? "/dashboard/gigs" : "/dashboard/search"} variant="secondary">{overview.canManageServices ? "Manage my gigs" : "Explore services"}</Button></div> : <div>{bookings.slice(0, 5).map(booking => <Link className="dashboard-booking" key={booking.id} to={`/bookings/${encodeURIComponent(booking.id)}`}><div><strong>{booking.serviceTitle}</strong><p>{booking.reference}</p></div><span>{booking.status.replaceAll('_', ' ')}</span></Link>)}</div>}
     </section>
     <div className="ws-card-grid" style={{marginTop:24}}>
       <section className="ws-mini-card"><span className="ws-chip">Conversations</span><h2>Keep the details together.</h2><p>Discuss a booking or start a private conversation with an accepted connection.</p><Link to="/dashboard/messages">Open messages →</Link></section>
@@ -92,7 +93,7 @@ function ProHighlights({ extra, plan }) {
   const m = extra?.metrics; const t = m?.totals;
   return <section className="ws-panel" aria-label="Performance, last 30 days">
     <div className="ws-row" style={{ paddingTop: 0 }}><div><h2 style={{ marginBottom: 4 }}>Last 30 days</h2><p>Calculated from your own bookings, ledger and reviews.</p></div><div className="ws-actions"><Link className="btn btn--secondary" to="/dashboard/analytics">Full analytics</Link>{extra?.unread > 0 && <Link className="btn btn--secondary" to="/dashboard/notifications">{extra.unread} unread notification{extra.unread === 1 ? '' : 's'}</Link>}</div></div>
-    {extra === null ? <p className="ws-muted" role="status">Loading your metrics…</p> : !m ? <p className="ws-muted" role="alert">Your metrics could not be loaded right now.</p> : <>
+    {extra === null ? <div style={{ marginTop: 16 }}><StatsSkeleton label="Loading your metrics…" /></div> : !m ? <p className="ws-muted" role="alert">Your metrics could not be loaded right now.</p> : <>
       <div className="ws-stat-grid" style={{ marginTop: 16 }}><div className="ws-stat"><span>Earnings released</span><strong style={{ fontSize: 24 }}>{formatPrice(t.earnings)}</strong><small>Credited to payable balance</small></div><div className="ws-stat"><span>New bookings</span><strong>{t.bookings}</strong><small>{t.completed} completed</small></div><div className="ws-stat"><span>Response rate</span><strong>{t.responseRate === null ? '—' : `${t.responseRate}%`}</strong><small>{t.medianResponseHours === null ? 'No paid requests yet' : `Median ${t.medianResponseHours} h`}</small></div><div className="ws-stat"><span>Rating</span><strong>{t.reviewCount ? t.ratingAvg.toFixed(2) : '—'}</strong><small>{t.reviewCount} review{t.reviewCount === 1 ? '' : 's'} overall</small></div></div>
       {plan !== 'free' ? <LineChart data={m.series} y="earnings" label="Earnings released per day" money height={140} /> : <p className="ws-muted">Daily trends, status breakdowns and per-service performance are part of <Link to="/dashboard/plan">Servix Pro</Link>.</p>}
     </>}
@@ -102,7 +103,7 @@ function CustomerHighlights({ extra }) {
   const m = extra?.metrics;
   return <section className="ws-panel" aria-label="Your activity">
     <div className="ws-row" style={{ paddingTop: 0 }}><div><h2 style={{ marginBottom: 4 }}>Your activity</h2><p>Spending and upcoming bookings from your real records.</p></div><div className="ws-actions"><Link className="btn btn--secondary" to="/dashboard/payments">Payments</Link>{extra?.unread > 0 && <Link className="btn btn--secondary" to="/dashboard/notifications">{extra.unread} unread notification{extra.unread === 1 ? '' : 's'}</Link>}</div></div>
-    {extra === null ? <p className="ws-muted" role="status">Loading your activity…</p> : !m ? <p className="ws-muted" role="alert">Your activity could not be loaded right now.</p> : <div className="ws-two-col" style={{ marginTop: 16 }}>
+    {extra === null ? <div style={{ marginTop: 16 }}><StatsSkeleton label="Loading your activity…" /></div> : !m ? <p className="ws-muted" role="alert">Your activity could not be loaded right now.</p> : <div className="ws-two-col" style={{ marginTop: 16 }}>
       <BarChart data={m.monthly} x="month" y="spent" label="Spent per month (captured payments)" money height={150} />
       <div><h3 style={{ fontSize: 14, marginBottom: 10 }}>Upcoming</h3>{!m.upcoming.length ? <p className="ws-muted">No upcoming bookings. <Link to="/dashboard/search">Find a professional</Link>.</p> : m.upcoming.map(b => <Link className="dashboard-booking" key={b.id} to={`/bookings/${b.id}`}><div><strong>{b.serviceTitle}</strong><p>{new Date(b.scheduledAt).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p></div><span>{b.status.replaceAll('_', ' ')}</span></Link>)}{m.pendingReviews > 0 && <p className="ws-muted" style={{ marginTop: 12 }}>You have {m.pendingReviews} completed booking{m.pendingReviews === 1 ? '' : 's'} waiting for a review. <Link to="/bookings">Leave a review</Link>.</p>}</div>
     </div>}

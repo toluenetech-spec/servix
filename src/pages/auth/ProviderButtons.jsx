@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { oauthProviders, oauthConnections, startProvider } from '../../lib/authApi.js';
 import { ProviderLogo } from '../../components/brand/ProviderLogo.jsx';
 import { Button } from '../../components/ui/Button.jsx';
+import { Skeleton } from '../../components/ui/States.jsx';
 
 const messages = {
   cancelled: 'Provider sign-in was cancelled. You can try again or use your password.',
@@ -36,7 +37,7 @@ export function ProviderButtons({ linking = false }) {
       <p style={{ fontSize: 13 }}>By continuing, you agree to the <Link to="/terms">Terms</Link> and acknowledge the <Link to="/privacy">Privacy Policy</Link>. New accounts are for users aged 18 or over.</p>
       <p style={{ fontSize: 13 }}>Your saved security method is still required. New accounts must set one up.</p>
     </div>}
-    {loading && linking && <p role="status">Loading connections…</p>}
+    {loading && linking && <div role="status" aria-busy="true"><span className="sr-only">Loading connections…</span><div aria-hidden="true" style={{ display: 'grid', gap: 10 }}><Skeleton height="2.8rem" /><Skeleton height="2.8rem" /></div></div>}
     {!loading && linking && providers.length === 0 && <p>Provider connections are not available right now.</p>}
   </>;
 }

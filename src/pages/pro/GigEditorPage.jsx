@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '../../components/ui/Button.jsx';
+import { FormSkeleton, Skeleton } from '../../components/ui/States.jsx';
 import { Field } from '../../components/ui/Field.jsx';
 import { Icon } from '../../components/ui/Icon.jsx';
 import { OnboardingLayout, Stepper } from '../../components/onboarding/OnboardingLayout.jsx';
@@ -179,7 +180,7 @@ export default function GigEditorPage() {
     return <OnboardingLayout exitTo="/login"><div className="ob-status"><h1>Sign in to manage gigs</h1><p>The gig editor is part of the professional workspace.</p><Button to="/login" variant="primary">Sign in</Button></div></OnboardingLayout>;
   }
   if (initializing || state === 'loading') {
-    return <OnboardingLayout exitTo="/dashboard/gigs"><div className="ob-status" role="status" aria-busy="true"><p>Loading your gig…</p></div></OnboardingLayout>;
+    return <OnboardingLayout exitTo="/dashboard/gigs"><div className="ob-section"><Skeleton height="2rem" width="40%" style={{ marginBottom: 12 }} /><Skeleton height="0.9rem" width="65%" style={{ marginBottom: 28 }} /><FormSkeleton fields={4} panel={false} label="Loading your gig…" /></div></OnboardingLayout>;
   }
   if (state === 'error') {
     return <OnboardingLayout exitTo="/dashboard/gigs"><div className="ob-status"><h1>We couldn’t load this gig</h1><p>It may have been removed, or the connection dropped.</p><Button to="/dashboard/gigs" variant="secondary">Back to my gigs</Button></div></OnboardingLayout>;

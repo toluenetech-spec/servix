@@ -46,11 +46,30 @@ const LegalPage = lazy(() => import('./pages/LegalPage.jsx'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage.jsx'));
 
 function RouteFallback() {
+  // Shown only while a page's code is downloading; each page then renders its own skeleton.
+  const card = (i) => (
+    <div key={i} className="card" style={{ padding: '1.25rem', display: 'grid', gap: '0.6rem' }}>
+      <div className="skeleton" style={{ height: '1.3rem', width: '5rem', borderRadius: '999px' }} />
+      <div className="skeleton" style={{ height: '1.1rem', width: '70%', marginTop: '0.5rem' }} />
+      <div className="skeleton" style={{ height: '0.8rem', width: '90%' }} />
+      <div className="skeleton" style={{ height: '0.8rem', width: '60%' }} />
+    </div>
+  );
   return (
-    <div className="container section" aria-busy="true">
-      <div className="skeleton" style={{ height: '2rem', width: '40%', marginBottom: '1rem' }} />
-      <div className="skeleton" style={{ height: '1rem', width: '70%', marginBottom: '2rem' }} />
-      <div className="skeleton" style={{ height: '16rem' }} />
+    <div className="container section route-fallback" role="status" aria-busy="true" aria-live="polite">
+      <span className="sr-only">Loading page…</span>
+      <div aria-hidden="true">
+        <div className="skeleton" style={{ height: '0.8rem', width: '8rem', marginBottom: '0.9rem', borderRadius: '999px' }} />
+        <div className="skeleton" style={{ height: '2rem', width: '40%', marginBottom: '0.8rem' }} />
+        <div className="skeleton" style={{ height: '1rem', width: '65%', marginBottom: '2rem' }} />
+        <div className="results-grid" style={{ marginBottom: '1.5rem' }}>{[0, 1, 2].map(card)}</div>
+        <div className="card" style={{ padding: '1.25rem', display: 'grid', gap: '0.9rem' }}>
+          <div className="skeleton" style={{ height: '1rem', width: '30%' }} />
+          <div className="skeleton" style={{ height: '0.8rem', width: '95%' }} />
+          <div className="skeleton" style={{ height: '0.8rem', width: '85%' }} />
+          <div className="skeleton" style={{ height: '0.8rem', width: '70%' }} />
+        </div>
+      </div>
     </div>
   );
 }

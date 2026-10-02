@@ -19,7 +19,7 @@ import { Field } from '../../components/ui/Field.jsx';
 import { Modal } from '../../components/ui/Modal.jsx';
 import { Tabs } from '../../components/ui/Tabs.jsx';
 import { Icon } from '../../components/ui/Icon.jsx';
-import { Skeleton, EmptyState, ErrorState } from '../../components/ui/States.jsx';
+import { Skeleton, EmptyState, ErrorState, StatsSkeleton, TableSkeleton, ListSkeleton, PanelSkeleton } from '../../components/ui/States.jsx';
 import { useToast } from '../../components/ui/Toast.jsx';
 import { useAuth } from '../../lib/AuthContext.jsx';
 import { useDocumentMeta } from '../../lib/useDocumentMeta.js';
@@ -69,7 +69,7 @@ function OverviewTab() {
   useEffect(load, [load]);
 
   if (error) return <ErrorState message="We couldn't load platform stats." onRetry={load} />;
-  if (!stats) return <Skeleton height="10rem" />;
+  if (!stats) return <><StatsSkeleton label="Loading platform overview…" /><PanelSkeleton rows={3} label="" /></>;
 
   const items = [
     { label: 'Users', value: stats.users },
@@ -164,7 +164,7 @@ function ApplicationsTab() {
       </div>
 
       {error && <ErrorState message="We couldn't load applications." onRetry={load} />}
-      {!error && !data && <Skeleton height="10rem" />}
+      {!error && !data && <ListSkeleton rows={4} label="Loading applications…" />}
       {data && data.items.length === 0 && (
         <EmptyState title="Nothing here" message="No applications match this filter." />
       )}
@@ -279,7 +279,7 @@ function ServicesTab() {
       </div>
 
       {error && <ErrorState message="We couldn't load services." onRetry={load} />}
-      {!error && !data && <Skeleton height="10rem" />}
+      {!error && !data && <TableSkeleton rows={6} cols={5} label="Loading services…" />}
       {data && data.items.length === 0 && <EmptyState title="No services" message="No services match this filter." />}
 
       {data && data.items.map((s) => (
@@ -366,7 +366,7 @@ function UsersTab() {
       </form>
 
       {error && <ErrorState message="We couldn't load users." onRetry={load} />}
-      {!error && !data && <Skeleton height="10rem" />}
+      {!error && !data && <TableSkeleton rows={8} cols={5} label="Loading users…" />}
       {data && data.items.length === 0 && <EmptyState title="No users found" message="Try a different search." />}
 
       {data && data.items.length > 0 && (
@@ -471,7 +471,7 @@ function BookingsTab() {
       </div>
 
       {error && <ErrorState message="We couldn't load bookings." onRetry={load} />}
-      {!error && !data && <Skeleton height="10rem" />}
+      {!error && !data && <TableSkeleton rows={8} cols={6} label="Loading bookings…" />}
       {data && data.items.length === 0 && (
         <EmptyState title="Nothing here" message={status === 'disputed' ? 'No open disputes — good news.' : 'No bookings match this filter.'} />
       )}
@@ -615,7 +615,7 @@ function PayoutsTab() {
       </div>
 
       {error && <ErrorState message="We couldn't load payouts." onRetry={load} />}
-      {!error && !data && <Skeleton height="10rem" />}
+      {!error && !data && <TableSkeleton rows={6} cols={5} label="Loading payouts…" />}
       {data && data.items.length === 0 && <EmptyState title="No payouts" message="No payouts match this filter." />}
 
       {data && data.items.length > 0 && (
@@ -679,7 +679,7 @@ function AuditTab() {
       </div>
 
       {error && <ErrorState message="We couldn't load the audit log." onRetry={load} />}
-      {!error && !data && <Skeleton height="10rem" />}
+      {!error && !data && <TableSkeleton rows={10} cols={4} label="Loading audit log…" />}
       {data && data.items.length === 0 && <EmptyState title="No entries" message="No audit entries match this filter." />}
 
       {data && data.items.length > 0 && (
@@ -739,7 +739,8 @@ export default function AdminPage() {
     return (
       <div className="page container section" aria-busy="true">
         <Skeleton height="2rem" width="40%" style={{ marginBottom: '1rem' }} />
-        <Skeleton height="16rem" />
+        <StatsSkeleton label="Loading admin console…" />
+        <TableSkeleton rows={5} label="" />
       </div>
     );
   }

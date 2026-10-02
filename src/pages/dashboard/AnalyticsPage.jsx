@@ -10,7 +10,7 @@ export default function AnalyticsPage() {
   useDocumentMeta({ title: 'Analytics', description: 'Your Servix performance metrics.' });
   const [days, setDays] = useState(30); const r = useResource(() => Promise.all([getProAnalytics(days), getPlan()]).then(([analytics, plan]) => ({ ...analytics, plan })), [days]);
   const a = r.data; const t = a?.totals; const detailed = a?.plan?.limits?.analytics;
-  return <><PageHead title="Analytics" description="Every figure below is calculated from your own bookings, ledger entries and reviews. Nothing is estimated."><div className="ws-range" role="group" aria-label="Period">{[7, 30, 90, 365].map(d => <button key={d} aria-pressed={days === d} onClick={() => setDays(d)}>{d === 365 ? '1 year' : `${d} days`}</button>)}</div></PageHead><LoadState resource={r}>{() => <>
+  return <><PageHead title="Analytics" description="Every figure below is calculated from your own bookings, ledger entries and reviews. Nothing is estimated."><div className="ws-range" role="group" aria-label="Period">{[7, 30, 90, 365].map(d => <button key={d} aria-pressed={days === d} onClick={() => setDays(d)}>{d === 365 ? '1 year' : `${d} days`}</button>)}</div></PageHead><LoadState skeleton="stats" label="Loading your analytics…" resource={r}>{() => <>
     <div className="ws-stat-grid">
       <div className="ws-stat"><span>Bookings</span><strong>{t.bookings}</strong><small>{t.completed} completed · {t.cancelled} cancelled or declined</small></div>
       <div className="ws-stat"><span>Earnings released</span><strong style={{ fontSize: 24 }}>{formatPrice(t.earnings)}</strong><small>Credited to your payable balance in this period</small></div>

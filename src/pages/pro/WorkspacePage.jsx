@@ -10,7 +10,7 @@ import { Field } from '../../components/ui/Field.jsx';
 import { Badge, VerifiedBadge } from '../../components/ui/Badge.jsx';
 import { Tabs } from '../../components/ui/Tabs.jsx';
 import { Icon } from '../../components/ui/Icon.jsx';
-import { Skeleton, EmptyState, ErrorState } from '../../components/ui/States.jsx';
+import { Skeleton, EmptyState, ErrorState, ListSkeleton, StatsSkeleton, TableSkeleton, FormSkeleton, CardsSkeleton } from '../../components/ui/States.jsx';
 import { useToast } from '../../components/ui/Toast.jsx';
 import { useAuth } from '../../lib/AuthContext.jsx';
 import { useDocumentMeta } from '../../lib/useDocumentMeta.js';
@@ -68,7 +68,7 @@ function ProBookingsTab() {
   }
 
   if (error) return <ErrorState message="We couldn't load your bookings." onRetry={load} />;
-  if (!bookings) return <Skeleton height="10rem" />;
+  if (!bookings) return <ListSkeleton rows={5} label="Loading client bookings…" />;
   if (bookings.length === 0) {
     return <EmptyState title="No bookings yet" message="Customer bookings on your services appear here." />;
   }
@@ -140,7 +140,7 @@ function EarningsTab() {
   }
 
   if (error) return <ErrorState message="We couldn't load your earnings." onRetry={load} />;
-  if (!data) return <Skeleton height="10rem" />;
+  if (!data) return <><StatsSkeleton label="Loading your earnings…" /><TableSkeleton rows={5} label="" /></>;
 
   return (
     <div style={{ display: 'grid', gap: 'var(--space-6)', maxWidth: '40rem' }}>
@@ -220,7 +220,7 @@ function ServicesTab({ categories }) {
     return <ErrorState message="We couldn't load your services." onRetry={load} />;
   }
   if (!services) {
-    return <Skeleton height="12rem" />;
+    return <CardsSkeleton count={3} tall label="Loading your gigs…" />;
   }
 
   return (
@@ -537,7 +537,7 @@ export default function WorkspacePage({ section = null }) {
     return (
       <div className="page container section" aria-busy="true">
         <Skeleton height="2rem" width="40%" style={{ marginBottom: '1rem' }} />
-        <Skeleton height="16rem" />
+        <ListSkeleton rows={4} label="Loading your workspace…" />
       </div>
     );
   }

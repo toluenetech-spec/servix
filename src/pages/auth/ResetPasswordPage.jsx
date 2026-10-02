@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { AuthShell } from './AuthShell.jsx';
 import { Button } from '../../components/ui/Button.jsx';
+import { Skeleton, SkeletonText } from '../../components/ui/States.jsx';
 import { Field } from '../../components/ui/Field.jsx';
 import { Icon } from '../../components/ui/Icon.jsx';
 import { useToast } from '../../components/ui/Toast.jsx';
@@ -87,7 +88,7 @@ export default function ResetPasswordPage() {
     <AuthShell>
       <h1>Choose a new password</h1>
       <p>Choose a unique password with at least 8 characters.</p>
-      {!policy && !policyError && <p role="status">Loading password requirements…</p>}
+      {!policy && !policyError && <div role="status" aria-busy="true"><span className="sr-only">Loading password requirements…</span><div aria-hidden="true" style={{ display: 'grid', gap: 12, margin: '16px 0' }}><Skeleton height="2.8rem" /><Skeleton height="2.8rem" /><SkeletonText lines={4} widths={['60%', '50%', '65%', '45%']} /></div></div>}
       {policyError && <div role="alert">{policyError} <button type="button" onClick={() => setRetry(value => value + 1)}>Try again</button> <Link to="/forgot-password">Request a new link</Link></div>}
       <form className="auth__form" onSubmit={onSubmit} noValidate>
         <Field label="New password" required error={errors.password}>

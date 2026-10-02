@@ -5,7 +5,7 @@ import { Icon } from '../components/ui/Icon.jsx';
 import { Drawer } from '../components/ui/Drawer.jsx';
 import { Pagination } from '../components/ui/Pagination.jsx';
 import { ServiceCard } from '../components/cards/ServiceCard.jsx';
-import { CardGridSkeleton, EmptyState, ErrorState } from '../components/ui/States.jsx';
+import { CardGridSkeleton, EmptyState, ErrorState, Skeleton } from '../components/ui/States.jsx';
 import { useFetch } from '../lib/useFetch.js';
 import { useDocumentMeta } from '../lib/useDocumentMeta.js';
 import { getServices } from '../lib/api.js';
@@ -253,7 +253,7 @@ export default function ServicesPage() {
           <div>
             <div className="results-head">
               <p className="results-head__count" aria-live="polite">
-                {loading ? 'Loading services…' : `${items.length} service${items.length === 1 ? '' : 's'} found`}
+                {loading ? <><span className="sr-only">Loading services…</span><Skeleton height="0.9rem" width="9rem" style={{ display: 'inline-block', verticalAlign: 'middle' }} /></> : `${items.length} service${items.length === 1 ? '' : 's'} found`}
               </p>
               <div className="results-head__controls">
                 <label className="sr-only" htmlFor="sort-services">

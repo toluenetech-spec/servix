@@ -9,7 +9,7 @@ import { Badge } from '../../components/ui/Badge.jsx';
 import { Field } from '../../components/ui/Field.jsx';
 import { Modal } from '../../components/ui/Modal.jsx';
 import { Icon } from '../../components/ui/Icon.jsx';
-import { Skeleton, EmptyState, ErrorState } from '../../components/ui/States.jsx';
+import { Skeleton, EmptyState, ErrorState, PanelSkeleton } from '../../components/ui/States.jsx';
 import { useToast } from '../../components/ui/Toast.jsx';
 import { useAuth } from '../../lib/AuthContext.jsx';
 import { useDocumentMeta } from '../../lib/useDocumentMeta.js';
@@ -80,7 +80,9 @@ export default function BookingDetailPage() {
     return (
       <div className="page container container--narrow section" aria-busy="true">
         <Skeleton height="2rem" width="45%" style={{ marginBottom: '1rem' }} />
-        <Skeleton height="14rem" />
+        <Skeleton height="0.9rem" width="30%" style={{ marginBottom: '1.5rem' }} />
+        <PanelSkeleton rows={4} heading={false} label="Loading booking…" />
+        <PanelSkeleton rows={2} label="" />
       </div>
     );
   }

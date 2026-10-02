@@ -7,7 +7,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Button } from '../../components/ui/Button.jsx';
 import { Badge } from '../../components/ui/Badge.jsx';
 import { Field } from '../../components/ui/Field.jsx';
-import { Skeleton, EmptyState, ErrorState } from '../../components/ui/States.jsx';
+import { Skeleton, EmptyState, ErrorState, StatsSkeleton, TableSkeleton, ListSkeleton } from '../../components/ui/States.jsx';
 import { useToast } from '../../components/ui/Toast.jsx';
 import { LineChart, BarChart, Donut, HBars } from '../../components/dashboard/Charts.jsx';
 import { formatPrice } from '../../lib/format.js';
@@ -22,7 +22,7 @@ export function AnalyticsTab() {
   if (error) return <ErrorState message="We couldn't load analytics." onRetry={load} />;
   return <div style={{ display: 'grid', gap: 'var(--space-5)' }}>
     <div className="ws-range" role="group" aria-label="Period">{[7, 30, 90, 365].map(d => <button key={d} aria-pressed={days === d} onClick={() => setDays(d)}>{d === 365 ? '1 year' : `${d} days`}</button>)}</div>
-    {!data ? <Skeleton height="16rem" /> : <>
+    {!data ? <><StatsSkeleton label="Loading analytics…" /><Skeleton height="14rem" style={{ marginBottom: 22 }} /></> : <>
       <div className="ws-stat-grid" style={{ margin: 0 }}>
         <div className="ws-stat"><span>Payments captured (GMV)</span><strong style={{ fontSize: 24 }}>{formatPrice(data.totals.gmv)}</strong><small>{formatPrice(data.totals.refunds)} refunded in period</small></div>
         <div className="ws-stat"><span>Platform fees earned</span><strong style={{ fontSize: 24 }}>{formatPrice(data.totals.platformFees)}</strong><small>Ledger: platform revenue credits</small></div>
@@ -79,7 +79,7 @@ export function NotificationsTab() {
     </section>
     <section className="ws-panel"><h2>Sent notifications</h2>
       {error && <ErrorState message="We couldn't load the history." onRetry={load} />}
-      {!error && !history && <Skeleton height="8rem" />}
+      {!error && !history && <ListSkeleton rows={3} avatar={false} label="Loading sent notifications…" />}
       {history && history.items.length === 0 && <EmptyState title="Nothing sent yet" message="Broadcasts you send will be listed here with delivery and read counts." />}
       {history && history.items.map(b => <article className="ws-review" key={b.id}><header><span><strong>{b.title}</strong></span><Badge variant="neutral">{b.audience}</Badge></header><p>{b.body}</p><small>{fmtWhen(b.createdAt)} · by {b.sentBy} · {b.recipientCount} recipient{b.recipientCount === 1 ? '' : 's'} · {b.readCount} read{b.link ? ` · ${b.link}` : ''}</small></article>)}
     </section>
@@ -93,7 +93,7 @@ export function SubscriptionsTab() {
   return <div style={{ display: 'grid', gap: 'var(--space-5)' }}>
     <div style={{ maxWidth: '16rem' }}><Field label="Status filter">{props => <select {...props} className="select" value={status} onChange={e => setStatus(e.target.value)}><option value="">All</option>{['initiated', 'active', 'failed', 'expired', 'cancelled'].map(s => <option key={s} value={s}>{s}</option>)}</select>}</Field></div>
     {error && <ErrorState message="We couldn't load plan subscriptions." onRetry={load} />}
-    {!error && !data && <Skeleton height="10rem" />}
+    {!error && !data && <TableSkeleton rows={6} cols={5} label="Loading subscriptions…" />}
     {data && data.items.length === 0 && <EmptyState title="No plan purchases" message="When a professional upgrades to Servix Pro, the purchase and its verification status appear here." />}
     {data && data.items.length > 0 && <div className="earnings"><table><thead><tr><th>Reference</th><th>Professional</th><th>Plan</th><th>Amount</th><th>Status</th><th>Period</th></tr></thead><tbody>{data.items.map(s => <tr key={s.id}><td style={{ fontSize: 'var(--text-xs)' }}>{s.reference}<br /><small>{fmtWhen(s.createdAt)}</small></td><td>{s.professional.name}<br /><small>{s.professional.email ?? 'unclaimed profile'} · now on {s.professional.currentPlan}</small></td><td>{s.plan}</td><td>{formatPrice(s.amount)}</td><td><Badge variant={s.status === 'active' ? 'brand' : s.status === 'initiated' ? 'accent' : 'neutral'}>{s.status}</Badge></td><td>{s.startsAt ? `${new Date(s.startsAt).toLocaleDateString('en-GB')} – ${new Date(s.endsAt).toLocaleDateString('en-GB')}` : '—'}</td></tr>)}</tbody></table></div>}
     <p className="ws-muted">Plans activate only after the payment provider confirms the charge (return verification or signed webhook). Plans do not auto-renew.</p>
