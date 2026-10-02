@@ -10,7 +10,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/db.js';
-import { requireProfessional } from '../lib/authGuard.js';
+import { requireProfessional, requireKycVerified } from '../lib/authGuard.js';
 import { ApiError, notFound } from '../lib/errors.js';
 import { parseBody, parsePatchBody } from '../lib/query.js';
 import { serializeProfessionalDetail, serializeServiceDetail } from '../lib/serialize.js';
@@ -457,7 +457,7 @@ export async function proRoutes(app: FastifyInstance) {
 
   app.post(
     '/pro/services/:id/publish',
-    { ...guard, schema: { tags: ['professional'], summary: 'Publish a service', security: [{ bearerAuth: [] }] } },
+    { preHandler: [requireProfessional, requireKycVerified], schema: { tags: ['professional'], summary: 'Publish a service (identity verification required)', security: [{ bearerAuth: [] }] } },
     async (req) => {
       const { id } = req.params as { id: string };
       const service = await ownedService(id, req.professionalProfileId!);

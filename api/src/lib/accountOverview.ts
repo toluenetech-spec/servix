@@ -19,6 +19,7 @@ export async function accountOverview(userId: string, tx: Prisma.TransactionClie
     kind: user.role === 'admin' ? 'admin' : canManageServices ? 'professional' : intent === 'professional' ? 'applicant' : 'customer',
     intent, applicationStatus: application, canManageServices,
     emailVerified: Boolean(user.emailVerifiedAt),
+    kycStatus: user.kycStatus,
     plan: canManageServices && user.professionalProfile ? effectivePlan(user.professionalProfile) : null,
     needsChoice: user.role === 'customer' && user.oauthIdentities.length > 0 && !record && !application,
   };

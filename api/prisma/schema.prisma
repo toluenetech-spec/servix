@@ -39,6 +39,28 @@ enum UserRole {
   admin
 }
 
+/** Manual KYC (identity verification). */
+enum KycDocumentType {
+  nin_slip
+  international_passport
+  voters_card
+  drivers_license
+}
+
+enum KycStatus {
+  not_submitted
+  pending
+  approved
+  rejected
+}
+
+enum UserKycStatus {
+  unverified
+  pending
+  verified
+  rejected
+}
+
 enum UserStatus {
   pending_verification
   active
@@ -52,6 +74,7 @@ model User {
   passwordHash    String     @map("password_hash")
   fullName        String     @map("full_name")
   avatarUrl       String?    @map("avatar_url")
+  kycStatus       UserKycStatus @default(unverified) @map("kyc_status")
   role            UserRole   @default(customer)
   status          UserStatus @default(pending_verification)
   emailVerifiedAt DateTime?  @map("email_verified_at")
@@ -82,8 +105,41 @@ model User {
   professionalProfile ProfessionalProfile?
   bookings      Booking[] @relation("customerBookings")
   auditEntries  AuditLog[]
+  kyc           KycVerification? @relation("kyc_subject")
+  kycReviews    KycVerification[] @relation("kyc_reviewer")
 
   @@map("users")
+}
+
+/**
+ * One identity-verification record per user. ID numbers are encrypted at rest
+ * (AES-256-GCM via AUTH_SECURITY_SECRET) plus an HMAC digest for duplicate
+ * detection; files live under private object-storage keys that are only ever
+ * exposed through short-lived signed URLs to admins.
+ */
+model KycVerification {
+  id                String          @id @default(uuid())
+  userId            String          @unique @map("user_id")
+  user              User            @relation("kyc_subject", fields: [userId], references: [id], onDelete: Cascade)
+  documentType      KycDocumentType @map("document_type")
+  idNumberEncrypted String          @map("id_number_encrypted")
+  idNumberDigest    String          @map("id_number_digest")
+  dateOfBirth       DateTime?       @map("date_of_birth") @db.Date
+  phone             String?
+  documentFileKey   String          @map("document_file_key")
+  selfieFileKey     String          @map("selfie_file_key")
+  status            KycStatus       @default(pending)
+  rejectionReason   String?         @map("rejection_reason")
+  reviewedById      String?         @map("reviewed_by")
+  reviewedBy        User?           @relation("kyc_reviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt        DateTime?       @map("reviewed_at")
+  consentAt         DateTime        @map("consent_at")
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+
+  @@index([status, createdAt])
+  @@index([idNumberDigest])
+  @@map("kyc_verifications")
 }
 
 model RefreshToken {

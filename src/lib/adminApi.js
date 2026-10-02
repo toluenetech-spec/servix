@@ -83,3 +83,9 @@ export const getAnalytics = (days = 30) => call('GET', `/admin/analytics?days=${
 export const getBroadcasts = (params) => call('GET', `/admin/notifications${qs(params)}`);
 export const sendBroadcast = (body) => call('POST', '/admin/notifications', body);
 export const getSubscriptions = (params) => call('GET', `/admin/subscriptions${qs(params)}`);
+
+/* identity verification (KYC) */
+export const getKycQueue = (params) => call('GET', `/admin/kyc/pending${qs(params)}`);
+export const getKycCase = (id) => call('GET', `/admin/kyc/${encodeURIComponent(id)}`);
+export const reviewKyc = (id, action, rejectionReason) =>
+  call('POST', `/admin/kyc/${encodeURIComponent(id)}/review`, rejectionReason ? { action, rejectionReason } : { action });

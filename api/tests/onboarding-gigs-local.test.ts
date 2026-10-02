@@ -172,6 +172,11 @@ describe.skipIf(process.env.RUN_LOCAL_ONBOARDING_GIGS_TESTS !== '1')('onboarding
     expect(draft.json()).toMatchObject({ status: 'draft', searchTags: ['shopify', 'woocommerce', 'online store'], serviceType: 'E-commerce website', deliveryDays: null });
     expect(Object.keys(draft.json().publishProblems).sort()).toEqual(['deliveryDays', 'description', 'gallery', 'shortDescription']);
     const id = draft.json().id;
+    // Publishing is gated on identity verification first…
+    const unverified = await call(pro.token, `pro/services/${id}/publish`, {});
+    expect(unverified.statusCode).toBe(403); expect(unverified.json().error.code).toBe('KYC_REQUIRED');
+    await prisma.user.update({ where: { id: pro.user.id }, data: { kycStatus: 'verified' } });
+    // …then on the gig checklist.
     const blocked = await call(pro.token, `pro/services/${id}/publish`, {});
     expect(blocked.statusCode).toBe(422); expect(blocked.json().error.code).toBe('GIG_INCOMPLETE'); expect(blocked.json().error.errors.gallery).toContain('image');
     // Validation on tags.

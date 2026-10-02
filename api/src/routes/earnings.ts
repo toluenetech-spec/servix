@@ -6,7 +6,7 @@
  */
 import type { FastifyInstance } from 'fastify';
 import { prisma } from '../lib/db.js';
-import { requireProfessional } from '../lib/authGuard.js';
+import { requireProfessional, requireKycVerified } from '../lib/authGuard.js';
 import { accountBalance } from '../lib/ledger.js';
 import { requestPayout } from '../lib/payoutService.js';
 
@@ -45,7 +45,7 @@ export async function earningsRoutes(app: FastifyInstance) {
 
   app.post(
     '/pro/payouts',
-    { preHandler: requireProfessional, schema: { tags: ['payments'], summary: 'Request payout of the full payable balance', security: [{ bearerAuth: [] }] } },
+    { preHandler: [requireProfessional, requireKycVerified], schema: { tags: ['payments'], summary: 'Request payout of the full payable balance (identity verification required)', security: [{ bearerAuth: [] }] } },
     async (req, reply) => {
       const updated = await requestPayout(req.professionalProfileId!);
       return reply.code(201).send({

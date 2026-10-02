@@ -121,6 +121,7 @@ function EarningsTab() {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [kycBlocked, setKycBlocked] = useState(false);
 
   const load = useCallback(() => {
     setError(null);
@@ -135,6 +136,7 @@ function EarningsTab() {
       showToast(`Payout of ${formatPrice(res.amount)} processed (${res.providerRef}).`, 'success');
       load();
     } catch (err) {
+      if (err.code === 'KYC_REQUIRED') { setKycBlocked(true); showToast('Identity verification is required before payouts.', 'error'); return; }
       showToast(err.message ?? 'Payout failed.', 'error');
     } finally {
       setBusy(false);
@@ -156,6 +158,7 @@ function EarningsTab() {
           <div className="profile-stat__label">Lifetime earnings</div>
         </div>
       </div>
+      {kycBlocked && <div className="ob-error" role="alert" data-testid="kyc-required">Payouts are only available to verified professionals. <Link to="/dashboard/identity">Verify your identity →</Link> (one-time, usually 12–24 hours).</div>}
       <div>
         <Button variant="primary" disabled={busy || data.payable <= 0} onClick={payout}>
           {busy ? 'Processing…' : 'Request Payout'}
@@ -212,6 +215,11 @@ function ServicesTab({ categories }) {
       if (err.code === 'GIG_INCOMPLETE') {
         showToast('Finish the gig before publishing — opening the editor.', 'error');
         navigate(`/dashboard/gigs/${id}/edit`);
+        return;
+      }
+      if (err.code === 'KYC_REQUIRED') {
+        showToast('Verify your identity before publishing — opening Identity verification.', 'error');
+        navigate('/dashboard/identity');
         return;
       }
       showToast(err.message ?? 'Action failed.', 'error');

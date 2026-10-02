@@ -72,6 +72,7 @@ All dashboard pages share a sidebar, a top search bar ("Search services and prof
 | **Payments** | `/dashboard/payments` | Transaction history (latest 100), CSV download, plain-language notes (not tax invoices; card details never stored) |
 | **Notifications** | `/dashboard/notifications` | Full list, mark read; types include booking updates, payouts, plan activation, chat, admin announcements |
 | **Explore / Search** | `/dashboard/search?q=` | Searches services and professionals from the top bar |
+| **Identity verification** | `/dashboard/identity` | One-time manual KYC: choose document type (NIN slip, international passport, voter's card, driver's licence), enter the ID number, upload the document (JPEG/PNG; PDF only for an NIN slip; 5 MB) and a selfie holding a paper with today's date and full name, tick the NDPA consent box, submit. Shows *under review* (12–24 h), *verification failed: reason* with re-submit, or a green **Identity verified** badge. Required before publishing a gig or requesting a payout |
 | **Verification & security** | `/dashboard/verification` | Email ownership status, account security (authenticator/passkey, recovery codes guidance), connected providers, professional approval status |
 | **Settings** | `/dashboard/settings` | **Profile photo** (upload JPEG/PNG/WebP ≤5 MB, remove), Personal details (name), Sign-in & security (Google/GitHub connections), Privacy preferences (optional analytics), Account assistance (closure/correction via support) |
 | **Become a professional** | `/professionals/apply` | See §5 |
@@ -147,7 +148,7 @@ A plan activates only after Paystack confirms the charge (return verification or
 
 ## 9. Admin console (`/admin`, administrators only)
 
-Tabs: **Overview** (pending applications, open disputes, failed payouts, dead jobs, active services, bookings by status) · **Analytics & charts** (GMV captured, platform revenue, professionals on paid plans, services with bookings, trends) · **Applications** (each card shows photo, title, about, skills, experience/education/certifications, portfolio, **CV link**; Approve / Reject with reason) · **Users** (search, suspend/reactivate, reset password — basic 8–200 chars) · **Services** (feature / unpublish / remove) · **Bookings & disputes** (view, resolve: release or refund with note) · **Payouts** (retry failed) · **Plan subscriptions** · **Send notification** (in-app broadcast to all / customers / professionals / one account; no email or SMS) · **Audit log** (who did what, when).
+Tabs: **Overview** (pending applications, open disputes, failed payouts, dead jobs, active services, bookings by status) · **Analytics & charts** (GMV captured, platform revenue, professionals on paid plans, services with bookings, trends) · **Applications** (each card shows photo, title, about, skills, experience/education/certifications, portfolio, **CV link**; Approve / Reject with reason) · **Identity (KYC)** (pending queue with name, email, document type, ID number, date; split-screen review — profile details left, zoom/pan ID document centre, selfie right; green **Approve**, **Reject** with standard reasons: Document blurry, Name mismatch, Selfie does not match ID, Expired document; the person is notified in-app and by email) · **Users** (search, suspend/reactivate, reset password — basic 8–200 chars) · **Services** (feature / unpublish / remove) · **Bookings & disputes** (view, resolve: release or refund with note) · **Payouts** (retry failed) · **Plan subscriptions** · **Send notification** (in-app broadcast to all / customers / professionals / one account; no email or SMS) · **Audit log** (who did what, when).
 
 The admin account `admin@servix.app` is bootstrapped from configuration; admins are exempt from the live password checklist on resets.
 
@@ -169,6 +170,8 @@ Single upload endpoint with strict rules (visible at `/api/v1/uploads/rules`):
 | resume (CV/LinkedIn) / service document | PDF | 10 MB |
 | service video | MP4, WebM, MOV | 50 MB |
 
+Identity documents use a separate endpoint (`POST /kyc/upload`): JPEG/PNG (PDF only for an NIN slip), 5 MB, type checked by file contents on both the browser and the server. They are stored under private `kyc/…` keys that the public `/media` route never serves; only administrators can open them, through signed links that expire after 20 minutes.
+
 Files go to Cloudflare R2 (`servix-storage`). The API only accepts media URLs that belong to its own bucket. If storage is ever unavailable the UI shows a clear "uploads unavailable" message instead of failing silently.
 
 ---
@@ -180,6 +183,7 @@ Files go to Cloudflare R2 (`servix-storage`). The API only accepts media URLs th
 - Google and GitHub OAuth (sign in only if linked; linking from Settings).
 - Rate limiting on auth and sensitive routes; CORS allow-list; audit log of admin and money actions.
 - Cookie consent (essential vs optional analytics); NDPA-aware privacy policy; no third-party trackers without consent.
+- Identity verification data: ID numbers encrypted at rest (AES-256-GCM) with a keyed digest to stop one document being used on two accounts; documents in a private bucket; explicit consent timestamp; every admin view and decision in the audit log; one submission per person (re-submission only after a rejection).
 - Health endpoints: `/healthz` (liveness) and `/readyz` (database, queue, storage).
 
 ---
@@ -188,7 +192,7 @@ Files go to Cloudflare R2 (`servix-storage`). The API only accepts media URLs th
 
 - **Frontend:** React + Vite, React Router, lazy-loaded pages, shared UI kit (`src/components/ui`), served by Vercel (`www.servix.name.ng`).
 - **API:** Node 22 + Fastify + Prisma 7 on Railway (`api.servix.name.ng`), PostgreSQL on Neon (Ohio), Swagger docs at `/docs`.
-- **Database migrations:** 11, applied manually (never at start-up); guarded Neon scripts live in `api/docs/`.
+- **Database migrations:** 12, applied manually (never at start-up); guarded Neon scripts live in `api/docs/` (latest: `manual-kyc-upgrade.sql`).
 - **Tests:** 106 API tests (embedded Postgres), 14 unit tests, 44 Playwright browser tests.
 - **Categories seeded:** Web Development, UI/UX Design, Graphic Design, Video Editing, Photography, Marketing, Writing, Consulting.
 
@@ -205,6 +209,7 @@ Files go to Cloudflare R2 (`servix-storage`). The API only accepts media URLs th
 - **Professional profile & gigs:** `GET|PATCH /pro/profile`, `PUT /pro/skills`, `POST /pro/portfolio`, `DELETE /pro/portfolio/:itemId`, `GET|POST /pro/services`, `GET|PATCH|DELETE /pro/services/:id`, `POST /pro/services/:id/publish|unpublish`
 - **Workspace:** `GET|PUT /pro/availability`, `POST /pro/availability/exceptions`, `DELETE /pro/availability/exceptions/:id`, `GET /pro/analytics`, `GET /pro/reviews`, `GET /pro/earnings`, `POST /pro/payouts`, `GET /pro/plan`, `POST /pro/plan/checkout|verify`
 - **Uploads:** `POST /uploads?kind=…`, `GET /uploads/rules`
+- **Identity verification:** `POST /kyc/upload?part=document|selfie&documentType=…`, `POST /kyc/submit`, `GET /kyc/status`, `GET /kyc/files/:name?t=<signed token>` (admin-minted, 20-minute expiry); admin: `GET /admin/kyc/pending`, `GET /admin/kyc/:id`, `POST /admin/kyc/:id/review` (`approve` | `reject` + reason)
 - **Community (flag-gated):** `GET /community/config|connections|threads|threads/:id/messages`, `POST /community/connections`, `/connections/:id/action`, `/threads`, `/threads/:id/messages|read|block`
 - **Admin:** `GET /admin/stats|analytics|applications|users|services|bookings|bookings/:id|payouts|subscriptions|notifications|audit`; `POST /admin/applications/:id/approve|reject`, `/admin/users/:id/{suspend|reactivate|reset-password}`, `/admin/services/:slug/{feature|unpublish|remove}`, `/admin/bookings/:id/resolve`, `/admin/payouts/:id/retry`, `/admin/notifications`
 - **Payments:** `POST /api/v1/webhooks/paystack`; sandbox checkout `GET|POST /sandbox/checkout/:reference[/complete]`

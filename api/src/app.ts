@@ -34,6 +34,7 @@ import { bookingRoutes } from './routes/bookings.js';
 import { webhookRoutes } from './routes/webhooks.js';
 import { earningsRoutes } from './routes/earnings.js';
 import { adminRoutes } from './routes/admin.js';
+import { kycRoutes } from './routes/kyc.js';
 
 export async function buildApp() {
   const config = loadConfig();
@@ -215,6 +216,7 @@ export async function buildApp() {
       await bookingRoutes(v1);
       await earningsRoutes(v1);
       await adminRoutes(v1);
+      await kycRoutes(v1); // /kyc/* + /admin/kyc/*
     },
     { prefix: '/api/v1' },
   );

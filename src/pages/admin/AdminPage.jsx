@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AnalyticsTab, NotificationsTab, SubscriptionsTab } from './AdminExtraTabs.jsx';
+import { IdentityTab } from './AdminIdentityTab.jsx';
 import { Button } from '../../components/ui/Button.jsx';
 import { Badge } from '../../components/ui/Badge.jsx';
 import { Field } from '../../components/ui/Field.jsx';
@@ -30,6 +31,7 @@ const TABS = [
   { id: 'overview', label: 'Overview' },
   { id: 'analytics', label: 'Analytics' },
   { id: 'applications', label: 'Applications' },
+  { id: 'identity', label: 'Identity (KYC)' },
   { id: 'services', label: 'Services' },
   { id: 'users', label: 'Users' },
   { id: 'bookings', label: 'Bookings & Disputes' },
@@ -776,6 +778,7 @@ export default function AdminPage() {
         {tab === 'subscriptions' && <SubscriptionsTab />}
         {tab === 'notifications' && <NotificationsTab />}
         {tab === 'applications' && <ApplicationsTab />}
+        {tab === 'identity' && <IdentityTab />}
         {tab === 'services' && <ServicesTab />}
         {tab === 'users' && <UsersTab />}
         {tab === 'bookings' && <BookingsTab />}

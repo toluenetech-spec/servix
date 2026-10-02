@@ -4,13 +4,14 @@
  *   requireAuth          — valid Bearer access token
  *   requireProfessional  — token AND server-verified professional role.
  *   requireAdmin         — role re-read from the DATABASE (Phase E).
+ *   requireKycVerified   — identity verification approved (users.kyc_status).
  *
  * Roles are re-read from the DATABASE, never trusted from the JWT alone,
  * so a stale or forged claim can never grant professional or admin access.
  */
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { verifyAccessToken, type AccessClaims } from './tokens.js';
-import { forbidden, unauthorized } from './errors.js';
+import { ApiError, forbidden, unauthorized } from './errors.js';
 import { mfaEnabled } from './securityCrypto.js';
 import { prisma } from './db.js';
 
@@ -62,4 +63,21 @@ export async function requireAdmin(req: FastifyRequest, reply: FastifyReply): Pr
   const user = await prisma.user.findUnique({ where: { id: req.auth!.sub } });
   if (!user || user.deletedAt || user.status === 'suspended') throw unauthorized();
   if (user.role !== 'admin') throw forbidden('Admin access required.');
+}
+
+export const KYC_REQUIRED_MESSAGE = 'Verify your identity before using this feature. Go to Dashboard → Identity verification.';
+
+/**
+ * Gate for sensitive actions (publishing gigs, requesting payouts). Reads
+ * users.kyc_status from the database on every call so an approval or a
+ * revocation takes effect immediately. Call after requireAuth/requireProfessional.
+ */
+export async function requireKycVerified(req: FastifyRequest, reply: FastifyReply): Promise<void> {
+  if (!req.auth) await requireAuth(req, reply);
+  const user = await prisma.user.findUnique({ where: { id: req.auth!.sub }, select: { kycStatus: true, role: true } });
+  if (!user) throw unauthorized();
+  if (user.role === 'admin') return;
+  if (user.kycStatus !== 'verified') {
+    throw new ApiError(403, 'KYC_REQUIRED', KYC_REQUIRED_MESSAGE, { kycStatus: user.kycStatus });
+  }
 }

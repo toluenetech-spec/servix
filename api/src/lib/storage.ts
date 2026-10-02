@@ -73,6 +73,10 @@ export interface StorageProvider {
   putObject(kind: UploadKind, fileName: string, contentType: string, body: Buffer): Promise<PutResult>;
   /** Read an object back (used by GET /media/* so a private bucket still serves images). */
   fetchObject(key: string): Promise<Response | null>;
+  /** Store bytes under an explicit, caller-chosen key (private material such as KYC files). */
+  putObjectAt(key: string, contentType: string, body: Buffer): Promise<void>;
+  /** Best-effort delete; never throws. */
+  deleteObject(key: string): Promise<boolean>;
 }
 
 /** Keys we mint: `<kind>/<uuid>.<ext>` — anything else is refused by GET /media. */
@@ -238,6 +242,29 @@ class R2Provider implements StorageProvider {
     return { key: presigned.key, publicUrl: presigned.publicUrl };
   }
 
+  async putObjectAt(key: string, contentType: string, body: Buffer): Promise<void> {
+    const uploadUrl = presignS3Url({
+      method: 'PUT', host: this.host, path: `/${this.bucket}/${key}`, region: this.region,
+      accessKeyId: this.accessKeyId, secretAccessKey: this.secretAccessKey, expiresSeconds: 300,
+    });
+    const res = await fetch(uploadUrl, { method: 'PUT', headers: { 'content-type': contentType, 'content-length': String(body.byteLength) }, body });
+    if (!res.ok) {
+      const detail = (await res.text().catch(() => '')).slice(0, 300);
+      throw new Error(`Object storage rejected the upload (${res.status}). ${detail}`.trim());
+    }
+  }
+
+  async deleteObject(key: string): Promise<boolean> {
+    try {
+      const url = await this.presignDelete(key);
+      if (!url) return false;
+      const res = await fetch(url, { method: 'DELETE' });
+      return res.ok || res.status === 404;
+    } catch {
+      return false;
+    }
+  }
+
   async fetchObject(key: string): Promise<Response | null> {
     const res = await fetch(await this.presignGet(key, 300), { method: 'GET' });
     if (res.status === 404 || res.status === 403) return null;
@@ -280,6 +307,12 @@ class LocalStubProvider implements StorageProvider {
   }
   async fetchObject(): Promise<Response | null> {
     return null;
+  }
+  async putObjectAt(): Promise<void> {
+    throw new Error('Object storage is not configured in this environment.');
+  }
+  async deleteObject(): Promise<boolean> {
+    return false;
   }
 }
 

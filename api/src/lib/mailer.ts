@@ -214,3 +214,23 @@ export function securityNoticeMail(to: string, action: string, message: string):
     note: { title: 'Don’t recognise this activity?', text: 'Contact Servix support immediately using the link below. Never share your password, verification codes or recovery codes—even with someone claiming to be support.' },
   });
 }
+
+export function kycOutcomeMail(to: string, outcome: 'approved' | 'rejected', reason?: string | null): Mail {
+  const base = (process.env.APP_BASE_URL ?? '').replace(/\/$/, '');
+  const link = `${base}/dashboard/identity`;
+  if (outcome === 'approved') {
+    return {
+      to,
+      subject: 'Your identity has been verified',
+      text: `Good news — your identity verification on Servix was approved. Verified features such as publishing gigs and requesting payouts are now open to you.\n\n${link}`,
+      html: `<p>Good news — your identity verification on Servix was <strong>approved</strong>.</p><p>Verified features such as publishing gigs and requesting payouts are now open to you.</p><p><a href="${link}">Open your dashboard</a></p>`,
+    };
+  }
+  const why = (reason ?? '').trim() || 'The documents could not be verified.';
+  return {
+    to,
+    subject: 'Action needed: identity verification was not approved',
+    text: `We could not verify your identity on Servix.\n\nReason: ${why}\n\nYou can submit fresh documents at any time: ${link}`,
+    html: `<p>We could not verify your identity on Servix.</p><p><strong>Reason:</strong> ${why.replace(/</g, '&lt;')}</p><p>You can submit fresh documents at any time: <a href="${link}">Identity verification</a></p>`,
+  };
+}

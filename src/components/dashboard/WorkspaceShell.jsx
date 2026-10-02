@@ -8,6 +8,7 @@ import { Icon } from '../ui/Icon.jsx';
 import { Avatar } from '../ui/Avatar.jsx';
 import { DashboardSkeleton, ListSkeleton, Skeleton } from '../ui/States.jsx';
 import './workspace.css';
+import './kyc.css';
 const Context = createContext(null);
 export const useWorkspace = () => useContext(Context);
 export const NOTIFICATIONS_EVENT = 'servix:notifications-changed';
@@ -57,6 +58,7 @@ function buildNavigation({ user, overview }) {
     ]],
     ['Account', [
       ['/dashboard/plan', onFreePlan ? 'Upgrade to Servix Pro' : 'Servix Pro plan', 'crown'],
+      ['/dashboard/identity', 'Identity verification', 'shield'],
       ['/dashboard/verification', 'Verification', 'shield'],
       ['/dashboard/settings', 'Settings', 'settings'],
     ]],
@@ -73,6 +75,7 @@ function buildNavigation({ user, overview }) {
     ]],
     ['Account', [
       ['/professionals/apply', overview?.kind === 'applicant' ? 'My professional application' : 'Become a professional', 'briefcase'],
+      ['/dashboard/identity', 'Identity verification', 'shield'],
       ['/dashboard/verification', 'Verification', 'shield'],
       ['/dashboard/settings', 'Settings', 'settings'],
     ]],
@@ -96,6 +99,7 @@ export function WorkspaceShell({ children }) {
   if (!user) return <Navigate to="/login" replace />;
   const professional = overview?.canManageServices; const role = user.role === 'admin' ? 'Administrator' : professional ? (overview?.plan && overview.plan !== 'free' ? 'Servix Pro professional' : 'Professional') : overview?.kind === 'applicant' ? 'Professional applicant' : 'Customer';
   const sections = buildNavigation({ user, overview });
+  const kyc = user.role === 'admin' ? null : (overview?.kycStatus ?? user.kycStatus ?? null);
   return <Context.Provider value={{ overview, user }}><div className="ws-layout">
     <a className="skip-link" href="#workspace-main">Skip to workspace</a>
     {menu && <button className="ws-menu-scrim" onClick={() => setMenu(false)} aria-label="Close navigation" />}
@@ -104,8 +108,16 @@ export function WorkspaceShell({ children }) {
       <nav>{sections.map(([title, links]) => <div className="ws-nav-section" key={title}><div className="ws-space-label">{title.toUpperCase()} <span>●</span></div>{links.map(([to, label, icon]) => <Link to={to} key={to} className={isActive(to, location) ? 'active' : undefined} aria-current={isActive(to, location) ? 'page' : undefined}><Icon name={icon} size={18} /><span>{label}</span></Link>)}</div>)}</nav>
       <div className="ws-side-bottom"><Link to="/dashboard/search"><Icon name="search" size={17} />Explore marketplace</Link><Link to="/contact"><Icon name="help-circle" size={17} />Help & support</Link><button className="cookie-settings" onClick={() => window.dispatchEvent(new Event('servix:cookie-settings'))}>Cookie settings</button><div className="ws-person"><Avatar src={user.avatarUrl} name={user.fullName} /><div><strong>{user.fullName}</strong><small>{role}</small></div></div><button className="ws-signout" disabled={signingOut} onClick={async () => { setSigningOut(true); try { await logout(); navigate('/login'); } catch { setError('Could not sign out. Try again.'); } finally { setSigningOut(false); } }}>{signingOut ? 'Signing out…' : 'Sign out'}</button>{error && <p role="alert">{error}</p>}</div>
     </aside>
-    <div className="ws-body"><header className="ws-topbar"><button className="ws-menu-toggle" aria-label="Open navigation" aria-expanded={menu} aria-controls="workspace-navigation" onClick={() => setMenu(!menu)}><Icon name="menu" /></button><form className="ws-search" role="search" onSubmit={e => { e.preventDefault(); navigate(`/dashboard/search?q=${encodeURIComponent(query.trim())}`); }}><Icon name="search" size={19} /><input aria-label="Search services and professionals" placeholder="Search services and professionals…" value={query} onChange={e => setQuery(e.target.value)} /><button type="submit">Search</button></form>{user.role !== 'admin' && <Link className="ws-top-security" to="/dashboard/verification"><Icon name="shield" size={18} /><span>{overview?.emailVerified ? 'Email verified' : 'Account security'}</span></Link>}<NotificationBell userId={user.id} /><Link to="/dashboard/settings" className="ws-avatar-link" aria-label="Account settings"><Avatar src={user.avatarUrl} name={user.fullName} /></Link></header><main id="workspace-main" className="ws-content">{children}</main><footer className="ws-footer"><span>© {new Date().getFullYear()} Servix</span><div><Link to="/privacy">Privacy</Link><Link to="/terms">Terms</Link><Link to="/cookies">Cookies</Link></div></footer></div>
+    <div className="ws-body"><header className="ws-topbar"><button className="ws-menu-toggle" aria-label="Open navigation" aria-expanded={menu} aria-controls="workspace-navigation" onClick={() => setMenu(!menu)}><Icon name="menu" /></button><form className="ws-search" role="search" onSubmit={e => { e.preventDefault(); navigate(`/dashboard/search?q=${encodeURIComponent(query.trim())}`); }}><Icon name="search" size={19} /><input aria-label="Search services and professionals" placeholder="Search services and professionals…" value={query} onChange={e => setQuery(e.target.value)} /><button type="submit">Search</button></form>{user.role !== 'admin' && (kyc === 'verified' ? <Link className="ws-top-security is-verified" to="/dashboard/identity" data-testid="kyc-verified-badge"><Icon name="check-circle" size={18} /><span>Identity verified</span></Link> : <Link className="ws-top-security" to="/dashboard/verification"><Icon name="shield" size={18} /><span>{overview?.emailVerified ? 'Email verified' : 'Account security'}</span></Link>)}<NotificationBell userId={user.id} /><Link to="/dashboard/settings" className="ws-avatar-link" aria-label="Account settings"><Avatar src={user.avatarUrl} name={user.fullName} /></Link></header><KycBanner status={kyc} pathname={pathname} /><main id="workspace-main" className="ws-content">{children}</main><footer className="ws-footer"><span>© {new Date().getFullYear()} Servix</span><div><Link to="/privacy">Privacy</Link><Link to="/terms">Terms</Link><Link to="/cookies">Cookies</Link></div></footer></div>
   </div></Context.Provider>;
+}
+
+/* Identity verification banner: pending → waiting notice; rejected → reason + re-submit link. Hidden on the identity page itself. */
+function KycBanner({ status, pathname }) {
+  if (pathname === '/dashboard/identity') return null;
+  if (status === 'pending') return <div className="ws-kyc-banner is-pending" role="status" data-testid="kyc-banner"><Icon name="clock" size={16} /><span>Your identity verification is under review. This usually takes 12–24 hours.</span></div>;
+  if (status === 'rejected') return <div className="ws-kyc-banner is-rejected" role="alert" data-testid="kyc-banner"><Icon name="alert" size={16} /><span>Verification failed. <Link to="/dashboard/identity">Click here to re-submit.</Link></span></div>;
+  return null;
 }
 
 /* Bell: unread badge polled every 30s, latest items on open, mark-as-read on click. */

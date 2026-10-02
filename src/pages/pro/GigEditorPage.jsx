@@ -6,7 +6,7 @@
  * blocked by the server's checklist (publishProblems) until the gig is complete.
  */
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, Link } from 'react-router-dom';
 import { Button } from '../../components/ui/Button.jsx';
 import { FormSkeleton, Skeleton } from '../../components/ui/States.jsx';
 import { Field } from '../../components/ui/Field.jsx';
@@ -89,6 +89,7 @@ export default function GigEditorPage() {
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
+  const [kycBlocked, setKycBlocked] = useState(false);
 
   useEffect(() => { getCategories().then(setCategories).catch(() => {}); }, []);
   useEffect(() => {
@@ -172,6 +173,7 @@ export default function GigEditorPage() {
       showToast('Your gig is live.', 'success');
       navigate('/dashboard/gigs');
     } catch (err) {
+      if (err.code === 'KYC_REQUIRED') { setKycBlocked(true); setSaveError(''); return; }
       if (err.errors) setGig((g) => ({ ...g, publishProblems: err.errors }));
       setSaveError(err.message || 'Could not publish yet.');
     }
@@ -210,6 +212,7 @@ export default function GigEditorPage() {
     <OnboardingLayout exitTo="/dashboard/gigs" progress={((step + 1) / GIG_STEPS.length) * 100} actions={actions} wide>
       <Stepper steps={GIG_STEPS} current={step} />
       {saveError && <div className="ob-error" role="alert" style={{ marginBottom: 20 }}>{saveError}</div>}
+      {kycBlocked && <div className="ob-error" role="alert" style={{ marginBottom: 20 }} data-testid="kyc-required">Your gig is saved as a draft. Before it can go live, verify your identity — a one-time check that usually takes 12–24 hours. <Link to="/dashboard/identity">Verify your identity →</Link></div>}
 
       {step === 0 && (
         <section className="ob-section" aria-labelledby="gig-overview">

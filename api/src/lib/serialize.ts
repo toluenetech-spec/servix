@@ -230,6 +230,7 @@ export function serializeUser(u: User) {
     avatarUrl: mediaUrl(u.avatarUrl),
     role: u.role,
     status: u.status,
+    kycStatus: u.kycStatus,
     emailVerified: u.emailVerifiedAt != null,
     createdAt: u.createdAt.toISOString(),
   };

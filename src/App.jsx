@@ -10,6 +10,7 @@ import HomePage from './pages/HomePage.jsx';
 const PaymentsPage = lazy(() => import('./pages/dashboard/PaymentsPage.jsx'));
 const SettingsPage = lazy(() => import('./pages/dashboard/SettingsPage.jsx'));
 const VerificationPage = lazy(() => import('./pages/dashboard/VerificationPage.jsx'));
+const IdentityPage = lazy(() => import('./pages/dashboard/IdentityPage.jsx'));
 const SearchPage = lazy(() => import('./pages/dashboard/SearchPage.jsx'));
 const NetworkPage = lazy(() => import('./pages/dashboard/NetworkPage.jsx'));
 const MessagesPage = lazy(() => import('./pages/dashboard/MessagesPage.jsx'));
@@ -86,6 +87,7 @@ export default function App() {
             <Route path="/dashboard/payments" element={<PaymentsPage />} />
             <Route path="/dashboard/settings" element={<SettingsPage />} />
             <Route path="/dashboard/verification" element={<VerificationPage />} />
+            <Route path="/dashboard/identity" element={<IdentityPage />} />
             <Route path="/dashboard/search" element={<SearchPage />} />
             <Route path="/dashboard/network" element={<NetworkPage />} />
             <Route path="/dashboard/messages" element={<MessagesPage />} />
