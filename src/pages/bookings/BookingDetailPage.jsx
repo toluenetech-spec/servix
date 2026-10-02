@@ -3,7 +3,7 @@
  * Payment status, lifecycle actions, dispute, review — all real API.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '../../components/ui/Button.jsx';
 import { Badge } from '../../components/ui/Badge.jsx';
 import { Field } from '../../components/ui/Field.jsx';
@@ -16,6 +16,7 @@ import { useDocumentMeta } from '../../lib/useDocumentMeta.js';
 import { formatPrice } from '../../lib/format.js';
 import * as bookingApi from '../../lib/bookingApi.js';
 import { STATUS_META } from './BookingsPage.jsx';
+import { getRebookDraft } from '../../lib/marketplaceApi.js';
 
 export default function BookingDetailPage() {
   useDocumentMeta({ title: 'Booking', description: 'Servix booking details.' });
@@ -184,6 +185,9 @@ export default function BookingDetailPage() {
           {!isPro && booking.status === 'completed' && booking.hasReview && (
             <Badge variant="brand">Reviewed — thank you</Badge>
           )}
+          {!isPro && ['completed', 'cancelled', 'declined', 'refunded'].includes(booking.status) && (
+            <RebookButton bookingId={booking.id} />
+          )}
 
           {isPro && booking.status === 'requested' && (
             <>
@@ -261,4 +265,36 @@ export default function BookingDetailPage() {
       </Modal>
     </div>
   );
+}
+
+/** Book again: fetches a sanitised prefill (professional's current gigs + previous notes the customer may reuse) and sends them to the gig page with the date left open. */
+function RebookButton({ bookingId }) {
+  const navigate = useNavigate(); const showToast = useToast();
+  const [open, setOpen] = useState(false); const [draft, setDraft] = useState(null); const [service, setService] = useState(''); const [reuseNotes, setReuseNotes] = useState(true); const [loading, setLoading] = useState(false);
+  async function start() {
+    setLoading(true);
+    try { const d = await getRebookDraft(bookingId); setDraft(d); setService((d.services.find((s) => s.wasBooked) || d.services[0])?.id || ''); setOpen(true); }
+    catch (e) { showToast(e.message, 'error'); } finally { setLoading(false); }
+  }
+  function go() {
+    const params = new URLSearchParams({ rebook: bookingId });
+    if (reuseNotes && draft.previousNotes) params.set('notes', draft.previousNotes.slice(0, 1000));
+    navigate(`/services/${encodeURIComponent(service)}?${params}`);
+  }
+  return <>
+    <Button variant="secondary" onClick={start} disabled={loading}><Icon name="calendar" size={15} /> {loading ? 'Preparing…' : 'Book again'}</Button>
+    <Modal open={open} onClose={() => setOpen(false)} title={draft ? `Book ${draft.professional.name} again` : 'Book again'}>
+      {draft && (
+        <div style={{ display: 'grid', gap: 'var(--space-4)' }}>
+          {!draft.services.length ? <p style={{ fontSize: 'var(--text-sm)' }}>{draft.professional.name} has no active gigs right now. <a href={`/professionals/${encodeURIComponent(draft.professional.id)}`}>View their profile</a>.</p> : <>
+            <Field label="Service">{(props) => <select {...props} className="select" value={service} onChange={(e) => setService(e.target.value)}>{draft.services.map((s) => <option key={s.id} value={s.id}>{s.title} — {formatPrice(s.price)}{s.wasBooked ? ' (booked before)' : ''}</option>)}</select>}</Field>
+            {!draft.previousServiceAvailable && <p className="text-muted" style={{ fontSize: 'var(--text-sm)' }}>The gig you booked last time is no longer available; pick one of the current ones.</p>}
+            {draft.previousNotes && <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 'var(--text-sm)' }}><input type="checkbox" checked={reuseNotes} onChange={(e) => setReuseNotes(e.target.checked)} /> <span>Reuse my previous requirements<br /><small className="text-muted">“{draft.previousNotes.slice(0, 140)}{draft.previousNotes.length > 140 ? '…' : ''}”</small></span></label>}
+            <p className="text-muted" style={{ fontSize: 'var(--text-xs)' }}>You will pick a new date and see the current price before anything is booked or paid.</p>
+            <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap' }}><Button variant="primary" onClick={go} disabled={!service}>Continue</Button><Button variant="secondary" onClick={() => setOpen(false)}>Cancel</Button></div>
+          </>}
+        </div>
+      )}
+    </Modal>
+  </>;
 }

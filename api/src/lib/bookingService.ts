@@ -5,6 +5,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import { prisma } from './db.js';
+import { refreshProfessionalStanding } from './achievements.js';
 import { ApiError } from './errors.js';
 import { captureLegs, postTransaction, refundLegs, releaseLegs } from './ledger.js';
 import { platformFeeKobo, refundAmount, refundForCancellation } from './refundPolicy.js';
@@ -190,6 +191,12 @@ export async function transition(opts: TransitionOpts) {
 
 /** Escrow release on completion (confirm or auto-confirm). */
 export async function completeBooking(bookingId: string, actorId: string | null, auto: boolean) {
+  const result = await completeBookingInner(bookingId, actorId, auto);
+  refreshProfessionalStanding(result.professionalId);
+  return result;
+}
+
+async function completeBookingInner(bookingId: string, actorId: string | null, auto: boolean) {
   const booking = await prisma.booking.findUniqueOrThrow({ where: { id: bookingId } });
   return transition({
     bookingId,
@@ -257,9 +264,15 @@ export async function capturePayment(paymentId: string, bookingId: string, amoun
       data: { status: 'captured', verifiedAt: new Date() },
     });
     if (pay.count === 0) return null; // duplicate/out-of-order event — no-op
+    // Delivery-deadline snapshot (Trust: delivery reliability). The clock
+    // starts at payment capture; the agreed window is the service's
+    // deliveryDays measured from the later of now and the scheduled time.
+    const current = await tx.booking.findUnique({ where: { id: bookingId }, select: { scheduledAt: true, service: { select: { deliveryDays: true } } } });
+    const start = current ? Math.max(Date.now(), current.scheduledAt.getTime()) : Date.now();
+    const expectedDeliveryAt = current?.service.deliveryDays ? new Date(start + current.service.deliveryDays * 86_400_000) : null;
     const book = await tx.booking.updateMany({
       where: { id: bookingId, status: 'pending_payment' },
-      data: { status: 'requested' },
+      data: { status: 'requested', ...(expectedDeliveryAt ? { expectedDeliveryAt } : {}) },
     });
     if (book.count === 0) {
       throw new Error('Payment captured for a booking not awaiting payment');
@@ -297,4 +310,32 @@ export async function runAutoConfirmSweep(now = new Date()): Promise<number> {
     }
   }
   return done;
+}
+
+/* ---------------- availability discovery (real slots only) ---------------- */
+
+export type AvailabilityWindow = 'today' | 'tomorrow' | 'week';
+
+/** Earliest bookable slot and whether it falls inside today / tomorrow / this week. */
+export async function availabilitySummary(professionalId: string) {
+  const slots = await availableSlots(professionalId, 14);
+  const next = slots[0]?.startsAt ?? null;
+  const dayEnd = (offset: number) => { const d = new Date(); d.setHours(23, 59, 59, 999); d.setDate(d.getDate() + offset); return d; };
+  return {
+    nextAvailableAt: next ? next.toISOString() : null,
+    availableToday: Boolean(next && next <= dayEnd(0)),
+    availableTomorrow: Boolean(next && next <= dayEnd(1)),
+    availableThisWeek: Boolean(next && next <= dayEnd(6)),
+  };
+}
+
+/** Narrow a list of professional ids to those with a real free slot inside the window. */
+export async function filterByAvailability(professionalIds: string[], window: AvailabilityWindow): Promise<Set<string>> {
+  const unique = [...new Set(professionalIds)];
+  const keep = new Set<string>();
+  await Promise.all(unique.map(async (id) => {
+    const summary = await availabilitySummary(id);
+    if ((window === 'today' && summary.availableToday) || (window === 'tomorrow' && summary.availableTomorrow) || (window === 'week' && summary.availableThisWeek)) keep.add(id);
+  }));
+  return keep;
 }

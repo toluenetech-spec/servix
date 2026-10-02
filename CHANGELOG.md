@@ -2,6 +2,80 @@
 
 All notable changes to the Servix public website.
 
+## 0.7.0 — 2026-10-02 (Next-generation marketplace, block 1 — flag-gated)
+
+### Added
+- **Feature flags** (`api/src/lib/features.ts`, `GET /api/v1/features`):
+  `REQUESTS_ENABLED, COMPARE_ENABLED, TRUST_ENABLED, ACHIEVEMENTS_ENABLED,
+  PROJECTS_ENABLED, CRM_ENABLED, BUSINESS_ENABLED, PACKAGES_ENABLED,
+  PRICING_INSIGHTS_ENABLED` (all default off). Gated routes answer
+  `503 FEATURE_DISABLED`; the UI hides gated navigation/sections until the
+  snapshot says otherwise.
+- **Trust & Performance** (`api/src/lib/trust.ts`, docs `api/docs/TRUST.md`):
+  delivery reliability (from a deadline snapshotted at payment capture —
+  customer-caused delays never count against the professional), response rate
+  on paid requests, repeat-customer rate, completed/verified jobs, time on
+  Servix, Servix-verified + identity-verified facts. Every figure is computed
+  from real bookings/events/reviews; below the minimum sample the API returns
+  `null` and the UI shows "Not enough data". New "Trust & performance" tab on
+  profiles; `GET /professionals/:slug/trust`; admin **Trust & achievements**
+  tab with metric breakdown, badge history and audited recompute.
+- **Achievements** (`api/src/lib/achievements.ts`, `api/docs/ACHIEVEMENTS.md`):
+  central rules registry (10 rules), evaluated server-side after completions /
+  on view / on admin recompute, stored with evidence, revocable, notified via
+  the existing notification system, criteria shown to users
+  (`GET /achievements/catalog`).
+- **Verified Servix Projects**: professionals turn their own *completed*
+  bookings into portfolio items (`POST /pro/portfolio/from-booking/:id`, one per
+  booking). Profile portfolio shows a "Verified Servix Project" badge with
+  completion date, duration and customer rating derived from the booking.
+- **Service request marketplace + proposals** (`api/src/routes/requests.ts`,
+  docs `api/docs/MARKETPLACE_REQUESTS.md`, `api/docs/PROPOSALS.md`): customers
+  draft/publish/pause/close/cancel requests with budget, deadline, remote/on-site,
+  skills; professionals browse with filters and sorts and keep **one live
+  proposal per request** (database partial unique index); accepting a proposal
+  atomically awards the request, rejects the others and creates a normal
+  booking in `pending_payment` with the proposal price as the immutable amount
+  (attached to the professional's chosen gig or an archived "Custom work"
+  service). Payment, escrow, delivery, disputes and payouts are the existing
+  pipeline. Customer pages `/dashboard/requests*`, professional pages
+  `/dashboard/proposals*`, admin **Requests & proposals** tab (read-only).
+- **Comparison** (`/compare`, `GET /compare`): compare up to four professionals
+  with real trust data, achievements, next availability, skills, languages,
+  services, verified projects; best value per row highlighted; tray on the
+  professionals list and profile page.
+- **Availability discovery**: `available=today|tomorrow|week` on
+  `/professionals` and `/services` (computed from real working hours, days off
+  and bookings), "Free today/tomorrow/this week" filters and chips,
+  `GET /professionals/:slug/availability/summary`.
+- **Book again**: `GET /bookings/:id/rebook` returns a sanitised prefill
+  (current gigs, previous notes offered opt-in, date left open); booking detail
+  gets a "Book again" button; `bookings.rebooked_from_id` links the new booking.
+- **Preferred professionals**: `PATCH /account/saved/:slug {preferred, note}` —
+  preferred pins to the top of Saved; the private note is visible only to the
+  customer.
+- **Pro analytics**: profile/gig views (privacy-safe daily counters, no visitor
+  identity), delivery reliability, repeat customers, verified projects,
+  achievements with locked criteria, and a "turn completed bookings into
+  verified projects" panel.
+- Migration `20261003000000_nextgen_marketplace` (additive) + guarded Neon
+  script `api/docs/manual-nextgen-upgrade.sql` (verified on a fresh PostgreSQL:
+  applies once, idempotent on re-run).
+
+### Tests
+- `api/tests/nextgen-local.test.ts` — 7 isolated-PostgreSQL suites (flags,
+  request validation/ownership/transitions, proposals incl. duplicate + race +
+  award snapshot + notifications + admin, trust + achievements + analytics +
+  views, verified portfolio, compare/availability/rebook/preferred, flag off).
+- `tests/browser/nextgen.spec.js` — 8 Playwright journeys (profile trust tab,
+  compare tray/page, flag off, customer request → proposals → accept,
+  professional browse → propose with inline validation, preferred + note,
+  admin tabs, mobile overflow). Full browser suite 86/86.
+
+### Not in this block
+Projects & milestones, professional CRM, business workspace, price
+intelligence and optional packages are flagged but not yet built.
+
 ## 0.6.0 — 2026-08-27 (Phase E: production hardening, administration & launch readiness)
 
 ### Added

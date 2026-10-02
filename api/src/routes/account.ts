@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { assertOwnMediaUrl } from './uploads.js';
 import { prisma } from '../lib/db.js';
+import { notifySafely } from '../lib/notifications.js';
 import { requireAuth } from '../lib/authGuard.js';
 import { ApiError } from '../lib/errors.js';
 import { parseBody } from '../lib/query.js';
@@ -60,8 +61,8 @@ export async function accountRoutes(app: FastifyInstance) {
     return { updated: result.count, unread: await prisma.notification.count({ where: { userId: id, readAt: null } }) };
   });
   /* ---------------- saved professionals ---------------- */
-  const savedSelect = { id: true, createdAt: true, professional: { select: { slug: true, name: true, title: true, imageUrl: true, locationCity: true, ratingAvg: true, reviewCount: true, verification: true, availability: true, startingPrice: true, currency: true } } } as const;
-  const serializeSaved = (row: { id: string; createdAt: Date; professional: { slug: string; name: string; title: string; imageUrl: string | null; locationCity: string | null; ratingAvg: unknown; reviewCount: number; verification: string; availability: string; startingPrice: bigint | null; currency: string } }) => ({ id: row.id, savedAt: row.createdAt, professional: { ...row.professional, imageUrl: mediaUrl(row.professional.imageUrl), ratingAvg: Number(row.professional.ratingAvg), startingPrice: row.professional.startingPrice === null ? null : Number(row.professional.startingPrice) } });
+  const savedSelect = { id: true, createdAt: true, preferred: true, note: true, professional: { select: { slug: true, name: true, title: true, imageUrl: true, locationCity: true, ratingAvg: true, reviewCount: true, verification: true, availability: true, startingPrice: true, currency: true } } } as const;
+  const serializeSaved = (row: { id: string; createdAt: Date; preferred?: boolean; note?: string | null; professional: { slug: string; name: string; title: string; imageUrl: string | null; locationCity: string | null; ratingAvg: unknown; reviewCount: number; verification: string; availability: string; startingPrice: bigint | null; currency: string } }) => ({ id: row.id, savedAt: row.createdAt, preferred: Boolean(row.preferred), note: row.note ?? '', professional: { ...row.professional, imageUrl: mediaUrl(row.professional.imageUrl), ratingAvg: Number(row.professional.ratingAvg), startingPrice: row.professional.startingPrice === null ? null : Number(row.professional.startingPrice) } });
   app.get('/account/saved', { preHandler: requireAuth }, async (req, reply) => {
     reply.header('Cache-Control', 'no-store'); await accountOverview(req.auth!.sub);
     const rows = await prisma.savedProfessional.findMany({ where: { userId: req.auth!.sub }, orderBy: { createdAt: 'desc' }, take: 200, select: savedSelect });
@@ -74,6 +75,17 @@ export async function accountRoutes(app: FastifyInstance) {
     if (!profile) throw new ApiError(404, 'NOT_FOUND', 'No professional found.');
     if (profile.userId === req.auth!.sub) throw new ApiError(400, 'VALIDATION_ERROR', 'You cannot save your own profile.');
     const row = await prisma.savedProfessional.upsert({ where: { userId_professionalId: { userId: req.auth!.sub, professionalId: profile.id } }, create: { userId: req.auth!.sub, professionalId: profile.id }, update: {}, select: savedSelect });
+    return serializeSaved(row);
+  });
+  app.patch('/account/saved/:slug', { preHandler: requireAuth, config: { rateLimit: { max: 30, timeWindow: '1 minute' } }, schema: { tags: ['account'], summary: 'Mark a saved professional as preferred / add a private note', security: [{ bearerAuth: [] }] } }, async (req, reply) => {
+    reply.header('Cache-Control', 'no-store'); await accountOverview(req.auth!.sub);
+    const { slug } = req.params as { slug: string };
+    const body = parseBody(z.object({ preferred: z.boolean().optional(), note: z.string().trim().max(500).optional() }).strict(), req.body ?? {});
+    const profile = await prisma.professionalProfile.findUnique({ where: { slug }, select: { id: true, userId: true } });
+    if (!profile) throw new ApiError(404, 'NOT_FOUND', 'No professional found.');
+    if (profile.userId === req.auth!.sub) throw new ApiError(400, 'VALIDATION_ERROR', 'You cannot save your own profile.');
+    const row = await prisma.savedProfessional.upsert({ where: { userId_professionalId: { userId: req.auth!.sub, professionalId: profile.id } }, create: { userId: req.auth!.sub, professionalId: profile.id, preferred: body.preferred ?? false, note: body.note ?? null }, update: { ...(body.preferred === undefined ? {} : { preferred: body.preferred }), ...(body.note === undefined ? {} : { note: body.note || null }) }, select: savedSelect });
+    if (body.preferred && profile.userId) await notifySafely({ userId: profile.userId, type: 'professional.preferred', title: 'A customer marked you as a preferred professional', body: 'They can rebook you in one tap from their saved list.', link: '/dashboard/analytics' });
     return serializeSaved(row);
   });
   app.delete('/account/saved/:slug', { preHandler: requireAuth, config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (req, reply) => {

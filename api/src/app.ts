@@ -35,6 +35,8 @@ import { webhookRoutes } from './routes/webhooks.js';
 import { earningsRoutes } from './routes/earnings.js';
 import { adminRoutes } from './routes/admin.js';
 import { kycRoutes } from './routes/kyc.js';
+import { marketplaceRoutes } from './routes/marketplace.js';
+import { requestRoutes } from './routes/requests.js';
 
 export async function buildApp() {
   const config = loadConfig();
@@ -217,6 +219,8 @@ export async function buildApp() {
       await earningsRoutes(v1);
       await adminRoutes(v1);
       await kycRoutes(v1); // /kyc/* + /admin/kyc/*
+      await marketplaceRoutes(v1); // /features, trust, compare, achievements, verified portfolio
+      await requestRoutes(v1); // /requests/* + /proposals/* (REQUESTS_ENABLED)
     },
     { prefix: '/api/v1' },
   );

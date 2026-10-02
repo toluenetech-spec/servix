@@ -15,6 +15,7 @@ export const serviceQuerySchema = paginationSchema.extend({
   minRating: z.coerce.number().min(0).max(5).optional(),
   location: z.string().trim().max(100).optional(),
   availability: z.enum(['available', 'limited', 'unavailable']).optional(),
+  available: z.enum(['today', 'tomorrow', 'week']).optional(),
   sort: z.enum(['recommended', 'rating', 'reviews', 'price-asc', 'price-desc']).default('recommended'),
 });
 
@@ -25,6 +26,7 @@ export const professionalQuerySchema = paginationSchema.extend({
   minRating: z.coerce.number().min(0).max(5).optional(),
   maxPrice: z.coerce.number().int().min(0).optional(),
   availability: z.enum(['available', 'limited', 'unavailable']).optional(),
+  available: z.enum(['today', 'tomorrow', 'week']).optional(),
   sort: z.enum(['recommended', 'rating', 'reviews', 'price-asc', 'price-desc']).default('recommended'),
 });
 

@@ -5,11 +5,16 @@ import { useDocumentMeta } from '../../lib/useDocumentMeta.js';
 import { formatPrice } from '../../lib/format.js';
 import { LineChart, BarChart, Donut, HBars } from '../../components/dashboard/Charts.jsx';
 import { useResource, PageHead, LoadState } from './shared.jsx';
+import { getVerifiableBookings, addVerifiedProject, getAchievementCatalog, NOT_ENOUGH } from '../../lib/marketplaceApi.js';
+import { useFeatures } from '../../lib/useFeatures.js';
+import { Achievements } from '../../components/marketplace/TrustPanel.jsx';
+import { useToast } from '../../components/ui/Toast.jsx';
 const STATUS_LABEL = { pending_payment: 'Awaiting payment', requested: 'Requested', accepted: 'Accepted', in_progress: 'In progress', delivered: 'Delivered', completed: 'Completed', declined: 'Declined', cancelled: 'Cancelled', disputed: 'Disputed', refunded: 'Refunded' };
 export default function AnalyticsPage() {
   useDocumentMeta({ title: 'Analytics', description: 'Your Servix performance metrics.' });
   const [days, setDays] = useState(30); const r = useResource(() => Promise.all([getProAnalytics(days), getPlan()]).then(([analytics, plan]) => ({ ...analytics, plan })), [days]);
   const a = r.data; const t = a?.totals; const detailed = a?.plan?.limits?.analytics;
+  const features = useFeatures();
   return <><PageHead title="Analytics" description="Every figure below is calculated from your own bookings, ledger entries and reviews. Nothing is estimated."><div className="ws-range" role="group" aria-label="Period">{[7, 30, 90, 365].map(d => <button key={d} aria-pressed={days === d} onClick={() => setDays(d)}>{d === 365 ? '1 year' : `${d} days`}</button>)}</div></PageHead><LoadState skeleton="stats" label="Loading your analytics…" resource={r}>{() => <>
     <div className="ws-stat-grid">
       <div className="ws-stat"><span>Bookings</span><strong>{t.bookings}</strong><small>{t.completed} completed · {t.cancelled} cancelled or declined</small></div>
@@ -27,6 +32,27 @@ export default function AnalyticsPage() {
       </div>
       <section className="ws-panel"><h2>Service performance</h2>{!a.services.length ? <p className="ws-muted">No bookings for your services in this period.</p> : <div className="ws-record-table"><table><thead><tr><th>SERVICE</th><th>BOOKINGS</th><th>REVENUE (COMPLETED, AFTER FEES)</th></tr></thead><tbody>{a.services.map(s => <tr key={s.id}><td>{s.title}</td><td>{s.bookings}</td><td>{formatPrice(s.revenue)}</td></tr>)}</tbody></table></div>}</section>
     </>}
+    <div className="ws-stat-grid">
+      <div className="ws-stat"><span>Profile views</span><strong>{a.views?.profile ?? 0}</strong><small>{a.views?.services ?? 0} gig views in this period</small></div>
+      <div className="ws-stat"><span>Delivery reliability</span><strong>{a.reliability?.measurable >= 5 && a.reliability.percent != null ? `${a.reliability.percent}%` : <small style={{ fontSize: 14 }}>{NOT_ENOUGH}</small>}</strong><small>{a.reliability?.measurable ? `${a.reliability.onTime} on time, ${a.reliability.late} late of ${a.reliability.measurable} with a deadline` : 'Counts deliveries made by the agreed deadline (needs 5)'}</small></div>
+      <div className="ws-stat"><span>Repeat customers</span><strong>{a.repeatCustomers?.customers >= 5 && a.repeatCustomers.percent != null ? `${a.repeatCustomers.percent}%` : <small style={{ fontSize: 14 }}>{NOT_ENOUGH}</small>}</strong><small>{a.repeatCustomers?.customers ? `${a.repeatCustomers.repeat} of ${a.repeatCustomers.customers} customers booked again` : 'Shown after 5 customers'}</small></div>
+      <div className="ws-stat"><span>Verified projects</span><strong>{a.verifiedProjects ?? 0}</strong><small>Completed bookings shown as Verified Servix Projects</small></div>
+    </div>
+    {features.achievements && <AchievementsPanel earned={a.achievements ?? []} />}
+    <VerifiedProjectsPanel />
     <div className="ws-stat-grid"><div className="ws-stat"><span>Unique clients</span><strong>{t.uniqueClients}</strong><small>Distinct customers who booked in this period</small></div><div className="ws-stat"><span>Active services</span><strong>{t.activeServices}<small style={{ fontSize: 16 }}> / {t.totalServices}</small></strong><small>Published out of all listings</small></div><div className="ws-stat"><span>Completed projects</span><strong>{t.completedProjects}</strong><small>Shown on your public profile</small></div><div className="ws-stat"><span>Period</span><strong style={{ fontSize: 22 }}>{days === 365 ? '1 year' : `${days} days`}</strong><small>Since {new Date(a.since).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</small></div></div>
   </>}</LoadState></>;
+}
+
+function AchievementsPanel({ earned }) {
+  const c = useResource(getAchievementCatalog);
+  return <section className="ws-panel"><h2>Achievements</h2><p className="ws-muted" style={{ marginBottom: 14 }}>Earned automatically from your real activity; each one shows exactly what it takes. They appear on your public profile.</p>{c.data ? <Achievements items={earned} catalog={c.data.items} title={`${earned.length} of ${c.data.items.length} earned`} /> : <Achievements items={earned} />}</section>;
+}
+
+function VerifiedProjectsPanel() {
+  const toast = useToast(); const r = useResource(getVerifiableBookings); const [busy, setBusy] = useState('');
+  async function add(b) { setBusy(b.bookingId); try { await addVerifiedProject(b.bookingId); toast('Added to your portfolio as a Verified Servix Project.', 'success'); r.reload(); } catch (e) { toast(e.message, 'error'); } finally { setBusy(''); } }
+  if (!r.data?.items?.length) return null;
+  return <section className="ws-panel"><h2>Turn completed bookings into Verified Servix Projects</h2><p className="ws-muted" style={{ marginBottom: 14 }}>These completed bookings aren’t in your portfolio yet. Verified projects carry a badge customers can trust because Servix saw the work paid for and completed. You can edit the title afterwards under Profile &amp; portfolio.</p>
+    <div className="ws-record-table"><table><thead><tr><th>BOOKING</th><th>CATEGORY</th><th>COMPLETED</th><th></th></tr></thead><tbody>{r.data.items.map(b => <tr key={b.bookingId}><td>{b.title}</td><td>{b.category}</td><td>{b.completedAt ? new Date(b.completedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</td><td><button className="btn btn--secondary" disabled={busy === b.bookingId} onClick={() => add(b)}>{busy === b.bookingId ? 'Adding…' : 'Add to portfolio'}</button></td></tr>)}</tbody></table></div></section>;
 }

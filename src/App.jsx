@@ -45,6 +45,11 @@ const SecurityCheckPage = lazy(() => import('./pages/auth/SecurityCheckPage.jsx'
 const VerifyEmailPage = lazy(() => import('./pages/auth/VerifyEmailPage.jsx'));
 const LegalPage = lazy(() => import('./pages/LegalPage.jsx'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage.jsx'));
+const ComparePage = lazy(() => import('./pages/ComparePage.jsx'));
+const RequestsPage = lazy(() => import('./pages/requests/RequestsPage.jsx'));
+const RequestEditorPage = lazy(() => import('./pages/requests/RequestEditorPage.jsx'));
+const RequestDetailPage = lazy(() => import('./pages/requests/RequestDetailPage.jsx'));
+const ProposalsPage = lazy(() => import('./pages/pro/ProposalsPage.jsx'));
 
 function RouteFallback() {
   // Shown only while a page's code is downloading; each page then renders its own skeleton.
@@ -93,6 +98,13 @@ export default function App() {
             <Route path="/dashboard/messages" element={<MessagesPage />} />
             <Route path="/dashboard/notifications" element={<NotificationsPage />} />
             <Route path="/dashboard/saved" element={<SavedPage />} />
+            <Route path="/dashboard/requests" element={<RequestsPage />} />
+            <Route path="/dashboard/requests/new" element={<RequestEditorPage />} />
+            <Route path="/dashboard/requests/:id" element={<RequestDetailPage />} />
+            <Route path="/dashboard/requests/:id/edit" element={<RequestEditorPage />} />
+            <Route path="/dashboard/proposals" element={<ProposalsPage section="browse" />} />
+            <Route path="/dashboard/proposals/mine" element={<ProposalsPage section="mine" />} />
+            <Route path="/dashboard/proposals/requests/:id" element={<ProposalsPage section="detail" />} />
             <Route path="/dashboard/plan" element={<PlanPage />} />
             <Route path="/dashboard/analytics" element={<AnalyticsPage />} />
             <Route path="/dashboard/availability" element={<AvailabilityPage />} />
@@ -106,6 +118,7 @@ export default function App() {
             <Route path="/services" element={<ServicesPage />} />
             <Route path="/services/:id" element={<ServiceDetailPage />} />
             <Route path="/professionals" element={<ProfessionalsPage />} />
+            <Route path="/compare" element={<ComparePage />} />
             <Route path="/professionals/join" element={<ProfessionalsJoinPage />} />
             <Route path="/professionals/apply" element={<ApplyPage />} />
             <Route path="/pro" element={<WorkspacePage />} />

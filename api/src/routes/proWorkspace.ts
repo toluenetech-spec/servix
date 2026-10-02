@@ -7,6 +7,8 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/db.js';
+import { computeTrust, viewTotals } from '../lib/trust.js';
+import { listAchievements } from '../lib/achievements.js';
 import { requireProfessional } from '../lib/authGuard.js';
 import { ApiError } from '../lib/errors.js';
 import { parseBody } from '../lib/query.js';
@@ -66,8 +68,18 @@ export async function proWorkspaceRoutes(app: FastifyInstance) {
     for (const b of bookings) { const cur = byService.get(b.serviceId) ?? { title: b.serviceTitle, bookings: 0, revenue: 0 }; cur.bookings += 1; if (['completed'].includes(b.status)) cur.revenue += Number(b.amountKobo - b.platformFeeKobo) / 100; byService.set(b.serviceId, cur); }
     const statusCounts: Record<string, number> = {}; for (const b of bookings) statusCounts[b.status] = (statusCounts[b.status] ?? 0) + 1;
     const ratingBreakdown = [5, 4, 3, 2, 1].map(stars => ({ stars, count: reviews.filter(r => r.rating === stars).length }));
+    const [profileViews, serviceViews, trust, achievements] = await Promise.all([
+      viewTotals('professional', [proId], since),
+      viewTotals('service', services.map((s) => s.id), since),
+      computeTrust(proId),
+      listAchievements(proId),
+    ]);
+    const viewsByService = Object.fromEntries(serviceViews);
     return {
       days, since: since.toISOString(),
+      views: { profile: profileViews.get(proId) ?? 0, services: [...serviceViews.values()].reduce((a, b) => a + b, 0), byService: viewsByService },
+      reliability: trust.reliability, repeatCustomers: trust.repeatCustomers, response: trust.response,
+      achievements, verifiedProjects: trust.verifiedProjects,
       totals: {
         bookings: bookings.length, completed: statusCounts.completed ?? 0, cancelled: (statusCounts.cancelled ?? 0) + (statusCounts.declined ?? 0),
         earnings: credits.reduce((sum, c) => sum + Number(c.amountKobo) / 100, 0), uniqueClients: new Set(bookings.map(b => b.customerId)).size,

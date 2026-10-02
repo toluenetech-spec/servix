@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { countView } from '../lib/marketplaceApi.js';
 import { Breadcrumb } from '../components/ui/Breadcrumb.jsx';
 import { Button } from '../components/ui/Button.jsx';
 import { Icon } from '../components/ui/Icon.jsx';
@@ -54,13 +55,13 @@ function DetailSkeleton() {
   );
 }
 
-function BookingForm({ service, onClose }) {
+function BookingForm({ service, onClose, rebook }) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const showToast = useToast();
   const [slots, setSlots] = useState(null);
   const [selected, setSelected] = useState('');
-  const [notes, setNotes] = useState('');
+  const [notes, setNotes] = useState(rebook?.notes ?? '');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -96,7 +97,7 @@ function BookingForm({ service, onClose }) {
     setBusy(true);
     try {
       const booking = await bookingApi.createBooking(
-        { serviceId: service.id, scheduledAt: selected, notes: notes || undefined },
+        { serviceId: service.id, scheduledAt: selected, notes: notes || undefined, ...(rebook?.from ? { rebookedFrom: rebook.from } : {}) },
         `book-${service.id}-${selected}`,
       );
       const { authorizationUrl } = await bookingApi.payBooking(booking.id);
@@ -160,10 +161,14 @@ function BookingForm({ service, onClose }) {
 
 export default function ServiceDetailPage() {
   const { id } = useParams();
-  const [bookingOpen, setBookingOpen] = useState(false);
+  const [searchParams] = useSearchParams();
+  // "Book again" arrives with ?rebook=<previous booking id>&notes=<text the customer chose to reuse>.
+  const rebook = searchParams.get('rebook') ? { from: searchParams.get('rebook'), notes: searchParams.get('notes') || '' } : null;
+  const [bookingOpen, setBookingOpen] = useState(Boolean(rebook));
 
   const { data: service, loading, error, retry } = useFetch(() => getService(id), [id]);
   const { data: reviews } = useFetch(() => getServiceReviews(id), [id]);
+  useEffect(() => { if (service?.id) countView('service', service.id); }, [service?.id]);
 
   useDocumentMeta({
     title: service ? service.title : 'Service',
@@ -420,7 +425,7 @@ export default function ServiceDetailPage() {
 
       <Modal open={bookingOpen} onClose={() => setBookingOpen(false)} title={bookingApi.bookingAvailable ? 'Book this service' : 'Booking coming soon'}>
         {bookingApi.bookingAvailable ? (
-          <BookingForm service={service} onClose={() => setBookingOpen(false)} />
+          <BookingForm service={service} onClose={() => setBookingOpen(false)} rebook={rebook} />
         ) : (
           <div style={{ display: 'grid', gap: 'var(--space-4)' }}>
             <Badge variant="demo">Pre-launch preview</Badge>

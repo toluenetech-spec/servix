@@ -1,6 +1,9 @@
 import type { FastifyInstance } from 'fastify';
 import type { Prisma } from '../generated/prisma/client.js';
 import { prisma } from '../lib/db.js';
+import { featureEnabled } from '../lib/features.js';
+import { profileTrustSummary, verifiedPortfolioFields } from './marketplace.js';
+import { filterByAvailability } from '../lib/bookingService.js';
 import { notFound } from '../lib/errors.js';
 import { parseQuery, professionalQuerySchema } from '../lib/query.js';
 import {
@@ -51,6 +54,15 @@ export async function professionalRoutes(app: FastifyInstance) {
     async (req) => {
       const q = parseQuery(professionalQuerySchema, req.query);
       const where = buildWhere(q);
+      if (q.available) {
+        // Availability is computed from real rules/exceptions/bookings, so the
+        // narrowing happens after the database filter (bounded candidate set).
+        const candidates = await prisma.professionalProfile.findMany({ where, orderBy: buildOrderBy(q.sort), take: 120, include: { category: true } });
+        const keep = await filterByAvailability(candidates.map((c) => c.id), q.available);
+        const matched = candidates.filter((c) => keep.has(c.id));
+        const pageRows = matched.slice((q.page - 1) * q.pageSize, q.page * q.pageSize);
+        return { items: pageRows.map((p) => ({ ...serializeProfessionalSummary(p), availableNow: true })), total: matched.length, page: q.page, pageSize: q.pageSize };
+      }
       const [total, rows] = await prisma.$transaction([
         prisma.professionalProfile.count({ where }),
         prisma.professionalProfile.findMany({
@@ -80,12 +92,19 @@ export async function professionalRoutes(app: FastifyInstance) {
         include: {
           category: true,
           skills: true,
-          portfolio: true,
+          portfolio: { include: { booking: { select: { completedAt: true, createdAt: true, review: { select: { rating: true } } } } } },
           services: { where: { status: 'active' } },
         },
       });
       if (!pro) throw notFound('PROFESSIONAL_NOT_FOUND', 'Professional not found');
-      return serializeProfessionalDetail(pro);
+      const detail = serializeProfessionalDetail(pro);
+      const verifiedById = new Map(pro.portfolio.map((i) => [i.id, verifiedPortfolioFields(i)]));
+      return {
+        ...detail,
+        portfolio: detail.portfolio.map((item) => ({ ...item, ...verifiedById.get(item.id) })),
+        verifiedProjects: pro.portfolio.filter((i) => i.verifiedAt).length,
+        trust: featureEnabled('trust') ? await profileTrustSummary(pro.id) : null,
+      };
     },
   );
 

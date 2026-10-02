@@ -3,6 +3,7 @@ import { Rating } from '../ui/Rating.jsx';
 import { VerifiedBadge } from '../ui/Badge.jsx';
 import { Icon } from '../ui/Icon.jsx';
 import { formatPrice } from '../../lib/format.js';
+import { CompareToggle } from '../marketplace/CompareTray.jsx';
 
 /** Professional directory card. */
 export function ProfessionalCard({ professional: pro }) {
@@ -48,6 +49,10 @@ export function ProfessionalCard({ professional: pro }) {
           </div>
         </div>
       </Link>
+      <div style={{ padding: '0 var(--space-5) var(--space-4)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <CompareToggle slug={pro.id} name={pro.name} />
+        {pro.availableNow && <span className="avail-chip">Free in your window</span>}
+      </div>
     </article>
   );
 }

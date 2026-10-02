@@ -29,6 +29,10 @@ const AVAILABILITY_OPTIONS = [
   { id: 'all', label: 'Any availability', value: '' },
   { id: 'available', label: 'Available now', value: 'available' },
   { id: 'limited', label: 'Limited availability', value: 'limited' },
+  // Real-slot discovery: computed from each professional's working hours, days off and bookings.
+  { id: 'today', label: 'Free today', window: 'today' },
+  { id: 'tomorrow', label: 'Free tomorrow', window: 'tomorrow' },
+  { id: 'week', label: 'Free this week', window: 'week' },
 ];
 
 const SORT_OPTIONS = [
@@ -179,6 +183,7 @@ export default function ProfessionalsPage() {
         minRating: ratingOpt.value,
         maxPrice: priceOpt.value,
         availability: availOpt.value || undefined,
+        available: availOpt.window || undefined,
         sort: filters.sort,
       }),
     [queryKey]

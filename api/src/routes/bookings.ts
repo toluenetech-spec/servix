@@ -11,6 +11,7 @@ import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { prisma } from '../lib/db.js';
+import { mediaUrl } from '../lib/storage.js';
 import { requireAuth, requireProfessional } from '../lib/authGuard.js';
 import { ApiError, notFound } from '../lib/errors.js';
 import { parseBody } from '../lib/query.js';
@@ -29,6 +30,7 @@ import { bookingCancelledMail, disputeOpenedMail } from '../lib/mailer.js';
 import { notify, professionalUserId } from '../lib/notifications.js';
 
 const createSchema = z.object({
+  rebookedFrom: z.string().uuid().optional(),
   serviceId: z.string().min(1), // public slug
   scheduledAt: z.coerce.date(),
   notes: z.string().trim().max(2000).optional(),
@@ -128,6 +130,28 @@ export async function bookingRoutes(app: FastifyInstance) {
 
   /* ============ customer: create + pay ============ */
 
+  /** Book again: a sanitised prefill from a previous booking of the same customer.
+   *  Nothing is copied blindly — previous notes are returned separately for the
+   *  customer to opt into, the professional's current active services are listed,
+   *  and the date is left for them to pick. */
+  app.get(
+    '/bookings/:id/rebook',
+    { preHandler: requireAuth, schema: { tags: ['bookings'], summary: 'Prefill for booking the same professional again', security: [{ bearerAuth: [] }] } },
+    async (req) => {
+      const { id } = req.params as { id: string };
+      const previous = await prisma.booking.findFirst({ where: { id, customerId: req.auth!.sub }, include: { service: { select: { slug: true, status: true } }, professional: { select: { id: true, slug: true, name: true, imageUrl: true, services: { where: { status: 'active' }, select: { slug: true, title: true, price: true, priceUnit: true, deliveryDays: true } } } } } });
+      if (!previous) throw notFound('BOOKING_NOT_FOUND', 'Booking not found');
+      return {
+        previousBookingId: previous.id,
+        previousStatus: previous.status,
+        professional: { id: previous.professional.slug, name: previous.professional.name, image: mediaUrl(previous.professional.imageUrl) },
+        services: previous.professional.services.map((s) => ({ id: s.slug, title: s.title, price: Number(s.price), priceUnit: s.priceUnit, deliveryDays: s.deliveryDays, wasBooked: s.slug === previous.service.slug })),
+        previousServiceAvailable: previous.service.status === 'active',
+        previousNotes: previous.notes ?? '',
+      };
+    },
+  );
+
   app.post(
     '/bookings',
     { preHandler: requireAuth, schema: { tags: ['bookings'], summary: 'Create a booking (pending payment)', security: [{ bearerAuth: [] }] } },
@@ -174,6 +198,7 @@ export async function bookingRoutes(app: FastifyInstance) {
             serviceTitle: service.title,
             priceUnit: service.priceUnit,
             notes: data.notes,
+            rebookedFromId: data.rebookedFrom ?? null,
             idempotencyKey,
             events: { create: { actorId: user.id, event: 'created', data: {} } },
           },

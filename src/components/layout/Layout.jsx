@@ -3,6 +3,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { Navbar } from './Navbar.jsx';
 import { WorkspaceShell } from '../dashboard/WorkspaceShell.jsx';
 import { Footer } from './Footer.jsx';
+import { CompareTray } from '../marketplace/CompareTray.jsx';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -29,6 +30,7 @@ export function Layout() {
       <main id="main">
         <Outlet />
       </main>
+      <CompareTray />
       <Footer />
     </>
   );

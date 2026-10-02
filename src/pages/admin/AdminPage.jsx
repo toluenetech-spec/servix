@@ -14,6 +14,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AnalyticsTab, NotificationsTab, SubscriptionsTab } from './AdminExtraTabs.jsx';
 import { IdentityTab } from './AdminIdentityTab.jsx';
+import { RequestsTab, TrustTab } from './AdminMarketplaceTabs.jsx';
 import { Button } from '../../components/ui/Button.jsx';
 import { Badge } from '../../components/ui/Badge.jsx';
 import { Field } from '../../components/ui/Field.jsx';
@@ -35,6 +36,8 @@ const TABS = [
   { id: 'services', label: 'Services' },
   { id: 'users', label: 'Users' },
   { id: 'bookings', label: 'Bookings & Disputes' },
+  { id: 'requests', label: 'Requests & proposals' },
+  { id: 'trust', label: 'Trust & achievements' },
   { id: 'payouts', label: 'Payouts' },
   { id: 'subscriptions', label: 'Plan subscriptions' },
   { id: 'notifications', label: 'Send notification' },
@@ -782,6 +785,8 @@ export default function AdminPage() {
         {tab === 'services' && <ServicesTab />}
         {tab === 'users' && <UsersTab />}
         {tab === 'bookings' && <BookingsTab />}
+        {tab === 'requests' && <RequestsTab />}
+        {tab === 'trust' && <TrustTab />}
         {tab === 'payouts' && <PayoutsTab />}
         {tab === 'audit' && <AuditTab />}
       </div>

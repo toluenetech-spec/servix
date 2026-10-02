@@ -19,13 +19,18 @@ import {
   getProfessionalServices,
 } from '../lib/api.js';
 import { formatPrice, formatDate } from '../lib/format.js';
+import { useFeatures } from '../lib/useFeatures.js';
+import { countView, getAvailabilitySummary } from '../lib/marketplaceApi.js';
+import { TrustPanel, VerifiedProjectBadge } from '../components/marketplace/TrustPanel.jsx';
+import { CompareToggle } from '../components/marketplace/CompareTray.jsx';
 
-const TABS = [
+const BASE_TABS = [
   { id: 'about', label: 'About' },
   { id: 'services', label: 'Services' },
   { id: 'portfolio', label: 'Portfolio' },
   { id: 'reviews', label: 'Reviews' },
 ];
+const TRUST_TAB = { id: 'trust', label: 'Trust & performance' };
 
 function ProfileSkeleton() {
   return (
@@ -51,6 +56,10 @@ export default function ProfessionalProfilePage() {
   const { data: pro, loading, error, retry } = useFetch(() => getProfessional(id), [id]);
   const { data: services } = useFetch(() => getProfessionalServices(id), [id]);
   const { data: reviews } = useFetch(() => getProfessionalReviews(id), [id]);
+  const features = useFeatures();
+  const { data: availability } = useFetch(() => getAvailabilitySummary(id).catch(() => null), [id]);
+  useEffect(() => { if (pro?.id) countView('professional', pro.id); }, [pro?.id]);
+  const TABS = features.trust && pro?.trust ? [...BASE_TABS.slice(0, 1), TRUST_TAB, ...BASE_TABS.slice(1)] : BASE_TABS;
 
   useDocumentMeta({
     title: pro ? `${pro.name} — ${pro.title}` : 'Professional Profile',
@@ -128,8 +137,11 @@ export default function ProfessionalProfilePage() {
             Request Booking
           </Button>
           <SaveButton slug={pro.id} />
+          <CompareToggle slug={pro.id} name={pro.name} />
           <span className="trust-strip__note" style={{ margin: 0, textAlign: 'center' }}>
-            {pro.availability === 'available' ? 'Available now' : 'Limited availability'}
+            {availability?.nextAvailableAt
+              ? <span className="avail-chip">{availability.availableToday ? 'Free today' : availability.availableTomorrow ? 'Free tomorrow' : availability.availableThisWeek ? 'Free this week' : `Next: ${new Date(availability.nextAvailableAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`}</span>
+              : (pro.availability === 'available' ? 'Available now' : 'Limited availability')}
           </span>
         </div>
       </header>
@@ -145,7 +157,7 @@ export default function ProfessionalProfilePage() {
         </div>
         <div>
           <div className="profile-stat__value">{pro.completedProjects}</div>
-          <div className="profile-stat__label">Completed projects</div>
+          <div className="profile-stat__label">Completed projects{pro.verifiedProjects ? ` · ${pro.verifiedProjects} verified` : ''}</div>
         </div>
         <div>
           <div className="profile-stat__value">{formatPrice(pro.startingPrice)}</div>
@@ -156,6 +168,14 @@ export default function ProfessionalProfilePage() {
       <Tabs tabs={TABS} active={tab} onChange={setTab} label="Profile sections" />
 
       <div style={{ paddingBlock: 'var(--space-8) var(--space-20)' }}>
+        {tab === 'trust' && pro.trust && (
+          <div style={{ maxWidth: '52rem' }}>
+            <TrustPanel trust={pro.trust} />
+            <p className="trust-strip__note" style={{ marginTop: 'var(--space-4)' }}>
+              How these are calculated: delivery reliability counts deliveries made on or before the agreed deadline (customer-requested changes don’t count against the professional); response rate counts paid requests answered; repeat customers are people who booked this professional more than once.
+            </p>
+          </div>
+        )}
         {tab === 'about' && (
           <div style={{ display: 'grid', gap: 'var(--space-8)', maxWidth: '46rem' }}>
             <section aria-labelledby="about-h">
@@ -248,6 +268,12 @@ export default function ProfessionalProfilePage() {
                   <div className="portfolio-item__body">
                     <h3 className="portfolio-item__title">{item.title}</h3>
                     <p className="portfolio-item__cat">{item.category}</p>
+                    {item.verified && (
+                      <p className="portfolio-item__cat" style={{ marginTop: 6, display: 'grid', gap: 4 }}>
+                        <VerifiedProjectBadge item={item} />
+                        <small>{[item.completedAt ? `Completed ${formatDate(item.completedAt)}` : null, item.deliveryDays ? `${item.deliveryDays} day${item.deliveryDays === 1 ? '' : 's'}` : null, item.customerRating ? `Rated ${item.customerRating}/5` : null].filter(Boolean).join(' · ')}</small>
+                      </p>
+                    )}
                   </div>
                 </article>
               ))}

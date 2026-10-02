@@ -351,6 +351,35 @@ Code verified / Infrastructure verified / Third-party verified / Not yet
 verified — nothing is claimed "production ready" merely because tests
 pass.
 
+## 11h. Next-generation marketplace — block 1 (2026-10-02)
+
+Scope shipped behind feature flags (all default off; see `api/.env.example`):
+Trust & performance, delivery reliability, Verified Servix Projects,
+achievements, pro analytics extension, professional comparison, availability
+discovery (today/tomorrow/week), Book again, preferred professionals, and the
+service request + proposal marketplace with admin oversight. Details and
+formulas: `api/docs/TRUST.md`, `api/docs/ACHIEVEMENTS.md`,
+`api/docs/MARKETPLACE_REQUESTS.md`, `api/docs/PROPOSALS.md`.
+
+Verification performed in the sandbox (honest status):
+
+| Check | Result |
+| --- | --- |
+| `api` TypeScript + `npm run build` | pass |
+| Root `npm run build` (Vite) | pass |
+| `api/tests/nextgen-local.test.ts` (embedded PostgreSQL, all 13 migrations from scratch) | 7/7 |
+| Existing local API suites (`kyc-local`, `onboarding-gigs-local`, `onboarding-local`, `media-route`) | 17/17 |
+| Playwright (`tests/browser`, API mocked) | 86/86 (78 existing + 8 new) |
+| Root `node --test` | 14/14 |
+| `api/docs/manual-nextgen-upgrade.sql` on a fresh PostgreSQL seeded with the 12 prior migrations | applies, re-run skipped, 13 records |
+| Live Paystack checkout from an awarded proposal | **not exercised** (TEST keys; requires the production deploy) |
+| Production (Neon / Railway / Vercel) | **not yet deployed** — SQL must run before the API deploy |
+
+Deploy order: 1) run `api/docs/manual-nextgen-upgrade.sql` in the Neon SQL
+Editor; 2) deploy the API; 3) promote the frontend; 4) switch flags on one at a
+time in Railway (`TRUST_ENABLED`, `ACHIEVEMENTS_ENABLED`, `COMPARE_ENABLED`,
+`REQUESTS_ENABLED`) and re-check `/readyz` + `GET /api/v1/features`.
+
 ## 12. Known Issues / Remaining Tasks
 
 - Service-detail availability preview is generated client-side (clearly
@@ -358,7 +387,12 @@ pass.
 - Legal pages are placeholders pending real, reviewed documents.
 - Social links in the footer are non-functional placeholders by design.
 - Portfolio items on profiles use placeholder tiles (no fabricated project
-  imagery) until real professionals supply work samples.
+  imagery) until real professionals supply work samples. Verified Servix
+  Projects (from completed bookings) now carry real completion facts.
+- Delivery reliability only measures bookings paid after the next-gen
+  migration (older bookings have no deadline snapshot and are not counted).
+- Projects/milestones, professional CRM, business workspace, price
+  intelligence and optional packages: flags exist, features not built yet.
 
 ## 13. Backend Integration Points (next phase)
 

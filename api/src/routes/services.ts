@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { Prisma } from '../generated/prisma/client.js';
 import { prisma } from '../lib/db.js';
+import { filterByAvailability } from '../lib/bookingService.js';
 import { notFound } from '../lib/errors.js';
 import { parseQuery, serviceQuerySchema } from '../lib/query.js';
 import {
@@ -53,6 +54,13 @@ export async function serviceRoutes(app: FastifyInstance) {
     async (req) => {
       const q = parseQuery(serviceQuerySchema, req.query);
       const where = buildWhere(q);
+      if (q.available) {
+        const candidates = await prisma.service.findMany({ where, orderBy: buildOrderBy(q.sort), take: 120, include: { media: true, category: true, professional: true } });
+        const keep = await filterByAvailability(candidates.map((c) => c.professionalId), q.available);
+        const matched = candidates.filter((c) => keep.has(c.professionalId));
+        const pageRows = matched.slice((q.page - 1) * q.pageSize, q.page * q.pageSize);
+        return { items: pageRows.map((s) => ({ ...serializeServiceSummary(s), availableNow: true })), total: matched.length, page: q.page, pageSize: q.pageSize };
+      }
       const [total, rows] = await prisma.$transaction([
         prisma.service.count({ where }),
         prisma.service.findMany({
