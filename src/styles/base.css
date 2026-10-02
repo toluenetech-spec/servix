@@ -13,6 +13,8 @@
 }
 
 html {
+  /* Never let a single too-wide element make phones zoom the page out. */
+  overflow-x: clip;
   scroll-behavior: smooth;
 }
 

@@ -13,6 +13,8 @@ import { Field } from '../../components/ui/Field.jsx';
 import { Icon } from '../../components/ui/Icon.jsx';
 import { OnboardingLayout, Stepper } from '../../components/onboarding/OnboardingLayout.jsx';
 import { ListEditor, TagInput } from '../../components/onboarding/ListEditor.jsx';
+import { SelectWithOther } from '../../components/onboarding/OptionPicker.jsx';
+import { optionsFor } from '../../data/professionCatalog.js';
 import { useToast } from '../../components/ui/Toast.jsx';
 import { useAuth } from '../../lib/AuthContext.jsx';
 import { useDocumentMeta } from '../../lib/useDocumentMeta.js';
@@ -230,11 +232,36 @@ export default function GigEditorPage() {
                 </select>
               )}
             </Field>
-            <Field label="Service type" hint="The specific thing you do inside that category, e.g. Logo design, Shopify store, Wedding photography.">
-              {(props) => <input {...props} className="input" type="text" maxLength={80} value={gig.serviceType} onChange={(e) => patch({ serviceType: e.target.value })} />}
+            <Field label="Service type" hint={gig.categorySlug ? 'The specific thing this gig delivers inside that category. Pick “Other” if it isn’t listed.' : 'Choose a category first to see the service types for it.'}>
+              {(props) => (
+                <SelectWithOther
+                  id={props.id}
+                  aria-describedby={props['aria-describedby']}
+                  options={optionsFor(gig.categorySlug, 'serviceTypes')}
+                  value={gig.serviceType}
+                  onChange={(serviceType) => patch({ serviceType })}
+                  placeholder="Choose a service type…"
+                  otherPlaceholder="e.g. Shopify store setup"
+                  maxLength={80}
+                />
+              )}
             </Field>
-            <Field label="Search tags" error={errors.searchTags} hint="Up to 5 words or phrases clients might search for. 2–20 characters each.">
-              {(props) => <TagInput id={props.id} value={gig.searchTags} onChange={(searchTags) => patch({ searchTags })} max={5} maxLength={20} placeholder="e.g. logo, brand identity" />}
+            <Field label="Search tags" error={errors.searchTags} hint="Up to 5 words or phrases clients might search for. 2–20 characters each. Tap a suggestion or type your own.">
+              {(props) => (
+                <div style={{ display: 'grid', gap: 8 }}>
+                  <TagInput id={props.id} value={gig.searchTags} onChange={(searchTags) => patch({ searchTags })} max={5} maxLength={20} placeholder="e.g. logo, brand identity" />
+                  {gig.searchTags.length < 5 && (
+                    <div className="ob-chips__list" aria-label="Suggested tags">
+                      {optionsFor(gig.categorySlug, 'skills')
+                        .filter((t) => t.length >= 2 && t.length <= 20 && !gig.searchTags.some((x) => x.toLowerCase() === t.toLowerCase()))
+                        .slice(0, 12)
+                        .map((t) => (
+                          <button key={t} type="button" className="ob-chip" onClick={() => patch({ searchTags: [...gig.searchTags, t].slice(0, 5) })}>+ {t}</button>
+                        ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </Field>
           </div>
         </section>

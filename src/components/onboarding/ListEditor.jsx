@@ -1,3 +1,4 @@
+import { SelectWithOther } from './OptionPicker.jsx';
 /**
  * Repeating-row editor (experience, education, certifications, languages,
  * portfolio). `fields` describe the inputs; rows are plain objects.
@@ -20,7 +21,18 @@ export function ListEditor({ label, items, onChange, fields, addLabel = 'Add ano
             {fields.map((f) => (
               <label key={f.key} className={f.wide ? 'ob-list__item--wide' : ''}>
                 {f.label}{f.required && <span aria-hidden="true" style={{ color: 'var(--danger)' }}> *</span>}
-                {f.type === 'select' ? (
+                {f.type === 'select-other' ? (
+                  <SelectWithOther
+                    options={typeof f.options === 'function' ? f.options(row) : f.options}
+                    value={row[f.key] ?? ''}
+                    onChange={(v) => update(i, f.key, v)}
+                    placeholder={f.placeholder ?? 'Choose…'}
+                    otherPlaceholder={f.otherPlaceholder ?? 'Type it here'}
+                    maxLength={f.maxLength ?? 160}
+                    className=""
+                    inputClassName=""
+                  />
+                ) : f.type === 'select' ? (
                   <select value={row[f.key] ?? ''} onChange={(e) => update(i, f.key, e.target.value)}>
                     {f.options.map((o) => <option key={o} value={o}>{o || 'Choose…'}</option>)}
                   </select>

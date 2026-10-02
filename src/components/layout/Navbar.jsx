@@ -107,10 +107,10 @@ export function Navbar() {
               <Button variant="ghost" to={homeFor(user).to}>
                 {homeFor(user).label}
               </Button>
-              <span className="navbar__user" title={user.email} style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              <Link className="navbar__user" title={user.email} to="/dashboard/settings" aria-label={`Account settings for ${user.fullName}`}>
                 <Avatar src={user.avatarUrl} name={user.fullName} size={28} />
-                {user.fullName.split(' ')[0]}
-              </span>
+                <span className="navbar__user-name">{user.fullName.split(' ')[0]}</span>
+              </Link>
               <Button variant="ghost" onClick={onSignOut}>
                 Sign Out
               </Button>

@@ -17,7 +17,9 @@ import { Icon } from '../../components/ui/Icon.jsx';
 import { Avatar } from '../../components/ui/Avatar.jsx';
 import { PhotoUploader } from '../../components/ui/PhotoUploader.jsx';
 import { OnboardingLayout, Stepper } from '../../components/onboarding/OnboardingLayout.jsx';
-import { ListEditor, TagInput } from '../../components/onboarding/ListEditor.jsx';
+import { ListEditor } from '../../components/onboarding/ListEditor.jsx';
+import { ChipPicker, SelectWithOther } from '../../components/onboarding/OptionPicker.jsx';
+import { LANGUAGES, LANGUAGE_LEVELS, optionsFor } from '../../data/professionCatalog.js';
 import { useToast } from '../../components/ui/Toast.jsx';
 import { useAuth } from '../../lib/AuthContext.jsx';
 import { useDocumentMeta } from '../../lib/useDocumentMeta.js';
@@ -26,7 +28,7 @@ import * as proApi from '../../lib/proApi.js';
 import { importResume, uploadFile, formatBytes, UPLOAD_LIMITS } from '../../lib/uploadApi.js';
 
 const STEPS = ['Personal info', 'Professional info', 'Portfolio', 'Review'];
-const LANGUAGE_LEVELS = ['', 'Basic', 'Conversational', 'Fluent', 'Native or bilingual'];
+const LEVEL_OPTIONS = ['', ...LANGUAGE_LEVELS];
 const ABOUT_MIN = 50;
 
 const EMPTY_DETAILS = { occupation: '', website: '', languages: [], education: [], certifications: [], experience: [], source: undefined };
@@ -299,15 +301,26 @@ export default function ApplyPage() {
               <span className="field__label">Profile picture</span>
               <PhotoUploader kind="profile" value={form.photoUrl ?? user.avatarUrl} name={user.fullName} onChange={(url) => patch({ photoUrl: url })} />
             </div>
-            <Field label="Professional title" required error={errors.title} hint="e.g. Brand Designer, Backend Developer, Wedding Photographer">
-              {(props) => <input {...props} className="input" type="text" maxLength={120} value={form.title} onChange={(e) => patch({ title: e.target.value })} />}
-            </Field>
-            <Field label="Category" required error={errors.categorySlug}>
+            <Field label="Category" required error={errors.categorySlug} hint="Pick your profession first — the titles, skills and certifications you can choose from depend on it.">
               {(props) => (
                 <select {...props} className="select" value={form.categorySlug} onChange={(e) => patch({ categorySlug: e.target.value })}>
                   <option value="">Choose a category…</option>
                   {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
+              )}
+            </Field>
+            <Field label="Professional title" required error={errors.title} hint="Choose the title clients will see. Pick “Other” if yours isn’t listed.">
+              {(props) => (
+                <SelectWithOther
+                  id={props.id}
+                  aria-describedby={props['aria-describedby']}
+                  options={optionsFor(form.categorySlug, 'titles')}
+                  value={form.title}
+                  onChange={(title) => patch({ title })}
+                  placeholder="Choose your title…"
+                  otherPlaceholder="e.g. Wedding Photographer"
+                  maxLength={120}
+                />
               )}
             </Field>
             <Field label="Description" required error={errors.about} hint={`Share your work, experience and interests. ${form.about.trim().length}/${ABOUT_MIN} characters minimum.`}>
@@ -325,8 +338,8 @@ export default function ApplyPage() {
                 max={8}
                 addLabel="Add language"
                 fields={[
-                  { key: 'name', label: 'Language', placeholder: 'e.g. English', required: true, maxLength: 40 },
-                  { key: 'level', label: 'Level', type: 'select', options: LANGUAGE_LEVELS },
+                  { key: 'name', label: 'Language', type: 'select-other', options: LANGUAGES, placeholder: 'Choose a language…', otherPlaceholder: 'Language name', required: true, maxLength: 40 },
+                  { key: 'level', label: 'Level', type: 'select', options: LEVEL_OPTIONS },
                 ]}
               />
             </div>
@@ -339,11 +352,32 @@ export default function ApplyPage() {
           <h1 id="step-professional">Professional info</h1>
           <p className="lead">This is your time to shine. Let potential clients know what you do best and how you gained your skills, certifications and experience.</p>
           <div className="ob-form">
-            <Field label="Occupation" hint="A plain-language label, e.g. Graphic designer, Software developer, Event planner.">
-              {(props) => <input {...props} className="input" type="text" maxLength={120} value={form.details.occupation} onChange={(e) => patchDetails({ occupation: e.target.value })} />}
+            <Field label="Occupation" hint="A plain-language label for what you do.">
+              {(props) => (
+                <SelectWithOther
+                  id={props.id}
+                  aria-describedby={props['aria-describedby']}
+                  options={optionsFor(form.categorySlug, 'occupations')}
+                  value={form.details.occupation}
+                  onChange={(occupation) => patchDetails({ occupation })}
+                  placeholder="Choose an occupation…"
+                  otherPlaceholder="e.g. Event planner"
+                  maxLength={120}
+                />
+              )}
             </Field>
-            <Field label="Skills" required error={errors.skills} hint="Up to 15. Press Enter after each one.">
-              {(props) => <TagInput id={props.id} aria-describedby={props['aria-describedby']} value={form.skills} onChange={(skills) => patch({ skills })} max={15} placeholder="e.g. Figma, SEO, Node.js" />}
+            <Field label="Skills" required error={errors.skills} hint={`Tap the skills you offer (up to 15)${form.categorySlug ? '' : ' — choose a category in Personal info to see the most relevant ones'}. Use “Other” for anything not listed.`}>
+              {(props) => (
+                <ChipPicker
+                  id={props.id}
+                  aria-describedby={props['aria-describedby']}
+                  label="Skills"
+                  options={optionsFor(form.categorySlug, 'skills')}
+                  value={form.skills}
+                  onChange={(skills) => patch({ skills })}
+                  max={15}
+                />
+              )}
             </Field>
             <div className="field">
               <span className="field__label">Work experience</span>
@@ -355,7 +389,7 @@ export default function ApplyPage() {
                 addLabel="Add experience"
                 empty="No roles added yet."
                 fields={[
-                  { key: 'title', label: 'Job title', required: true, maxLength: 120 },
+                  { key: 'title', label: 'Job title', type: 'select-other', options: optionsFor(form.categorySlug, 'titles'), placeholder: 'Choose a job title…', otherPlaceholder: 'Job title', required: true, maxLength: 120 },
                   { key: 'company', label: 'Company / client', maxLength: 120 },
                   { key: 'start', label: 'From', placeholder: 'e.g. Jan 2021', maxLength: 40 },
                   { key: 'end', label: 'To', placeholder: 'e.g. Present', maxLength: 40 },
@@ -387,7 +421,7 @@ export default function ApplyPage() {
                 max={10}
                 addLabel="Add certification"
                 fields={[
-                  { key: 'name', label: 'Certificate', required: true, wide: true },
+                  { key: 'name', label: 'Certificate', type: 'select-other', options: optionsFor(form.categorySlug, 'certifications'), placeholder: 'Choose a certification…', otherPlaceholder: 'Certificate name', required: true, wide: true },
                   { key: 'issuer', label: 'Issued by', maxLength: 120 },
                   { key: 'year', label: 'Year', maxLength: 40 },
                 ]}

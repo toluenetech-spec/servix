@@ -153,6 +153,15 @@ describe.skipIf(process.env.RUN_LOCAL_ONBOARDING_GIGS_TESTS !== '1')('onboarding
     expect((await call(me.token, 'me')).json().user.avatarUrl).toBe('https://cdn.example.test/avatar/a.png');
     expect((await call(proToken, 'pro/profile')).json().image).toBe('https://cdn.example.test/avatar/a.png');
     expect((await call(me.token, 'account/profile', {}, 'PATCH')).statusCode).toBe(422);
+    // …and a photo saved from the professional Profile tab updates the account avatar (navbar) too.
+    expect((await call(proToken, 'pro/profile', { imageUrl: 'https://cdn.example.test/profile/p.jpg' }, 'PATCH')).json().image).toBe('https://cdn.example.test/profile/p.jpg');
+    expect((await call(me.token, 'me')).json().user.avatarUrl).toBe('https://cdn.example.test/profile/p.jpg');
+    expect((await call(proToken, 'pro/profile', { imageUrl: '' }, 'PATCH')).json().image).toBeNull();
+    expect((await call(me.token, 'me')).json().user.avatarUrl).toBeNull();
+    // A title-only PATCH leaves the avatar alone.
+    expect((await call(proToken, 'pro/profile', { imageUrl: 'https://cdn.example.test/profile/q.jpg' }, 'PATCH')).statusCode).toBe(200);
+    expect((await call(proToken, 'pro/profile', { title: 'Senior Web Developer' }, 'PATCH')).statusCode).toBe(200);
+    expect((await call(me.token, 'me')).json().user.avatarUrl).toBe('https://cdn.example.test/profile/q.jpg');
   });
 
   it('gig wizard: drafts save early, publishing enforces the checklist, media kinds are capped', async () => {

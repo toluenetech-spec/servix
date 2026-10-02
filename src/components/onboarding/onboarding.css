@@ -89,3 +89,20 @@
 .gig-thumb--add{display:grid;place-items:center;gap:6px;min-height:150px;border:1px dashed #b9c2b5;cursor:pointer;font-weight:600;font-size:13px;color:#1f2a24;grid-template-rows:none}
 .gig-thumb--add:hover{background:#f4f6f1}
 .gig-file{display:flex;align-items:center;gap:12px;border:1px solid #e3e7df;border-radius:8px;padding:10px 14px;font-size:14px}.gig-file span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ---- pick-from-options controls (skills chips, select + "Other") ---- */
+.ob-select-other{display:grid;gap:8px}
+.ob-chips{display:grid;gap:10px}
+.ob-chips__list{display:flex;flex-wrap:wrap;gap:8px}
+.ob-chip{border:1px solid #cfd6ca;background:#fff;border-radius:20px;padding:7px 13px;font:inherit;font-size:13px;font-weight:600;color:#2b3a33;cursor:pointer;line-height:1.2;transition:background .15s,border-color .15s,color .15s;max-width:100%;overflow-wrap:anywhere;text-align:left}
+.ob-chip:hover:not(:disabled){border-color:#1f5a3d;background:#f1f6f2}
+.ob-chip:focus-visible{outline:2px solid #1f5a3d;outline-offset:2px}
+.ob-chip:disabled{opacity:.45;cursor:not-allowed}
+.ob-chip--on{background:#1f5a3d;border-color:#1f5a3d;color:#fff}
+.ob-chip--on:hover:not(:disabled){background:#174630;border-color:#174630}
+.ob-chip--custom{background:#2b3a33;border-color:#2b3a33}
+.ob-chip--other{border-style:dashed;color:#1f5a3d;background:#fbfcfa}
+.ob-chips__other{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.ob-chips__other .input{flex:1;min-width:180px}
+.ob-chips__count{margin:0;font-size:12px;color:#51605a}
+.ob-list__grid .ob-select-other select,.ob-list__grid .ob-select-other input{width:100%}

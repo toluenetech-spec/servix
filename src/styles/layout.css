@@ -256,18 +256,48 @@
 
 /* Signed-in user name in the navbar (Phase B) */
 .navbar__user {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   font-size: var(--text-sm);
   font-weight: 650;
   color: var(--color-deep-forest);
   padding-inline: var(--space-2);
   white-space: nowrap;
   max-width: 10rem;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.navbar__user-name {
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+/* Phones: avatar only — the first name plus logo plus menu button no longer
+   fit on a 360px screen, and an overflowing navbar lets Android Chrome zoom
+   the whole page out (header/footer look narrower than the screen). */
 @media (max-width: 900px) {
+  .navbar__inner {
+    gap: var(--space-3);
+  }
+
   .navbar__user {
+    padding-inline: 0;
+  }
+
+  .navbar__user-name {
     display: none;
+  }
+
+  .navbar__actions {
+    gap: var(--space-1);
+  }
+}
+
+@media (max-width: 360px) {
+  .navbar__brand svg,
+  .navbar__brand img {
+    height: 24px !important;
   }
 }

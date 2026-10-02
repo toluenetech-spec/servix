@@ -85,7 +85,7 @@ export default function ProfessionalProfilePage() {
   }
 
   return (
-    <div className="page container">
+    <div className="page container profile-page">
       <div style={{ paddingTop: 'var(--space-6)' }}>
         <Breadcrumb
           items={[
@@ -97,7 +97,13 @@ export default function ProfessionalProfilePage() {
       </div>
 
       <header className="profile-head">
-        <img className="profile-head__avatar" src={pro.image} alt={`Portrait of ${pro.name}`} width="112" height="112" />
+        {pro.image ? (
+          <img className="profile-head__avatar" src={pro.image} alt={`Portrait of ${pro.name}`} width="112" height="112" />
+        ) : (
+          <span className="profile-head__avatar profile-head__avatar--initial" role="img" aria-label={`${pro.name} has not added a photo yet`}>
+            {(pro.name || '?').trim().slice(0, 1).toUpperCase()}
+          </span>
+        )}
         <div className="profile-head__info" style={{ flex: 1, minWidth: '16rem' }}>
           <h1>
             {pro.name}

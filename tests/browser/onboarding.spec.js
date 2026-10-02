@@ -6,12 +6,14 @@ const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
 
 /** Mock API with an in-memory application + service store so the wizards behave like the real thing. */
 async function mock(page, options = {}) {
-  const db = { user: { ...baseUser, ...options.user }, application: options.application ?? null, services: {}, uploads: [], calls: [] };
+  const db = { user: { ...baseUser, ...options.user }, application: options.application ?? null, services: {}, uploads: [], calls: [], profilePatches: [] };
   page.db = db;
   await page.addInitScript(() => localStorage.setItem('servix_cookie_preferences', JSON.stringify({ version: '2026-09-28', optional: false, savedAt: Date.now() })));
   await page.route('**/*', (route) => {
     const req = route.request();
     const url = new URL(req.url());
+    // Stored media is served from the (mock) CDN unless a test says it is unreachable.
+    if (url.hostname === 'cdn.servix.test' && !options.cdnDown) return route.fulfill({ status: 200, contentType: 'image/png', body: png });
     if (!['localhost', '127.0.0.1'].includes(url.hostname)) return route.abort();
     if (!url.pathname.startsWith('/api/v1/')) return route.continue();
     const path = url.pathname.slice('/api/v1/'.length);
@@ -37,7 +39,18 @@ async function mock(page, options = {}) {
     if (path === 'applications' && method === 'POST') { db.application = { id: 'app-1', status: 'pending', submittedAt: null, rejectionReason: null, ...body() }; return route.fulfill({ status: 201, json: db.application }); }
     if (path.startsWith('applications/app-1') && method === 'PATCH') { db.application = { ...db.application, ...body() }; return route.fulfill({ json: db.application }); }
     if (path === 'applications/app-1/submit') { db.application = { ...db.application, status: 'under_review', submittedAt: new Date().toISOString() }; return route.fulfill({ json: db.application }); }
-    if (path === 'pro/profile') return route.fulfill({ json: { id: 'adaeze', name: db.user.fullName, title: 'Developer', location: 'Lagos, Nigeria', skills: [], portfolio: [], details: {}, verified: false, availability: 'available', image: null } });
+    if (path === 'pro/profile') {
+      db.profile ??= { id: 'adaeze', name: db.user.fullName, title: 'Developer', categoryId: 'web-development', location: 'Lagos, Nigeria', skills: ['React'], portfolio: [], details: {}, verified: false, availability: 'available', image: null };
+      if (req.method() === 'PATCH') {
+        const body = req.postDataJSON();
+        db.profilePatches.push(body);
+        if (body.imageUrl !== undefined) { db.profile.image = body.imageUrl || null; db.user.avatarUrl = body.imageUrl || null; }
+        if (body.title !== undefined) db.profile.title = body.title;
+        if (body.details !== undefined) db.profile.details = body.details;
+      }
+      return route.fulfill({ json: db.profile });
+    }
+    if (path === 'pro/skills' && req.method() === 'PUT') { db.profile.skills = req.postDataJSON().skills; return route.fulfill({ json: { skills: db.profile.skills } }); }
     if (path === 'pro/services' && method === 'GET') return route.fulfill({ json: Object.values(db.services) });
     if (path === 'pro/services' && method === 'POST') {
       const b = body(); const id = 'gig-1';
@@ -104,12 +117,19 @@ test('onboarding overview offers LinkedIn/CV import or manual entry, and the man
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await expect(page.getByText('Enter your professional title')).toBeVisible();
   expect(page.db.calls.filter((c) => c.startsWith('POST applications'))).toHaveLength(0);
-  await page.getByLabel('Professional title').fill('Senior Web Developer');
+  // Title options depend on the category: before a category is picked every
+  // category's titles are offered; afterwards only web-development ones.
   await page.getByLabel('Category').selectOption('web-development');
+  const titleSelect = page.getByLabel('Professional title');
+  await expect(titleSelect.locator('option', { hasText: 'Frontend Developer' })).toHaveCount(1);
+  await expect(titleSelect.locator('option', { hasText: 'Wedding Photographer' })).toHaveCount(0);
+  // "Other" reveals a text box; typing a listed value is still allowed.
+  await titleSelect.selectOption('__other__');
+  await page.getByRole('textbox', { name: /^Other — / }).fill('Senior Web Developer');
   await page.getByLabel('Description').fill('I build fast, accessible web applications for growing businesses across Nigeria.');
   await page.getByLabel('City').fill('Lagos');
   await page.getByRole('button', { name: '+ Add language' }).click();
-  await page.getByRole('textbox', { name: 'Language', exact: true }).fill('English');
+  await page.getByRole('combobox', { name: 'Language', exact: true }).selectOption('English');
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
 
   // Step 2 — professional info; the draft now exists on the server.
@@ -117,25 +137,35 @@ test('onboarding overview offers LinkedIn/CV import or manual entry, and the man
   expect(page.db.application).toMatchObject({ title: 'Senior Web Developer', categorySlug: 'web-development', locationCity: 'Lagos', details: { languages: [{ name: 'English', level: '' }], source: 'manual' } });
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await expect(page.getByText('Add at least one skill.')).toBeVisible();
-  await page.getByLabel('Skills').fill('React');
-  await page.getByLabel('Skills').press('Enter');
-  await page.getByLabel('Skills').fill('Node.js');
-  await page.getByLabel('Skills').press('Enter');
-  await expect(page.getByRole('button', { name: 'Remove React' })).toBeVisible();
+  // Skills are tap-to-select chips drawn from the web-development catalog…
+  const skills = page.getByRole('group', { name: 'Skills' });
+  await expect(skills.getByRole('button', { name: 'React', exact: true })).toBeVisible();
+  await expect(skills.getByRole('button', { name: 'Adobe Photoshop' })).toHaveCount(0);
+  await skills.getByRole('button', { name: 'React', exact: true }).click();
+  await skills.getByRole('button', { name: 'Node.js', exact: true }).click();
+  await expect(skills.getByRole('button', { name: 'React', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  // …with an "Other" escape hatch for anything not listed.
+  await skills.getByRole('button', { name: /Other…/ }).click();
+  await skills.getByRole('textbox', { name: 'Add a skill not listed' }).fill('Hausa localisation');
+  await skills.getByRole('button', { name: 'Add', exact: true }).click();
+  await expect(skills.getByText('3/15 selected')).toBeVisible();
   await page.getByRole('button', { name: '+ Add experience' }).click();
-  await page.getByRole('textbox', { name: 'Job title' }).fill('Lead Developer');
+  await page.getByRole('combobox', { name: 'Job title' }).selectOption('Full Stack Developer');
   await page.getByLabel('Company / client').fill('Brightline Studio');
+  await page.getByRole('button', { name: '+ Add certification' }).click();
+  await page.getByRole('combobox', { name: 'Certificate' }).selectOption('AWS Certified Cloud Practitioner');
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
 
   // Step 3 — portfolio is optional.
   await expect(page.getByRole('heading', { name: 'Show your work' })).toBeVisible();
-  expect(page.db.application.skills).toEqual(['React', 'Node.js']);
-  expect(page.db.application.details.experience[0]).toMatchObject({ title: 'Lead Developer', company: 'Brightline Studio' });
+  expect(page.db.application.skills).toEqual(['React', 'Node.js', 'Hausa localisation']);
+  expect(page.db.application.details.experience[0]).toMatchObject({ title: 'Full Stack Developer', company: 'Brightline Studio' });
+  expect(page.db.application.details.certifications[0]).toMatchObject({ name: 'AWS Certified Cloud Practitioner' });
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
 
   // Step 4 — review, confirmation required, then submit locks the application.
   await expect(page.getByRole('heading', { name: 'Review and submit' })).toBeVisible();
-  await expect(page.getByText('React, Node.js')).toBeVisible();
+  await expect(page.getByText('React, Node.js, Hausa localisation')).toBeVisible();
   await page.getByRole('button', { name: 'Submit for review' }).click();
   await expect(page.getByText('Please confirm your details are accurate.')).toBeVisible();
   await page.getByRole('checkbox').check();
@@ -163,13 +193,16 @@ test('uploading a LinkedIn PDF pre-fills the application and attaches the CV', a
   await expect(page.getByText('2 skills')).toBeVisible();
   expect(page.db.calls).toContain('resume:application/pdf');
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await expect(page.getByLabel('Professional title')).toHaveValue('Senior Web Developer');
+  // Imported values that aren't in the option lists are kept and shown under "Other".
+  await expect(page.getByLabel('Professional title')).toHaveValue('__other__');
+  await expect(page.getByRole('textbox', { name: /^Other — / })).toHaveValue('Senior Web Developer');
   await expect(page.getByLabel('City')).toHaveValue('Lagos');
-  await expect(page.getByRole('textbox', { name: 'Language', exact: true })).toHaveValue('English');
+  await expect(page.getByRole('combobox', { name: 'Language', exact: true })).toHaveValue('English');
   await page.getByLabel('Category').selectOption('web-development');
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Remove React' })).toBeVisible();
-  await expect(page.getByRole('textbox', { name: 'Job title' })).toHaveValue('Senior Web Developer');
+  await expect(page.getByRole('group', { name: 'Skills' }).getByRole('button', { name: 'React', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('combobox', { name: 'Job title' })).toHaveValue('__other__');
+  await expect(page.getByRole('textbox', { name: /^Other — / })).toHaveValue('Senior Web Developer');
   await expect(page.getByText('CV attached:')).toBeVisible();
   expect(page.db.application).toMatchObject({ resumeUrl: 'https://cdn.servix.test/resume/1.pdf', resumeFileName: 'Profile.pdf', details: { source: 'linkedin' } });
 });
@@ -185,9 +218,16 @@ test('gig wizard walks Overview → Pricing → Description → Requirements →
   await expect(page.getByText('Give the gig a title')).toBeVisible();
   await page.getByLabel('Gig title').fill('build a Shopify store for your brand');
   await page.getByLabel('Category').selectOption('web-development');
-  await page.getByLabel('Service type').fill('E-commerce website');
+  // Service types are offered per category, with "Other" as the escape hatch.
+  const serviceType = page.getByLabel('Service type');
+  await expect(serviceType.locator('option', { hasText: 'E-commerce store' })).toHaveCount(1);
+  await expect(serviceType.locator('option', { hasText: 'Logo design' })).toHaveCount(0);
+  await serviceType.selectOption('__other__');
+  await page.getByRole('textbox', { name: /^Other — / }).fill('E-commerce website');
   const tags = page.getByLabel('Search tags');
   for (const t of ['shopify', 'online store']) { await tags.fill(t); await tags.press('Enter'); }
+  // Suggested tags come from the category's skill list.
+  await page.getByRole('button', { name: '+ React', exact: true }).click();
   await next.click();
   expect(page.db.calls.filter((c) => c === 'POST pro/services')).toHaveLength(0); // nothing saved until a price exists
 
@@ -201,7 +241,7 @@ test('gig wizard walks Overview → Pricing → Description → Requirements →
   await inc.fill('Up to 50 products'); await inc.press('Enter');
   await next.click();
   await expect(page).toHaveURL(/\/dashboard\/gigs\/gig-1\/edit$/);
-  expect(page.db.services['gig-1'].raw).toMatchObject({ title: 'I will build a Shopify store for your brand', categorySlug: 'web-development', serviceType: 'E-commerce website', searchTags: ['shopify', 'online store'], price: 150000, deliveryDays: 7, revisions: 2, included: ['Up to 50 products'] });
+  expect(page.db.services['gig-1'].raw).toMatchObject({ title: 'I will build a Shopify store for your brand', categorySlug: 'web-development', serviceType: 'E-commerce website', searchTags: ['shopify', 'online store', 'React'], price: 150000, deliveryDays: 7, revisions: 2, included: ['Up to 50 products'] });
 
   await expect(page.getByRole('heading', { name: 'Description & FAQ' })).toBeVisible();
   await page.getByLabel('Short description').fill('A fast, secure online store built for Nigerian SMEs.');
@@ -276,6 +316,34 @@ test('account settings let anyone upload, see and remove a profile photo', async
   await page.getByRole('button', { name: 'Remove' }).click();
   await expect(page.getByText('Your photo has been removed.')).toBeVisible();
   expect(page.db.user.avatarUrl).toBeNull();
+});
+
+test('the professional Profile tab saves the photo immediately and keeps the navbar avatar in step', async ({ page }) => {
+  await mock(page, { user: { role: 'professional' } });
+  await page.goto('/dashboard/profile');
+  await expect(page.getByRole('heading', { name: 'Profile photo' }).or(page.getByText('Profile photo').first())).toBeVisible();
+  await page.getByLabel('Profile photo file').setInputFiles({ name: 'me.jpg', mimeType: 'image/jpeg', buffer: png });
+  await expect(page.getByText('Photo saved.')).toBeVisible();
+  // Saved without pressing "Save Profile": one PATCH carrying only the image.
+  expect(page.db.profilePatches).toEqual([{ imageUrl: 'https://cdn.servix.test/profile/1.bin' }]);
+  expect(page.db.user.avatarUrl).toBe('https://cdn.servix.test/profile/1.bin');
+  await expect(page.getByRole('img', { name: 'Photo of Adaeze Okafor' }).first()).toBeVisible();
+  // The option-based fields are present with the category's choices.
+  await expect(page.getByLabel('Professional title').locator('option', { hasText: 'Backend Developer' })).toHaveCount(1);
+  const skills = page.getByRole('group', { name: 'Skills' });
+  await expect(skills.getByRole('button', { name: 'React', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await skills.getByRole('button', { name: 'TypeScript', exact: true }).click();
+  await page.getByRole('button', { name: 'Save Profile' }).click();
+  await expect(page.getByText('Profile updated.')).toBeVisible();
+  expect(page.db.profile.skills).toEqual(['React', 'TypeScript']);
+});
+
+test('a saved photo whose link cannot load is reported honestly, not shown as a blank initial', async ({ page }) => {
+  await mock(page, { cdnDown: true, user: { avatarUrl: 'https://cdn.servix.test/avatar/9.bin' } });
+  await page.goto('/dashboard/settings');
+  await expect(page.getByRole('alert')).toContainText('cannot be displayed right now');
+  // Falls back to the initial rather than a broken image icon.
+  await expect(page.getByRole('img', { name: 'Photo of Adaeze Okafor' })).toHaveCount(0);
 });
 
 test('photo upload reports storage problems instead of pretending', async ({ page }) => {

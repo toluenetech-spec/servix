@@ -20,6 +20,8 @@ import * as proApi from '../../lib/proApi.js';
 import * as bookingApi from '../../lib/bookingApi.js';
 import { PhotoUploader } from '../../components/ui/PhotoUploader.jsx';
 import { ListEditor } from '../../components/onboarding/ListEditor.jsx';
+import { ChipPicker, SelectWithOther } from '../../components/onboarding/OptionPicker.jsx';
+import { LANGUAGES, LANGUAGE_LEVELS, optionsFor } from '../../data/professionCatalog.js';
 import '../../components/onboarding/onboarding.css';
 import { Link as RouterLink } from 'react-router-dom';
 
@@ -316,9 +318,21 @@ function ProfileTab({ categories, profile, onProfileChange }) {
     locationCity: (profile.location ?? '').split(',')[0] ?? '',
     categorySlug: profile.categoryId ?? '',
     availability: profile.availability ?? 'available',
-    skills: (profile.skills ?? []).join(', '),
+    skills: profile.skills ?? [],
   });
   const [image, setImage] = useState(profile.image ?? null);
+  const [photoStatus, setPhotoStatus] = useState('');
+  const { refreshUser } = useAuth();
+  // The photo is saved the moment it is picked (not on "Save profile"), so it
+  // can never be lost by navigating away; the account avatar is synced server-side.
+  const savePhoto = useCallback(async (url) => {
+    setPhotoStatus('');
+    const updated = await proApi.updateMyProfile({ imageUrl: url ?? '' });
+    setImage(url ?? null);
+    onProfileChange({ ...profile, image: updated.image ?? url ?? null });
+    try { await refreshUser(); } catch { /* navbar refreshes on next load */ }
+    setPhotoStatus(url ? 'Photo saved.' : 'Photo removed.');
+  }, [onProfileChange, profile, refreshUser]);
   const [details, setDetails] = useState({ occupation: '', website: '', languages: [], education: [], certifications: [], experience: [], ...(profile.details ?? {}) });
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
@@ -344,11 +358,7 @@ function ProfileTab({ categories, profile, onProfileChange }) {
           experience: details.experience.filter((x) => x.title?.trim()),
         },
       });
-      const skills = values.skills
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean)
-        .slice(0, 15);
+      const skills = values.skills.map((x) => x.trim()).filter(Boolean).slice(0, 15);
       await proApi.replaceSkills(skills);
       showToast('Profile updated.', 'success');
       onProfileChange({ ...updated, skills });
@@ -377,20 +387,8 @@ function ProfileTab({ categories, profile, onProfileChange }) {
       <form className="contact-form" onSubmit={save} noValidate>
         <div className="field">
           <span className="field__label">Profile photo</span>
-          <PhotoUploader kind="profile" value={image} name={profile.name} onChange={setImage} />
+          <PhotoUploader kind="profile" value={image} name={profile.name} onChange={savePhoto} status={photoStatus} />
         </div>
-        <Field label="Professional title" required error={errors.title}>
-          {(props) => (
-            <input
-              {...props}
-              className="input"
-              type="text"
-              value={values.title}
-              onChange={(e) => setValues((v) => ({ ...v, title: e.target.value }))}
-            />
-          )}
-        </Field>
-
         <div className="grid-2" style={{ gap: 'var(--space-5)' }}>
           <Field label="Category" error={errors.categorySlug}>
             {(props) => (
@@ -425,6 +423,21 @@ function ProfileTab({ categories, profile, onProfileChange }) {
           </Field>
         </div>
 
+        <Field label="Professional title" required error={errors.title} hint="Choose the title clients will see, or pick “Other” to type your own.">
+          {(props) => (
+            <SelectWithOther
+              id={props.id}
+              aria-describedby={props['aria-describedby']}
+              options={optionsFor(values.categorySlug, 'titles')}
+              value={values.title}
+              onChange={(title) => setValues((v) => ({ ...v, title }))}
+              placeholder="Choose your title…"
+              otherPlaceholder="e.g. Wedding Photographer"
+              maxLength={120}
+            />
+          )}
+        </Field>
+
         <Field label="City" error={errors.locationCity}>
           {(props) => (
             <input
@@ -449,30 +462,46 @@ function ProfileTab({ categories, profile, onProfileChange }) {
           )}
         </Field>
 
-        <Field label="Skills" error={errors.skills} hint="Comma-separated, up to 15.">
+        <Field label="Skills" error={errors.skills} hint="Tap the skills you offer (up to 15). Use “Other” for anything not listed.">
           {(props) => (
-            <input
-              {...props}
-              className="input"
-              type="text"
+            <ChipPicker
+              id={props.id}
+              aria-describedby={props['aria-describedby']}
+              label="Skills"
+              options={optionsFor(values.categorySlug, 'skills')}
               value={values.skills}
-              onChange={(e) => setValues((v) => ({ ...v, skills: e.target.value }))}
+              onChange={(skills) => setValues((v) => ({ ...v, skills }))}
+              max={15}
             />
           )}
         </Field>
 
+        <Field label="Occupation" error={errors['details.occupation']} hint="A plain-language label for what you do.">
+          {(props) => (
+            <SelectWithOther
+              id={props.id}
+              aria-describedby={props['aria-describedby']}
+              options={optionsFor(values.categorySlug, 'occupations')}
+              value={details.occupation ?? ''}
+              onChange={(occupation) => setDetails((d) => ({ ...d, occupation }))}
+              placeholder="Choose an occupation…"
+              otherPlaceholder="e.g. Event planner"
+              maxLength={120}
+            />
+          )}
+        </Field>
         <Field label="Personal website" error={errors['details.website']} hint="Optional — portfolio site, Behance, GitHub…">
           {(props) => <input {...props} className="input" type="url" placeholder="https://" value={details.website ?? ''} onChange={(e) => setDetails((d) => ({ ...d, website: e.target.value }))} />}
         </Field>
         <div className="field">
           <span className="field__label">Languages</span>
           <ListEditor label="Language" items={details.languages} onChange={(languages) => setDetails((d) => ({ ...d, languages }))} max={8} addLabel="Add language"
-            fields={[{ key: 'name', label: 'Language', required: true, maxLength: 40 }, { key: 'level', label: 'Level', type: 'select', options: ['', 'Basic', 'Conversational', 'Fluent', 'Native or bilingual'] }]} />
+            fields={[{ key: 'name', label: 'Language', type: 'select-other', options: LANGUAGES, placeholder: 'Choose a language…', otherPlaceholder: 'Language name', required: true, maxLength: 40 }, { key: 'level', label: 'Level', type: 'select', options: ['', ...LANGUAGE_LEVELS] }]} />
         </div>
         <div className="field">
           <span className="field__label">Work experience</span>
           <ListEditor label="Role" items={details.experience} onChange={(experience) => setDetails((d) => ({ ...d, experience }))} max={8} addLabel="Add experience" empty="Shown on your public profile under Experience."
-            fields={[{ key: 'title', label: 'Job title', required: true, maxLength: 120 }, { key: 'company', label: 'Company / client', maxLength: 120 }, { key: 'start', label: 'From', maxLength: 40 }, { key: 'end', label: 'To', maxLength: 40 }, { key: 'description', label: 'What you did', type: 'textarea', wide: true, maxLength: 600 }]} />
+            fields={[{ key: 'title', label: 'Job title', type: 'select-other', options: optionsFor(values.categorySlug, 'titles'), placeholder: 'Choose a job title…', otherPlaceholder: 'Job title', required: true, maxLength: 120 }, { key: 'company', label: 'Company / client', maxLength: 120 }, { key: 'start', label: 'From', maxLength: 40 }, { key: 'end', label: 'To', maxLength: 40 }, { key: 'description', label: 'What you did', type: 'textarea', wide: true, maxLength: 600 }]} />
         </div>
         <div className="field">
           <span className="field__label">Education</span>
@@ -482,7 +511,7 @@ function ProfileTab({ categories, profile, onProfileChange }) {
         <div className="field">
           <span className="field__label">Certifications</span>
           <ListEditor label="Certification" items={details.certifications} onChange={(certifications) => setDetails((d) => ({ ...d, certifications }))} max={10} addLabel="Add certification"
-            fields={[{ key: 'name', label: 'Certificate', required: true, wide: true }, { key: 'issuer', label: 'Issued by', maxLength: 120 }, { key: 'year', label: 'Year', maxLength: 40 }]} />
+            fields={[{ key: 'name', label: 'Certificate', type: 'select-other', options: optionsFor(values.categorySlug, 'certifications'), placeholder: 'Choose a certification…', otherPlaceholder: 'Certificate name', required: true, wide: true }, { key: 'issuer', label: 'Issued by', maxLength: 120 }, { key: 'year', label: 'Year', maxLength: 40 }]} />
         </div>
 
         <div>

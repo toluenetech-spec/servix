@@ -203,6 +203,11 @@ export async function proRoutes(app: FastifyInstance) {
         },
         include: { category: true, skills: true, portfolio: true, services: { where: { status: 'active' } } },
       });
+      // Keep the account avatar (navbar, messages) in step with the professional photo,
+      // the same way PATCH /account/profile pushes the account avatar down to the profile.
+      if (data.imageUrl !== undefined) {
+        await prisma.user.update({ where: { id: req.auth!.sub }, data: { avatarUrl: data.imageUrl || null } });
+      }
       return serializeProfessionalDetail(updated);
     },
   );
