@@ -162,6 +162,11 @@ const paths = {
     <path d="M12 20.5s-8-4.9-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 9.5c0 6.1-8 11-8 11Z" />
   ),
   sparkle: <path d="M12 3v4m0 10v4M3 12h4m10 0h4M6.3 6.3l2.1 2.1m7.2 7.2 2.1 2.1m0-11.4-2.1 2.1M8.4 15.6l-2.1 2.1" />,
+  'chevron-up': <path d="m6 15 6-6 6 6" />,
+  upload: <path d="M12 16V4m0 0 -4 4m4-4 4 4M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" />,
+  trash: <path d="M4 7h16M10 11v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3" />,
+  video: <path d="M15 10l5-3v10l-5-3M3 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1Z" />,
+  image: <path d="M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4M15 9h.01" />,
 };
 
 export function Icon({ name, size = 20, strokeWidth = 1.75, label, className }) {

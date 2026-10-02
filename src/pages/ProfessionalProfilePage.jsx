@@ -170,6 +170,47 @@ export default function ProfessionalProfilePage() {
                 ))}
               </div>
             </section>
+            {pro.details?.experience?.length > 0 && (
+              <section aria-labelledby="experience-h">
+                <h2 id="experience-h" style={{ fontSize: 'var(--text-lg)', marginBottom: 'var(--space-4)' }}>Experience</h2>
+                <ul className="profile-timeline">
+                  {pro.details.experience.map((x, i) => (
+                    <li key={`${x.title}-${i}`}>
+                      <strong>{x.title}</strong>{x.company ? ` · ${x.company}` : ''}
+                      {(x.start || x.end) && <span className="text-muted"> · {x.start}{x.start && x.end ? ' – ' : ''}{x.end}</span>}
+                      {x.description && <p className="text-muted">{x.description}</p>}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+            {pro.details?.education?.length > 0 && (
+              <section aria-labelledby="education-h">
+                <h2 id="education-h" style={{ fontSize: 'var(--text-lg)', marginBottom: 'var(--space-4)' }}>Education</h2>
+                <ul className="profile-timeline">
+                  {pro.details.education.map((x, i) => (
+                    <li key={`${x.school}-${i}`}><strong>{x.school}</strong>{x.degree ? ` · ${x.degree}` : ''}{x.year && <span className="text-muted"> · {x.year}</span>}</li>
+                  ))}
+                </ul>
+              </section>
+            )}
+            {pro.details?.certifications?.length > 0 && (
+              <section aria-labelledby="cert-h">
+                <h2 id="cert-h" style={{ fontSize: 'var(--text-lg)', marginBottom: 'var(--space-4)' }}>Certifications</h2>
+                <ul className="profile-timeline">
+                  {pro.details.certifications.map((x, i) => (
+                    <li key={`${x.name}-${i}`}><strong>{x.name}</strong>{x.issuer ? ` · ${x.issuer}` : ''}{x.year && <span className="text-muted"> · {x.year}</span>}</li>
+                  ))}
+                </ul>
+              </section>
+            )}
+            {(pro.details?.languages?.length > 0 || pro.details?.website) && (
+              <section aria-labelledby="more-h">
+                <h2 id="more-h" style={{ fontSize: 'var(--text-lg)', marginBottom: 'var(--space-3)' }}>More</h2>
+                {pro.details.languages?.length > 0 && <p className="text-muted"><strong>Languages:</strong> {pro.details.languages.map((l) => `${l.name}${l.level ? ` (${l.level})` : ''}`).join(', ')}</p>}
+                {pro.details.website && <p className="text-muted"><strong>Website:</strong> <a href={pro.details.website} target="_blank" rel="noreferrer nofollow">{pro.details.website}</a></p>}
+              </section>
+            )}
           </div>
         )}
 
@@ -195,8 +236,8 @@ export default function ProfessionalProfilePage() {
             <div className="portfolio-grid" style={{ maxWidth: '52rem' }}>
               {pro.portfolio.map((item) => (
                 <article className="portfolio-item" key={item.id}>
-                  <div className="portfolio-item__media" aria-hidden="true">
-                    <Icon name="layout" size={28} />
+                  <div className="portfolio-item__media" aria-hidden={item.image ? undefined : 'true'}>
+                    {item.image ? <img src={item.image} alt={item.title} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="layout" size={28} />}
                   </div>
                   <div className="portfolio-item__body">
                     <h3 className="portfolio-item__title">{item.title}</h3>
@@ -205,10 +246,11 @@ export default function ProfessionalProfilePage() {
                 </article>
               ))}
             </div>
-            <p className="trust-strip__note" style={{ marginTop: 'var(--space-5)' }}>
-              Portfolio previews are placeholders — full case studies arrive with
-              the platform launch.
-            </p>
+            {pro.portfolio.length === 0 && (
+              <p className="trust-strip__note" style={{ marginTop: 'var(--space-5)' }}>
+                This professional hasn’t added portfolio items yet.
+              </p>
+            )}
           </section>
         )}
 

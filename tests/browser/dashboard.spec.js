@@ -55,7 +55,7 @@ test('professional choice goes to application, not an approved workspace', async
   await page.getByRole('radio', { name: /Apply as a professional/ }).check();
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await expect(page).toHaveURL(/\/professionals\/apply$/);
-  await expect(page.getByRole('heading', { name: 'Apply to join Servix' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Grow your brand/ })).toBeVisible();
 });
 test('admin and approved professional dashboards have their own destination and no popup', async ({page}) => {
   await mock(page, { state: { kind:'admin', needsChoice:false }, user: { role:'admin' } });

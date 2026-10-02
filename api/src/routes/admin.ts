@@ -15,7 +15,7 @@ import { ApiError, notFound } from '../lib/errors.js';
 import { parseBody, parseQuery, paginationSchema } from '../lib/query.js';
 import { audit } from '../lib/audit.js';
 import { serializeUser } from '../lib/serialize.js';
-import { serializeApplication, slugify } from './applications.js';
+import { serializeApplication, slugify, normalizeDetails } from './applications.js';
 import { transition } from '../lib/bookingService.js';
 import { postTransaction, refundLegs, releaseLegs } from '../lib/ledger.js';
 import { refundAmount } from '../lib/refundPolicy.js';
@@ -98,7 +98,8 @@ export async function adminRoutes(app: FastifyInstance) {
         slug = `${base}-${i}`;
       }
       const skills = (application.skills as string[]) ?? [];
-      const portfolio = (application.portfolio as { title: string; category?: string }[]) ?? [];
+      const portfolio = (application.portfolio as { title: string; category?: string; mediaUrl?: string }[]) ?? [];
+      const details = normalizeDetails(application.details);
 
       const updated = await prisma.$transaction(async (tx) => {
         const app2 = await tx.professionalApplication.update({
@@ -116,9 +117,11 @@ export async function adminRoutes(app: FastifyInstance) {
             locationCity: application.locationCity,
             categoryId: category?.id ?? null,
             memberSince: String(new Date().getFullYear()),
+            imageUrl: application.photoUrl ?? application.user.avatarUrl ?? null,
+            details,
             skills: { create: skills.map((skill, i) => ({ skill, position: i })) },
             portfolio: {
-              create: portfolio.map((item, i) => ({ title: item.title, category: item.category, position: i })),
+              create: portfolio.map((item, i) => ({ title: item.title, category: item.category, mediaUrl: item.mediaUrl ?? null, position: i })),
             },
           },
         });

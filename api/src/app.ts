@@ -24,6 +24,7 @@ import { professionalRoutes } from './routes/professionals.js';
 import { contentRoutes } from './routes/content.js';
 import { communityRoutes } from './routes/community.js';
 import { accountRoutes } from './routes/account.js';
+import { uploadRoutes, UPLOAD_CONTENT_TYPES } from './routes/uploads.js';
 import { authRoutes } from './routes/auth.js';
 import { applicationRoutes } from './routes/applications.js';
 import { proRoutes } from './routes/pro.js';
@@ -83,6 +84,9 @@ export async function buildApp() {
   /* ---------------- Cookies & rate limiting ---------------- */
   await app.register(cookie);
   await app.register(formbody);
+  // Raw file bodies for /uploads and /applications/resume. Route-level
+  // bodyLimit applies; everything else keeps the 512 KB default.
+  app.addContentTypeParser(UPLOAD_CONTENT_TYPES, { parseAs: 'buffer' }, (_req, body, done) => done(null, body));
   await app.register(rateLimit, {
     global: true,
     // Generous global cap; auth routes set stricter per-route limits.
@@ -201,6 +205,7 @@ export async function buildApp() {
       await contentRoutes(v1);
       await authRoutes(v1);
       await accountRoutes(v1);
+      await uploadRoutes(v1);
       await communityRoutes(v1);
       await applicationRoutes(v1);
       await proRoutes(v1);

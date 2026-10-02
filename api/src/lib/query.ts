@@ -43,6 +43,20 @@ export function parseQuery<T extends z.ZodTypeAny>(schema: T, input: unknown): z
 }
 
 /** Parse a request body; zod failures → 422 with a field→message map. */
+/**
+ * PATCH semantics: validate against `schema.partial()` but only keep the keys
+ * the client actually sent. (Zod 4 still applies `.default()` values inside a
+ * partial schema, which would otherwise reset omitted arrays/flags to their
+ * defaults on every partial update.)
+ */
+export function parsePatchBody<T extends z.ZodObject<z.ZodRawShape>>(schema: T, input: unknown): Partial<z.infer<T>> {
+  const parsed = parseBody(schema.partial(), input) as Record<string, unknown>;
+  const sent = input && typeof input === 'object' ? new Set(Object.keys(input as object)) : new Set<string>();
+  const out: Record<string, unknown> = {};
+  for (const key of Object.keys(parsed)) if (sent.has(key)) out[key] = parsed[key];
+  return out as Partial<z.infer<T>>;
+}
+
 export function parseBody<T extends z.ZodTypeAny>(schema: T, input: unknown): z.infer<T> {
   const result = schema.safeParse(input);
   if (!result.success) {

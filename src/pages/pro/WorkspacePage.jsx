@@ -18,6 +18,9 @@ import { getCategories } from '../../lib/api.js';
 import { formatPrice } from '../../lib/format.js';
 import * as proApi from '../../lib/proApi.js';
 import * as bookingApi from '../../lib/bookingApi.js';
+import { PhotoUploader } from '../../components/ui/PhotoUploader.jsx';
+import { ListEditor } from '../../components/onboarding/ListEditor.jsx';
+import '../../components/onboarding/onboarding.css';
 import { Link as RouterLink } from 'react-router-dom';
 
 const TABS = [
@@ -181,225 +184,12 @@ function EarningsTab() {
   );
 }
 
-const EMPTY_SERVICE = {
-  title: '',
-  categorySlug: '',
-  price: '',
-  priceUnit: 'per project',
-  durationLabel: '',
-  shortDescription: '',
-  description: '',
-  included: '',
-  requirements: '',
-};
-
-/* ---------------- service editor ---------------- */
-
-function ServiceEditor({ categories, initial, onSaved, onCancel }) {
-  const showToast = useToast();
-  const [values, setValues] = useState(
-    initial
-      ? {
-          title: initial.title,
-          categorySlug: initial.categoryId,
-          price: String(initial.price),
-          priceUnit: initial.priceUnit,
-          durationLabel: initial.duration ?? '',
-          shortDescription: initial.shortDescription,
-          description: initial.description,
-          included: (initial.included ?? []).join('\n'),
-          requirements: (initial.requirements ?? []).join('\n'),
-        }
-      : EMPTY_SERVICE,
-  );
-  const [errors, setErrors] = useState({});
-  const [saving, setSaving] = useState(false);
-
-  const lines = (raw) =>
-    raw
-      .split('\n')
-      .map((s) => s.trim())
-      .filter(Boolean)
-      .slice(0, 15);
-
-  async function save(e) {
-    e.preventDefault();
-    setErrors({});
-    setSaving(true);
-    const payload = {
-      title: values.title,
-      categorySlug: values.categorySlug,
-      price: Number(values.price) || 0,
-      priceUnit: values.priceUnit,
-      durationLabel: values.durationLabel || undefined,
-      shortDescription: values.shortDescription,
-      description: values.description,
-      included: lines(values.included),
-      requirements: lines(values.requirements),
-    };
-    try {
-      const saved = initial
-        ? await proApi.updateService(initial.id, payload)
-        : await proApi.createService(payload);
-      showToast(initial ? 'Service updated.' : 'Service created as draft.', 'success');
-      onSaved(saved);
-    } catch (err) {
-      if (err.errors) setErrors(err.errors);
-      else showToast(err.message ?? 'Could not save the service.', 'error');
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <form className="contact-form" onSubmit={save} noValidate>
-      <Field label="Service title" required error={errors.title}>
-        {(props) => (
-          <input
-            {...props}
-            className="input"
-            type="text"
-            value={values.title}
-            onChange={(e) => setValues((v) => ({ ...v, title: e.target.value }))}
-          />
-        )}
-      </Field>
-
-      <div className="grid-2" style={{ gap: 'var(--space-5)' }}>
-        <Field label="Category" required error={errors.categorySlug}>
-          {(props) => (
-            <select
-              {...props}
-              className="select"
-              value={values.categorySlug}
-              onChange={(e) => setValues((v) => ({ ...v, categorySlug: e.target.value }))}
-            >
-              <option value="">Choose…</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          )}
-        </Field>
-        <Field label="Price (₦)" required error={errors.price} hint="Minimum ₦1,000">
-          {(props) => (
-            <input
-              {...props}
-              className="input"
-              type="number"
-              min="1000"
-              value={values.price}
-              onChange={(e) => setValues((v) => ({ ...v, price: e.target.value }))}
-            />
-          )}
-        </Field>
-      </div>
-
-      <div className="grid-2" style={{ gap: 'var(--space-5)' }}>
-        <Field label="Price unit" error={errors.priceUnit}>
-          {(props) => (
-            <select
-              {...props}
-              className="select"
-              value={values.priceUnit}
-              onChange={(e) => setValues((v) => ({ ...v, priceUnit: e.target.value }))}
-            >
-              {['per project', 'per session', 'per day', 'per engagement', 'per video'].map((u) => (
-                <option key={u} value={u}>
-                  {u}
-                </option>
-              ))}
-            </select>
-          )}
-        </Field>
-        <Field label="Duration" error={errors.durationLabel} hint="e.g. 2–3 weeks">
-          {(props) => (
-            <input
-              {...props}
-              className="input"
-              type="text"
-              value={values.durationLabel}
-              onChange={(e) => setValues((v) => ({ ...v, durationLabel: e.target.value }))}
-            />
-          )}
-        </Field>
-      </div>
-
-      <Field
-        label="Short description"
-        required
-        error={errors.shortDescription}
-        hint="Shown on service cards (20–200 characters)."
-      >
-        {(props) => (
-          <textarea
-            {...props}
-            className="textarea"
-            rows={2}
-            value={values.shortDescription}
-            onChange={(e) => setValues((v) => ({ ...v, shortDescription: e.target.value }))}
-          />
-        )}
-      </Field>
-
-      <Field label="Full description" required error={errors.description} hint="At least 50 characters.">
-        {(props) => (
-          <textarea
-            {...props}
-            className="textarea"
-            rows={6}
-            value={values.description}
-            onChange={(e) => setValues((v) => ({ ...v, description: e.target.value }))}
-          />
-        )}
-      </Field>
-
-      <div className="grid-2" style={{ gap: 'var(--space-5)' }}>
-        <Field label="What's included" error={errors.included} hint="One item per line.">
-          {(props) => (
-            <textarea
-              {...props}
-              className="textarea"
-              rows={4}
-              value={values.included}
-              onChange={(e) => setValues((v) => ({ ...v, included: e.target.value }))}
-            />
-          )}
-        </Field>
-        <Field label="What you need from the customer" error={errors.requirements} hint="One item per line.">
-          {(props) => (
-            <textarea
-              {...props}
-              className="textarea"
-              rows={4}
-              value={values.requirements}
-              onChange={(e) => setValues((v) => ({ ...v, requirements: e.target.value }))}
-            />
-          )}
-        </Field>
-      </div>
-
-      <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
-        <Button type="submit" variant="primary" disabled={saving}>
-          {saving ? 'Saving…' : initial ? 'Save Changes' : 'Create Draft'}
-        </Button>
-        <Button type="button" variant="secondary" onClick={onCancel}>
-          Cancel
-        </Button>
-      </div>
-    </form>
-  );
-}
-
-/* ---------------- services tab ---------------- */
-
 function ServicesTab({ categories }) {
   const showToast = useToast();
+  const navigate = useNavigate();
   const [services, setServices] = useState(null);
   const [error, setError] = useState(null);
-  const [editing, setEditing] = useState(null); // null | 'new' | service
+  const categoryName = (slug) => categories.find((c) => c.id === slug)?.name ?? slug;
 
   const load = useCallback(() => {
     setError(null);
@@ -417,6 +207,11 @@ function ServicesTab({ categories }) {
       showToast(message, 'success');
       load();
     } catch (err) {
+      if (err.code === 'GIG_INCOMPLETE') {
+        showToast('Finish the gig before publishing — opening the editor.', 'error');
+        navigate(`/dashboard/gigs/${id}/edit`);
+        return;
+      }
       showToast(err.message ?? 'Action failed.', 'error');
     }
   }
@@ -428,28 +223,14 @@ function ServicesTab({ categories }) {
     return <Skeleton height="12rem" />;
   }
 
-  if (editing) {
-    return (
-      <ServiceEditor
-        categories={categories}
-        initial={editing === 'new' ? null : editing}
-        onSaved={() => {
-          setEditing(null);
-          load();
-        }}
-        onCancel={() => setEditing(null)}
-      />
-    );
-  }
-
   return (
     <div style={{ display: 'grid', gap: 'var(--space-5)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
         <p className="text-muted" style={{ fontSize: 'var(--text-sm)' }}>
           {services.length} service{services.length === 1 ? '' : 's'} · drafts are only visible to you
         </p>
-        <Button variant="primary" onClick={() => setEditing('new')}>
-          New Service
+        <Button variant="primary" to="/dashboard/gigs/new">
+          Create a new gig
         </Button>
       </div>
 
@@ -458,8 +239,8 @@ function ServicesTab({ categories }) {
           title="No services yet"
           message="Create your first service listing — it stays a private draft until you publish it."
           action={
-            <Button variant="secondary" onClick={() => setEditing('new')}>
-              Create a Service
+            <Button variant="secondary" to="/dashboard/gigs/new">
+              Create a gig
             </Button>
           }
         />
@@ -472,7 +253,10 @@ function ServicesTab({ categories }) {
                   <Badge variant={s.status === 'active' ? 'brand' : 'outline'}>
                     {s.status === 'active' ? 'Published' : s.status === 'paused' ? 'Unpublished' : 'Draft'}
                   </Badge>
-                  <span className="service-card__category">{s.categoryId}</span>
+                  <span className="service-card__category">{categoryName(s.categoryId)}</span>
+                  {s.status !== 'active' && s.publishProblems && Object.keys(s.publishProblems).length > 0 && (
+                    <span className="ws-chip warn">{Object.keys(s.publishProblems).length} step{Object.keys(s.publishProblems).length === 1 ? '' : 's'} left</span>
+                  )}
                 </div>
                 <h3 style={{ fontSize: 'var(--text-base)', marginBottom: 'var(--space-1)' }}>{s.title}</h3>
                 <p className="text-muted" style={{ fontSize: 'var(--text-sm)' }}>
@@ -503,7 +287,7 @@ function ServicesTab({ categories }) {
                     Publish
                   </Button>
                 )}
-                <Button variant="secondary" size="sm" onClick={() => setEditing(s)}>
+                <Button variant="secondary" size="sm" to={`/dashboard/gigs/${s.id}/edit`}>
                   Edit
                 </Button>
                 <Button
@@ -534,6 +318,8 @@ function ProfileTab({ categories, profile, onProfileChange }) {
     availability: profile.availability ?? 'available',
     skills: (profile.skills ?? []).join(', '),
   });
+  const [image, setImage] = useState(profile.image ?? null);
+  const [details, setDetails] = useState({ occupation: '', website: '', languages: [], education: [], certifications: [], experience: [], ...(profile.details ?? {}) });
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
 
@@ -548,6 +334,15 @@ function ProfileTab({ categories, profile, onProfileChange }) {
         locationCity: values.locationCity || undefined,
         categorySlug: values.categorySlug || undefined,
         availability: values.availability,
+        imageUrl: image ?? '',
+        details: {
+          occupation: details.occupation?.trim() || undefined,
+          website: details.website?.trim() || undefined,
+          languages: details.languages.filter((x) => x.name?.trim()),
+          education: details.education.filter((x) => x.school?.trim()),
+          certifications: details.certifications.filter((x) => x.name?.trim()),
+          experience: details.experience.filter((x) => x.title?.trim()),
+        },
       });
       const skills = values.skills
         .split(',')
@@ -580,6 +375,10 @@ function ProfileTab({ categories, profile, onProfileChange }) {
       </div>
 
       <form className="contact-form" onSubmit={save} noValidate>
+        <div className="field">
+          <span className="field__label">Profile photo</span>
+          <PhotoUploader kind="profile" value={image} name={profile.name} onChange={setImage} />
+        </div>
         <Field label="Professional title" required error={errors.title}>
           {(props) => (
             <input
@@ -661,6 +460,30 @@ function ProfileTab({ categories, profile, onProfileChange }) {
             />
           )}
         </Field>
+
+        <Field label="Personal website" error={errors['details.website']} hint="Optional — portfolio site, Behance, GitHub…">
+          {(props) => <input {...props} className="input" type="url" placeholder="https://" value={details.website ?? ''} onChange={(e) => setDetails((d) => ({ ...d, website: e.target.value }))} />}
+        </Field>
+        <div className="field">
+          <span className="field__label">Languages</span>
+          <ListEditor label="Language" items={details.languages} onChange={(languages) => setDetails((d) => ({ ...d, languages }))} max={8} addLabel="Add language"
+            fields={[{ key: 'name', label: 'Language', required: true, maxLength: 40 }, { key: 'level', label: 'Level', type: 'select', options: ['', 'Basic', 'Conversational', 'Fluent', 'Native or bilingual'] }]} />
+        </div>
+        <div className="field">
+          <span className="field__label">Work experience</span>
+          <ListEditor label="Role" items={details.experience} onChange={(experience) => setDetails((d) => ({ ...d, experience }))} max={8} addLabel="Add experience" empty="Shown on your public profile under Experience."
+            fields={[{ key: 'title', label: 'Job title', required: true, maxLength: 120 }, { key: 'company', label: 'Company / client', maxLength: 120 }, { key: 'start', label: 'From', maxLength: 40 }, { key: 'end', label: 'To', maxLength: 40 }, { key: 'description', label: 'What you did', type: 'textarea', wide: true, maxLength: 600 }]} />
+        </div>
+        <div className="field">
+          <span className="field__label">Education</span>
+          <ListEditor label="Education" items={details.education} onChange={(education) => setDetails((d) => ({ ...d, education }))} max={6} addLabel="Add education"
+            fields={[{ key: 'school', label: 'School / institution', required: true, wide: true }, { key: 'degree', label: 'Degree or course' }, { key: 'year', label: 'Year', maxLength: 40 }]} />
+        </div>
+        <div className="field">
+          <span className="field__label">Certifications</span>
+          <ListEditor label="Certification" items={details.certifications} onChange={(certifications) => setDetails((d) => ({ ...d, certifications }))} max={10} addLabel="Add certification"
+            fields={[{ key: 'name', label: 'Certificate', required: true, wide: true }, { key: 'issuer', label: 'Issued by', maxLength: 120 }, { key: 'year', label: 'Year', maxLength: 40 }]} />
+        </div>
 
         <div>
           <Button type="submit" variant="primary" disabled={saving}>

@@ -177,12 +177,27 @@ function ApplicationsTab() {
                 <Badge variant={a.status === 'approved' ? 'brand' : a.status === 'rejected' ? 'outline' : 'accent'}>{a.status}</Badge>
                 <span className="text-muted" style={{ fontSize: 'var(--text-xs)' }}>{a.applicant} · {a.email}</span>
               </div>
-              <h3 style={{ fontSize: 'var(--text-base)' }}>{a.title}</h3>
+              <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>
+                {a.photoUrl && <img src={a.photoUrl} alt="" width="44" height="44" style={{ borderRadius: '50%', objectFit: 'cover' }} />}
+                <h3 style={{ fontSize: 'var(--text-base)' }}>{a.title}</h3>
+              </div>
               {a.about && <p className="text-muted" style={{ fontSize: 'var(--text-sm)' }}>{a.about}</p>}
               {Array.isArray(a.skills) && a.skills.length > 0 && (
                 <p className="text-muted" style={{ fontSize: 'var(--text-xs)', marginTop: 'var(--space-2)' }}>
                   Skills: {a.skills.join(', ')}
                 </p>
+              )}
+              {a.details && (
+                <div className="text-muted" style={{ fontSize: 'var(--text-xs)', marginTop: 'var(--space-2)', display: 'grid', gap: 4 }}>
+                  {a.locationCity && <span>City: {a.locationCity}</span>}
+                  {a.details.experience?.length > 0 && <span>Experience: {a.details.experience.map((x) => `${x.title}${x.company ? ` at ${x.company}` : ''}${x.start ? ` (${x.start}–${x.end || 'Present'})` : ''}`).join('; ')}</span>}
+                  {a.details.education?.length > 0 && <span>Education: {a.details.education.map((x) => `${x.degree ? `${x.degree}, ` : ''}${x.school}${x.year ? ` (${x.year})` : ''}`).join('; ')}</span>}
+                  {a.details.certifications?.length > 0 && <span>Certifications: {a.details.certifications.map((x) => x.name).join('; ')}</span>}
+                  {a.details.languages?.length > 0 && <span>Languages: {a.details.languages.map((x) => x.name).join(', ')}</span>}
+                  {a.details.website && <span>Website: <a href={a.details.website} target="_blank" rel="noreferrer nofollow">{a.details.website}</a></span>}
+                  {a.resumeUrl && <span>CV: <a href={a.resumeUrl} target="_blank" rel="noreferrer">{a.resumeFileName || 'Open PDF'}</a>{a.details.source && a.details.source !== 'manual' ? ` (imported from ${a.details.source === 'linkedin' ? 'LinkedIn' : 'CV'})` : ''}</span>}
+                  {Array.isArray(a.portfolio) && a.portfolio.length > 0 && <span>Portfolio: {a.portfolio.map((p) => p.title).join(', ')}</span>}
+                </div>
               )}
               {a.rejectionReason && (
                 <p className="text-muted" style={{ fontSize: 'var(--text-xs)', marginTop: 'var(--space-2)' }}>

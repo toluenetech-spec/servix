@@ -8,8 +8,10 @@ export class ApiError extends Error {
     public status: number,
     public code: string,
     message: string,
+    errors?: Record<string, string>,
   ) {
     super(message);
+    if (errors) this.errors = errors;
   }
 }
 

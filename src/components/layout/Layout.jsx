@@ -14,7 +14,10 @@ function ScrollToTop() {
 
 export function Layout() {
   const { pathname } = useLocation();
-  const workspace = pathname === '/dashboard' || pathname.startsWith('/dashboard/') || pathname === '/pro' || pathname === '/bookings' || pathname.startsWith('/bookings/') || pathname === '/professionals/apply' || pathname === '/connected-sign-in' || pathname === '/admin';
+  // Full-screen flows (professional onboarding, gig wizard) bring their own frame.
+  const standalone = pathname === '/professionals/apply' || /^\/dashboard\/gigs\/(new|[^/]+\/edit)$/.test(pathname);
+  if (standalone) return <><ScrollToTop /><Outlet /></>;
+  const workspace = pathname === '/dashboard' || pathname.startsWith('/dashboard/') || pathname === '/pro' || pathname === '/bookings' || pathname.startsWith('/bookings/') || pathname === '/connected-sign-in' || pathname === '/admin';
   if (workspace) return <WorkspaceShell><ScrollToTop /><Outlet /></WorkspaceShell>;
   return (
     <>

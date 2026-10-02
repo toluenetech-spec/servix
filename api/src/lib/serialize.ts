@@ -38,7 +38,8 @@ type ServiceWithRels = Service & {
 };
 
 export function serializeServiceSummary(s: ServiceWithRels) {
-  const cover = s.media?.find((m) => m.isCover) ?? s.media?.[0];
+  const images = (s.media ?? []).filter((m) => m.kind !== 'video' && m.kind !== 'document');
+  const cover = images.find((m) => m.isCover) ?? images[0];
   return {
     id: s.slug,
     title: s.title,
@@ -56,16 +57,55 @@ export function serializeServiceSummary(s: ServiceWithRels) {
   };
 }
 
+export interface ServiceRequirement { question: string; type: 'text' | 'choice' | 'file'; options: string[]; required: boolean }
+export interface ServiceMediaItem { url: string; kind: 'image' | 'video' | 'document'; fileName: string }
+
+/** Older services stored requirements as plain strings; expose one shape. */
+export function normalizeRequirements(value: unknown): ServiceRequirement[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item): ServiceRequirement | null => {
+      if (typeof item === 'string') return item.trim() ? { question: item.trim(), type: 'text', options: [], required: false } : null;
+      if (item && typeof item === 'object' && typeof (item as { question?: unknown }).question === 'string') {
+        const r = item as Partial<ServiceRequirement>;
+        return {
+          question: r.question!,
+          type: r.type === 'choice' || r.type === 'file' ? r.type : 'text',
+          options: Array.isArray(r.options) ? r.options.filter((o): o is string => typeof o === 'string') : [],
+          required: Boolean(r.required),
+        };
+      }
+      return null;
+    })
+    .filter((r): r is ServiceRequirement => r !== null);
+}
+
+export function normalizeGallery(media: ServiceMedia[] | undefined): ServiceMediaItem[] {
+  return (media ?? [])
+    .slice()
+    .sort((a, b) => a.position - b.position)
+    .map((m) => ({
+      url: m.url,
+      kind: m.kind === 'video' || m.kind === 'document' ? m.kind : 'image',
+      fileName: m.fileName ?? '',
+    }));
+}
+
 export function serializeServiceDetail(s: ServiceWithRels) {
+  const media = normalizeGallery(s.media);
   return {
     ...serializeServiceSummary(s),
-    gallery: (s.media ?? [])
-      .slice()
-      .sort((a, b) => a.position - b.position)
-      .map((m) => m.url),
+    gallery: media.filter((m) => m.kind === 'image').map((m) => m.url),
+    media,
+    video: media.find((m) => m.kind === 'video') ?? null,
+    documents: media.filter((m) => m.kind === 'document'),
     description: s.description,
+    serviceType: s.serviceType ?? '',
+    searchTags: Array.isArray(s.searchTags) ? (s.searchTags as string[]) : [],
+    deliveryDays: s.deliveryDays ?? null,
+    revisions: s.revisions ?? null,
     included: s.included as string[],
-    requirements: s.requirements as string[],
+    requirements: normalizeRequirements(s.requirements),
     faqs: (s.faqs ?? [])
       .slice()
       .sort((a, b) => a.position - b.position)
@@ -114,7 +154,30 @@ export function serializeProfessionalDetail(p: ProWithRels) {
     portfolio: (p.portfolio ?? [])
       .slice()
       .sort((a, b) => a.position - b.position)
-      .map((i) => ({ id: i.id, title: i.title, category: i.category ?? '' })),
+      .map((i) => ({ id: i.id, title: i.title, category: i.category ?? '', description: i.description ?? '', image: i.mediaUrl ?? null })),
+    details: normalizeProfileDetails(p.details),
+  };
+}
+
+export interface ProfileDetailsShape {
+  occupation: string; website: string;
+  languages: { name: string; level: string }[];
+  education: { school: string; degree: string; year: string }[];
+  certifications: { name: string; issuer: string; year: string }[];
+  experience: { title: string; company: string; start: string; end: string; description: string }[];
+}
+export function normalizeProfileDetails(value: unknown): ProfileDetailsShape {
+  const v = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>;
+  const list = <T>(key: string, map: (x: Record<string, unknown>) => T): T[] =>
+    Array.isArray(v[key]) ? (v[key] as unknown[]).filter((x) => x && typeof x === 'object').map((x) => map(x as Record<string, unknown>)) : [];
+  const str = (x: unknown) => (typeof x === 'string' ? x : '');
+  return {
+    occupation: str(v.occupation),
+    website: str(v.website),
+    languages: list('languages', (x) => ({ name: str(x.name), level: str(x.level) })).filter((x) => x.name),
+    education: list('education', (x) => ({ school: str(x.school), degree: str(x.degree), year: str(x.year) })).filter((x) => x.school),
+    certifications: list('certifications', (x) => ({ name: str(x.name), issuer: str(x.issuer), year: str(x.year) })).filter((x) => x.name),
+    experience: list('experience', (x) => ({ title: str(x.title), company: str(x.company), start: str(x.start), end: str(x.end), description: str(x.description) })).filter((x) => x.title),
   };
 }
 
@@ -159,6 +222,7 @@ export function serializeUser(u: User) {
     id: u.id,
     email: u.email,
     fullName: u.fullName,
+    avatarUrl: u.avatarUrl ?? null,
     role: u.role,
     status: u.status,
     emailVerified: u.emailVerifiedAt != null,

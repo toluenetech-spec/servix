@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { NavLink, Link, useLocation } from 'react-router-dom';
 import { Logo } from '../brand/Logo.jsx';
 import { Button } from '../ui/Button.jsx';
+import { Avatar } from '../ui/Avatar.jsx';
 import { Icon } from '../ui/Icon.jsx';
 import { useAuth } from '../../lib/AuthContext.jsx';
 
@@ -106,7 +107,8 @@ export function Navbar() {
               <Button variant="ghost" to={homeFor(user).to}>
                 {homeFor(user).label}
               </Button>
-              <span className="navbar__user" title={user.email}>
+              <span className="navbar__user" title={user.email} style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                <Avatar src={user.avatarUrl} name={user.fullName} size={28} />
                 {user.fullName.split(' ')[0]}
               </span>
               <Button variant="ghost" onClick={onSignOut}>

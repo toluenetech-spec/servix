@@ -51,6 +51,7 @@ model User {
   email           String     @unique
   passwordHash    String     @map("password_hash")
   fullName        String     @map("full_name")
+  avatarUrl       String?    @map("avatar_url")
   role            UserRole   @default(customer)
   status          UserStatus @default(pending_verification)
   emailVerifiedAt DateTime?  @map("email_verified_at")
@@ -139,6 +140,10 @@ model ProfessionalApplication {
   categorySlug    String?           @map("category_slug")
   skills          Json              @default("[]")
   portfolio       Json              @default("[]")
+  details         Json              @default("{}")
+  photoUrl        String?           @map("photo_url")
+  resumeUrl       String?           @map("resume_url")
+  resumeFileName  String?           @map("resume_file_name")
   submittedAt     DateTime?         @map("submitted_at")
   reviewedAt      DateTime?         @map("reviewed_at")
   rejectionReason String?           @map("rejection_reason")
@@ -418,6 +423,7 @@ model ProfessionalProfile {
   currency          String             @default("NGN")
   planSlug          String             @default("free") @map("plan_slug")
   planExpiresAt     DateTime?          @map("plan_expires_at")
+  details           Json               @default("{}")
   createdAt         DateTime           @default(now()) @map("created_at")
   updatedAt         DateTime           @updatedAt @map("updated_at")
 
@@ -482,6 +488,10 @@ model Service {
   status           ServiceStatus     @default(active)
   included         Json              @default("[]")
   requirements     Json              @default("[]")
+  searchTags       Json              @default("[]") @map("search_tags")
+  serviceType      String?           @map("service_type")
+  deliveryDays     Int?              @map("delivery_days")
+  revisions        Int?
   ratingAvg        Decimal           @default(0) @map("rating_avg") @db.Decimal(3, 2)
   reviewCount      Int               @default(0) @map("review_count")
   createdAt        DateTime          @default(now()) @map("created_at")
@@ -504,6 +514,8 @@ model ServiceMedia {
   serviceId String  @map("service_id")
   url       String
   altText   String? @map("alt_text")
+  kind      String  @default("image")
+  fileName  String? @map("file_name")
   position  Int     @default(0)
   isCover   Boolean @default(false) @map("is_cover")
 

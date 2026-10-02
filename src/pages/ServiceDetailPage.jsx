@@ -242,6 +242,14 @@ export default function ServiceDetailPage() {
 
           <Gallery images={service.gallery} alt={service.title} />
 
+          {service.video?.url && (
+            <div className="detail__video">
+              <video controls preload="metadata" src={service.video.url} style={{ width: '100%', borderRadius: 'var(--radius-lg, 12px)', background: '#000' }}>
+                Your browser cannot play this video.
+              </video>
+            </div>
+          )}
+
           {pro && (
             <div className="pro-strip">
               <img src={pro.image} alt="" width="52" height="52" />
@@ -260,7 +268,22 @@ export default function ServiceDetailPage() {
 
           <section className="detail__block" aria-labelledby="about-service">
             <h2 id="about-service">About this service</h2>
-            <p>{service.description}</p>
+            <p style={{ whiteSpace: 'pre-line' }}>{service.description}</p>
+            {service.searchTags?.length > 0 && (
+              <div className="skills" style={{ marginTop: 'var(--space-4)' }}>
+                {service.searchTags.map((t) => <Badge key={t} variant="outline">{t}</Badge>)}
+              </div>
+            )}
+            {service.documents?.length > 0 && (
+              <ul className="check-list" style={{ marginTop: 'var(--space-4)' }}>
+                {service.documents.map((d) => (
+                  <li key={d.url}>
+                    <Icon name="file" size={16} />
+                    <a href={d.url} target="_blank" rel="noreferrer">{d.fileName || 'Download document (PDF)'}</a>
+                  </li>
+                ))}
+              </ul>
+            )}
           </section>
 
           <section className="detail__block" aria-labelledby="included">
@@ -275,17 +298,27 @@ export default function ServiceDetailPage() {
             </ul>
           </section>
 
-          <section className="detail__block" aria-labelledby="requirements">
-            <h2 id="requirements">What the professional needs from you</h2>
-            <ul className="check-list">
-              {service.requirements.map((item) => (
-                <li key={item}>
-                  <Icon name="arrow-right" size={16} />
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </section>
+          {service.requirements?.length > 0 && (
+            <section className="detail__block" aria-labelledby="requirements">
+              <h2 id="requirements">What the professional needs from you</h2>
+              <ul className="check-list">
+                {service.requirements.map((item, i) => {
+                  const r = typeof item === 'string' ? { question: item, type: 'text', options: [], required: false } : item;
+                  return (
+                    <li key={`${r.question}-${i}`}>
+                      <Icon name="arrow-right" size={16} />
+                      <span>
+                        {r.question}
+                        {r.required && <span className="text-muted"> (required)</span>}
+                        {r.type === 'choice' && r.options?.length > 0 && <span className="text-muted"> — {r.options.join(' / ')}</span>}
+                        {r.type === 'file' && <span className="text-muted"> — attach a file</span>}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
 
           <section className="detail__block" aria-labelledby="availability-preview">
             <h2 id="availability-preview">Availability preview</h2>
@@ -348,8 +381,13 @@ export default function ServiceDetailPage() {
             </div>
             <div className="booking-card__meta">
               <span className="booking-card__meta-row">
-                <Icon name="clock" size={15} /> Duration: {service.duration}
+                <Icon name="clock" size={15} /> {service.deliveryDays ? `Delivery: ${service.deliveryDays === 1 ? '1 day' : `${service.deliveryDays} days`}` : `Duration: ${service.duration || 'On request'}`}
               </span>
+              {service.revisions != null && (
+                <span className="booking-card__meta-row">
+                  <Icon name="pen" size={15} /> {service.revisions === 0 ? 'No revisions' : service.revisions >= 20 ? 'Unlimited revisions' : `${service.revisions} revision${service.revisions === 1 ? '' : 's'}`}
+                </span>
+              )}
               <span className="booking-card__meta-row">
                 <Icon name="map-pin" size={15} /> {service.location}
               </span>

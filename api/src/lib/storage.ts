@@ -20,9 +20,35 @@ import { prisma } from './db.js';
 import { resolveStorageEnv } from './config.js';
 
 export const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+export const ALLOWED_DOCUMENT_TYPES = ['application/pdf'];
+export const ALLOWED_VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/quicktime'];
 export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
+export const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024;
+export const MAX_VIDEO_BYTES = 50 * 1024 * 1024;
 
-export type UploadKind = 'profile' | 'portfolio' | 'service';
+export type UploadKind =
+  | 'profile'
+  | 'portfolio'
+  | 'service'
+  | 'avatar'
+  | 'resume'
+  | 'service-video'
+  | 'service-document';
+
+export const UPLOAD_KINDS: UploadKind[] = ['profile', 'portfolio', 'service', 'avatar', 'resume', 'service-video', 'service-document'];
+
+/** Content-type whitelist and size cap per upload kind (enforced server-side). */
+export function uploadRules(kind: UploadKind): { types: string[]; maxBytes: number; label: string } {
+  switch (kind) {
+    case 'resume':
+    case 'service-document':
+      return { types: ALLOWED_DOCUMENT_TYPES, maxBytes: MAX_DOCUMENT_BYTES, label: 'PDF documents up to 10 MB' };
+    case 'service-video':
+      return { types: ALLOWED_VIDEO_TYPES, maxBytes: MAX_VIDEO_BYTES, label: 'MP4, WebM or MOV videos up to 50 MB' };
+    default:
+      return { types: ALLOWED_IMAGE_TYPES, maxBytes: MAX_UPLOAD_BYTES, label: 'JPEG, PNG or WebP images up to 5 MB' };
+  }
+}
 
 export interface PresignResult {
   enabled: boolean;
@@ -32,10 +58,19 @@ export interface PresignResult {
   note?: string;
 }
 
+export interface PutResult {
+  key: string;
+  publicUrl: string;
+}
+
 export interface StorageProvider {
   name: string;
+  enabled: boolean;
   presign(kind: UploadKind, fileName: string, contentType: string): Promise<PresignResult>;
   presignDelete(key: string): Promise<string | null>;
+  /** Server-side upload: the API streams the bytes to the bucket itself, so the
+   * browser never talks to R2 directly (no bucket CORS needed). */
+  putObject(kind: UploadKind, fileName: string, contentType: string, body: Buffer): Promise<PutResult>;
 }
 
 function safeExt(fileName: string, contentType: string): string {
@@ -43,6 +78,10 @@ function safeExt(fileName: string, contentType: string): string {
     'image/jpeg': 'jpg',
     'image/png': 'png',
     'image/webp': 'webp',
+    'application/pdf': 'pdf',
+    'video/mp4': 'mp4',
+    'video/webm': 'webm',
+    'video/quicktime': 'mov',
   };
   return byType[contentType] ?? 'bin';
 }
@@ -120,6 +159,7 @@ export function presignS3Url(p: SigV4Params): string {
 
 class R2Provider implements StorageProvider {
   name = 'r2';
+  enabled = true;
   private env = resolveStorageEnv();
   private accessKeyId = this.env.accessKeyId;
   private secretAccessKey = this.env.secretAccessKey;
@@ -162,6 +202,20 @@ class R2Provider implements StorageProvider {
     });
   }
 
+  async putObject(kind: UploadKind, fileName: string, contentType: string, body: Buffer): Promise<PutResult> {
+    const presigned = await this.presign(kind, fileName, contentType);
+    const res = await fetch(presigned.uploadUrl!, {
+      method: 'PUT',
+      headers: { 'content-type': contentType, 'content-length': String(body.byteLength) },
+      body,
+    });
+    if (!res.ok) {
+      const detail = (await res.text().catch(() => '')).slice(0, 300);
+      throw new Error(`Object storage rejected the upload (${res.status}). ${detail}`.trim());
+    }
+    return { key: presigned.key, publicUrl: presigned.publicUrl };
+  }
+
   /** Short-lived presigned GET (image retrieval when the bucket is private). */
   async presignGet(key: string, expiresSeconds = 3600): Promise<string> {
     return presignS3Url({
@@ -178,6 +232,7 @@ class R2Provider implements StorageProvider {
 
 class LocalStubProvider implements StorageProvider {
   name = 'stub';
+  enabled = false;
   async presign(kind: UploadKind, fileName: string, contentType: string): Promise<PresignResult> {
     const key = makeKey(kind, fileName, contentType);
     return {
@@ -190,6 +245,9 @@ class LocalStubProvider implements StorageProvider {
   }
   async presignDelete(): Promise<string | null> {
     return null;
+  }
+  async putObject(): Promise<PutResult> {
+    throw new Error('Object storage is not configured in this environment.');
   }
 }
 

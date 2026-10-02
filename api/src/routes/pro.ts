@@ -12,11 +12,13 @@ import { z } from 'zod';
 import { prisma } from '../lib/db.js';
 import { requireProfessional } from '../lib/authGuard.js';
 import { ApiError, notFound } from '../lib/errors.js';
-import { parseBody } from '../lib/query.js';
+import { parseBody, parsePatchBody } from '../lib/query.js';
 import { serializeProfessionalDetail, serializeServiceDetail } from '../lib/serialize.js';
 import { ALLOWED_IMAGE_TYPES, getStorage, MAX_UPLOAD_BYTES } from '../lib/storage.js';
 import { audit } from '../lib/audit.js';
 import { assertListingAllowed } from '../lib/plans.js';
+import { assertOwnMediaUrl } from './uploads.js';
+import { profileDetailsSchema } from './applications.js';
 
 /* ---------------- schemas ---------------- */
 
@@ -27,7 +29,8 @@ const profileSchema = z.object({
   categorySlug: z.string().trim().max(100).optional(),
   availability: z.enum(['available', 'limited', 'unavailable']).optional(),
   responseTimeLabel: z.string().trim().max(60).optional(),
-  imageUrl: z.string().trim().max(500).optional(),
+  imageUrl: z.string().trim().max(500).optional().nullable(),
+  details: profileDetailsSchema.optional(),
 });
 
 const skillsSchema = z.object({
@@ -41,25 +44,77 @@ const portfolioItemSchema = z.object({
   mediaUrl: z.string().trim().max(500).optional(),
 });
 
+/* Gig wizard (Fiverr-style): Overview → Pricing → Description & FAQ →
+ * Requirements → Gallery → Publish. Drafts may be saved with only the
+ * Overview fields; publishing enforces completeness (see publishProblems). */
+const requirementSchema = z.union([
+  z.string().trim().min(1).max(300).transform((question) => ({ question, type: 'text' as const, options: [] as string[], required: false })),
+  z.object({
+    question: z.string().trim().min(1, 'Enter the question.').max(300),
+    type: z.enum(['text', 'choice', 'file']).default('text'),
+    options: z.array(z.string().trim().min(1).max(80)).max(10).default([]),
+    required: z.boolean().default(false),
+  }),
+]);
+const mediaSchema = z.union([
+  z.string().trim().min(1).max(500).transform((url) => ({ url, kind: 'image' as const, fileName: '' })),
+  z.object({
+    url: z.string().trim().min(1).max(500),
+    kind: z.enum(['image', 'video', 'document']).default('image'),
+    fileName: z.string().trim().max(200).default(''),
+  }),
+]);
 const serviceSchema = z.object({
   title: z.string().trim().min(5, 'Title must be at least 5 characters.').max(140),
   categorySlug: z.string().trim().min(1, 'Please choose a category.'),
+  serviceType: z.string().trim().max(80).optional(),
+  searchTags: z.array(z.string().trim().min(2, 'Tags need at least 2 characters.').max(20, 'Tags can be 20 characters at most.')).max(5, 'Up to 5 tags.').default([]),
   price: z.coerce.number().int().min(1000, 'Minimum price is ₦1,000.').max(100_000_000),
   priceUnit: z.string().trim().min(1).max(40).default('per project'),
+  deliveryDays: z.coerce.number().int().min(1, 'Delivery takes at least 1 day.').max(90, 'Delivery can be 90 days at most.').optional(),
+  revisions: z.coerce.number().int().min(0).max(20).optional(),
   durationLabel: z.string().trim().max(60).optional(),
   locationLabel: z.string().trim().max(120).optional(),
   isRemote: z.boolean().default(true),
   availability: z.enum(['available', 'limited', 'unavailable']).default('available'),
-  shortDescription: z.string().trim().min(20, 'Short description must be at least 20 characters.').max(200),
-  description: z.string().trim().min(50, 'Description must be at least 50 characters.').max(5000),
+  shortDescription: z.string().trim().max(200, 'Keep the short description under 200 characters.').default(''),
+  description: z.string().trim().max(5000).default(''),
   included: z.array(z.string().trim().min(1).max(200)).max(15).default([]),
-  requirements: z.array(z.string().trim().min(1).max(200)).max(15).default([]),
+  requirements: z.array(requirementSchema).max(15, 'Up to 15 requirements.').default([]),
   faqs: z
     .array(z.object({ q: z.string().trim().min(1).max(300), a: z.string().trim().min(1).max(1000) }))
     .max(10)
     .default([]),
-  gallery: z.array(z.string().trim().max(500)).max(8).default([]),
+  gallery: z.array(mediaSchema).max(8).default([]),
 });
+type ServiceInput = z.infer<typeof serviceSchema>;
+
+function checkGallery(gallery: ServiceInput['gallery'] | undefined) {
+  if (!gallery) return;
+  const counts = { image: 0, video: 0, document: 0 };
+  for (const item of gallery) {
+    assertOwnMediaUrl(item.url, 'Gallery file');
+    counts[item.kind] += 1;
+  }
+  if (counts.image > 5) throw new ApiError(422, 'VALIDATION_ERROR', 'A gig can have up to 5 images.');
+  if (counts.video > 1) throw new ApiError(422, 'VALIDATION_ERROR', 'A gig can have one video.');
+  if (counts.document > 2) throw new ApiError(422, 'VALIDATION_ERROR', 'A gig can have up to 2 PDF documents.');
+}
+
+/** What still blocks publishing — surfaced as a checklist to the professional. */
+export function publishProblems(s: {
+  title: string; shortDescription: string; description: string; price: bigint | number; deliveryDays: number | null;
+  media?: { kind: string }[];
+}): Record<string, string> {
+  const problems: Record<string, string> = {};
+  if (!s.title || s.title.trim().length < 5) problems.title = 'Add a title of at least 5 characters.';
+  if (!s.shortDescription || s.shortDescription.trim().length < 20) problems.shortDescription = 'Write a short description of at least 20 characters.';
+  if (!s.description || s.description.trim().length < 50) problems.description = 'Describe the gig in at least 50 characters.';
+  if (Number(s.price) < 1000) problems.price = 'Set a price of at least ₦1,000.';
+  if (!s.deliveryDays) problems.deliveryDays = 'Choose a delivery time.';
+  if (!(s.media ?? []).some((m) => m.kind === 'image')) problems.gallery = 'Add at least one image to the gallery.';
+  return problems;
+}
 
 function slugify(base: string): string {
   return base
@@ -89,8 +144,12 @@ async function ownedService(idOrSlug: string, professionalId: string) {
 
 const serviceInclude = { media: true, faqs: true, category: true, professional: true } as const;
 
-function serializeOwnService(s: Parameters<typeof serializeServiceDetail>[0] & { status: string }) {
-  return { ...serializeServiceDetail(s), status: s.status };
+function deliveryLabel(days: number) {
+  return days === 1 ? '1 day delivery' : `${days} days delivery`;
+}
+
+function serializeOwnService(s: Parameters<typeof serializeServiceDetail>[0] & { status: string; media?: { kind: string }[] }) {
+  return { ...serializeServiceDetail(s), status: s.status, publishProblems: publishProblems(s) };
 }
 
 export async function proRoutes(app: FastifyInstance) {
@@ -120,6 +179,7 @@ export async function proRoutes(app: FastifyInstance) {
     { ...guard, schema: { tags: ['professional'], summary: 'Update own professional profile', security: [{ bearerAuth: [] }] } },
     async (req) => {
       const data = parseBody(profileSchema, req.body);
+      if (data.imageUrl) assertOwnMediaUrl(data.imageUrl, 'Profile photo');
       let categoryId: string | null | undefined;
       if (data.categorySlug !== undefined) {
         if (data.categorySlug === '') categoryId = null;
@@ -137,7 +197,8 @@ export async function proRoutes(app: FastifyInstance) {
           locationCity: data.locationCity,
           availability: data.availability,
           responseTimeLabel: data.responseTimeLabel,
-          imageUrl: data.imageUrl,
+          imageUrl: data.imageUrl === undefined ? undefined : data.imageUrl || null,
+          details: data.details,
           ...(categoryId !== undefined ? { categoryId } : {}),
         },
         include: { category: true, skills: true, portfolio: true, services: { where: { status: 'active' } } },
@@ -175,6 +236,7 @@ export async function proRoutes(app: FastifyInstance) {
     { ...guard, schema: { tags: ['professional'], summary: 'Add a portfolio item', security: [{ bearerAuth: [] }] } },
     async (req, reply) => {
       const data = parseBody(portfolioItemSchema, req.body);
+      if (data.mediaUrl) assertOwnMediaUrl(data.mediaUrl, 'Portfolio image');
       const count = await prisma.portfolioItem.count({
         where: { professionalId: req.professionalProfileId! },
       });
@@ -182,7 +244,7 @@ export async function proRoutes(app: FastifyInstance) {
       const item = await prisma.portfolioItem.create({
         data: { ...data, professionalId: req.professionalProfileId!, position: count },
       });
-      return reply.code(201).send({ id: item.id, title: item.title, category: item.category ?? '' });
+      return reply.code(201).send({ id: item.id, title: item.title, category: item.category ?? '', description: item.description ?? '', image: item.mediaUrl ?? null });
     },
   );
 
@@ -254,6 +316,7 @@ export async function proRoutes(app: FastifyInstance) {
     { ...guard, schema: { tags: ['professional'], summary: 'Create a service (draft)', security: [{ bearerAuth: [] }] } },
     async (req, reply) => {
       const data = parseBody(serviceSchema, req.body);
+      checkGallery(data.gallery);
       await assertListingAllowed(req.professionalProfileId!);
       const category = await prisma.category.findUnique({ where: { slug: data.categorySlug } });
       if (!category) throw new ApiError(422, 'VALIDATION_ERROR', 'Unknown category.');
@@ -274,18 +337,24 @@ export async function proRoutes(app: FastifyInstance) {
           description: data.description,
           price: BigInt(data.price),
           priceUnit: data.priceUnit,
-          durationLabel: data.durationLabel,
+          durationLabel: data.durationLabel ?? (data.deliveryDays ? deliveryLabel(data.deliveryDays) : undefined),
           locationLabel: data.locationLabel ?? (data.isRemote ? 'Remote' : undefined),
           isRemote: data.isRemote,
           availability: data.availability,
           status: 'draft',
           included: data.included,
           requirements: data.requirements,
+          searchTags: data.searchTags,
+          serviceType: data.serviceType,
+          deliveryDays: data.deliveryDays,
+          revisions: data.revisions,
           media: {
-            create: data.gallery.map((url, i) => ({
-              url,
+            create: data.gallery.map((m, i) => ({
+              url: m.url,
+              kind: m.kind,
+              fileName: m.fileName || null,
               position: i,
-              isCover: i === 0,
+              isCover: i === data.gallery.findIndex((x) => x.kind === 'image'),
               altText: data.title,
             })),
           },
@@ -317,7 +386,8 @@ export async function proRoutes(app: FastifyInstance) {
     async (req) => {
       const { id } = req.params as { id: string };
       const service = await ownedService(id, req.professionalProfileId!);
-      const data = parseBody(serviceSchema.partial(), req.body);
+      const data = parsePatchBody(serviceSchema, req.body);
+      checkGallery(data.gallery);
 
       let categoryId: string | undefined;
       if (data.categorySlug) {
@@ -329,12 +399,15 @@ export async function proRoutes(app: FastifyInstance) {
       const updated = await prisma.$transaction(async (tx) => {
         if (data.gallery) {
           await tx.serviceMedia.deleteMany({ where: { serviceId: service.id } });
+          const gallery = data.gallery;
           await tx.serviceMedia.createMany({
-            data: data.gallery.map((url, i) => ({
+            data: gallery.map((m, i) => ({
               serviceId: service.id,
-              url,
+              url: m.url,
+              kind: m.kind,
+              fileName: m.fileName || null,
               position: i,
-              isCover: i === 0,
+              isCover: i === gallery.findIndex((x) => x.kind === 'image'),
               altText: data.title ?? service.title,
             })),
           });
@@ -358,12 +431,16 @@ export async function proRoutes(app: FastifyInstance) {
             description: data.description,
             price: data.price != null ? BigInt(data.price) : undefined,
             priceUnit: data.priceUnit,
-            durationLabel: data.durationLabel,
+            durationLabel: data.durationLabel ?? (data.deliveryDays ? deliveryLabel(data.deliveryDays) : undefined),
             locationLabel: data.locationLabel,
             isRemote: data.isRemote,
             availability: data.availability,
             included: data.included,
             requirements: data.requirements,
+            searchTags: data.searchTags,
+            serviceType: data.serviceType,
+            deliveryDays: data.deliveryDays,
+            revisions: data.revisions,
             ...(categoryId ? { categoryId } : {}),
           },
           include: serviceInclude,
@@ -380,6 +457,11 @@ export async function proRoutes(app: FastifyInstance) {
       const { id } = req.params as { id: string };
       const service = await ownedService(id, req.professionalProfileId!);
       if (service.status === 'active') return { ok: true, status: 'active' };
+      const media = await prisma.serviceMedia.findMany({ where: { serviceId: service.id }, select: { kind: true } });
+      const problems = publishProblems({ ...service, media });
+      if (Object.keys(problems).length > 0) {
+        throw new ApiError(422, 'GIG_INCOMPLETE', 'Finish these before publishing.', problems);
+      }
       const updated = await prisma.service.update({
         where: { id: service.id },
         data: { status: 'active' },

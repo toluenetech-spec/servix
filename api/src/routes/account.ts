@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { assertOwnMediaUrl } from './uploads.js';
 import { prisma } from '../lib/db.js';
 import { requireAuth } from '../lib/authGuard.js';
 import { ApiError } from '../lib/errors.js';
@@ -9,9 +10,17 @@ import { audit } from '../lib/audit.js';
 export async function accountRoutes(app: FastifyInstance) {
   app.patch('/account/profile', { preHandler: requireAuth, config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req, reply) => {
     reply.header('Cache-Control', 'no-store');
-    const { fullName } = parseBody(z.object({ fullName: z.string().trim().min(2).max(200) }).strict(), req.body);
+    const body = parseBody(z.object({ fullName: z.string().trim().min(2).max(200).optional(), avatarUrl: z.string().trim().max(500).nullable().optional() }).strict(), req.body);
+    if (body.fullName === undefined && body.avatarUrl === undefined) throw new ApiError(422, 'VALIDATION_ERROR', 'Nothing to update.');
+    if (body.avatarUrl) assertOwnMediaUrl(body.avatarUrl, 'Profile photo');
     await accountOverview(req.auth!.sub);
-    await prisma.user.update({ where: { id: req.auth!.sub }, data: { fullName } });
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({ where: { id: req.auth!.sub }, data: { fullName: body.fullName, avatarUrl: body.avatarUrl === undefined ? undefined : body.avatarUrl || null } });
+      // Keep the public professional card in step with the account photo unless the pro set a dedicated one during onboarding.
+      if (body.avatarUrl !== undefined) {
+        await tx.professionalProfile.updateMany({ where: { userId: req.auth!.sub }, data: { imageUrl: body.avatarUrl || null } });
+      }
+    });
     return { ok: true };
   });
   app.get('/account/security-summary', { preHandler: requireAuth }, async (req, reply) => {

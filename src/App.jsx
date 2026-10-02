@@ -27,6 +27,7 @@ const ProfessionalProfilePage = lazy(() => import('./pages/ProfessionalProfilePa
 const ProfessionalsJoinPage = lazy(() => import('./pages/ProfessionalsJoinPage.jsx'));
 const ApplyPage = lazy(() => import('./pages/pro/ApplyPage.jsx'));
 const WorkspacePage = lazy(() => import('./pages/pro/WorkspacePage.jsx'));
+const GigEditorPage = lazy(() => import('./pages/pro/GigEditorPage.jsx'));
 const BookingsPage = lazy(() => import('./pages/bookings/BookingsPage.jsx'));
 const BookingDetailPage = lazy(() => import('./pages/bookings/BookingDetailPage.jsx'));
 const AdminPage = lazy(() => import('./pages/admin/AdminPage.jsx'));
@@ -76,6 +77,8 @@ export default function App() {
             <Route path="/dashboard/availability" element={<AvailabilityPage />} />
             <Route path="/dashboard/reviews" element={<ReviewsPage />} />
             <Route path="/dashboard/gigs" element={<WorkspacePage section="services" />} />
+            <Route path="/dashboard/gigs/new" element={<GigEditorPage />} />
+            <Route path="/dashboard/gigs/:id/edit" element={<GigEditorPage />} />
             <Route path="/dashboard/work" element={<WorkspacePage section="bookings" />} />
             <Route path="/dashboard/earnings" element={<WorkspacePage section="earnings" />} />
             <Route path="/dashboard/profile" element={<WorkspacePage section="profile" />} />
