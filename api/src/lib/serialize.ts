@@ -55,6 +55,10 @@ export function serializeServiceSummary(s: ServiceWithRels) {
     availability: s.availability,
     image: mediaUrl(cover?.url),
     shortDescription: s.shortDescription,
+    // Who offers it — lets lists show the provider's photo next to the gig.
+    professional: s.professional
+      ? { id: s.professional.slug, name: s.professional.name, image: mediaUrl(s.professional.imageUrl), verified: s.professional.verification === 'verified' }
+      : null,
   };
 }
 

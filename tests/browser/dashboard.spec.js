@@ -36,6 +36,8 @@ async function mock(page, options = {}) {
     if (path === 'pro/availability') return route.fulfill({ json: { usingDefaults: true, rules: [], exceptions: [] } });
     if (path.startsWith('admin/')) return route.fulfill({ json: options.admin?.[path] ?? { items: [], pending: [], recent: [], totals: {}, series: [] } });
     if (['bookings','pro/bookings'].includes(path)) return route.fulfill({ json: [] });
+    if (path === 'professionals' && options.professionals) return route.fulfill({ json: { items: options.professionals, total: options.professionals.length, page: 1, pageSize: 12 } });
+    if (path === 'services' && options.services) return route.fulfill({ json: { items: options.services, total: options.services.length, page: 1, pageSize: 12 } });
     return route.fulfill({ json: { items: [], providers: [] } });
   });
 }
@@ -157,4 +159,29 @@ test('a rejected session renewal returns the user to sign-in instead of an error
   });
   await page.getByRole('link', { name: 'Saved professionals', exact: true }).click();
   await expect(page).toHaveURL(/\/login$/);
+});
+
+test('marketplace search shows professionals with their photos and gigs with their cover and provider', async ({page}) => {
+  const professionals = [
+    { id: 'toluwalase-olawumi', name: 'Toluwalase Olawumi', title: 'Full Stack Developer', location: 'Lagos, Nigeria', rating: 0, reviewCount: 0, verified: false, availability: 'available', image: '/images/professionals/adaeze-okafor.jpg', plan: 'professional' },
+    { id: 'no-photo', name: 'Bisi Adewale', title: 'Copywriter', location: 'Ibadan, Nigeria', rating: 4.8, reviewCount: 12, verified: true, availability: 'limited', image: null, plan: 'free' },
+  ];
+  const services = [
+    { id: 'shop-build', title: 'I will build a Shopify store', category: 'Web Development', price: 150000, priceUnit: 'per project', shortDescription: 'Fast store.', image: '/images/professionals/tunde-bakare.jpg', professional: { id: 'toluwalase-olawumi', name: 'Toluwalase Olawumi', image: '/images/professionals/adaeze-okafor.jpg' } },
+  ];
+  await mock(page, { professionals, services });
+  await page.goto('/dashboard/search?q=dev');
+  // Services tab (default): cover image + provider avatar.
+  await expect(page.getByRole('heading', { name: 'I will build a Shopify store' })).toBeVisible();
+  await expect(page.locator('.ws-result__cover img')).toHaveAttribute('src', '/images/professionals/tunde-bakare.jpg');
+  await expect(page.locator('.ws-result__by').getByRole('img', { name: 'Photo of Toluwalase Olawumi' })).toBeVisible();
+  // Professionals tab: photo when there is one, initial when there isn't.
+  await page.getByRole('button', { name: 'Professionals' }).click();
+  await expect(page.getByRole('heading', { name: 'Toluwalase Olawumi' })).toBeVisible();
+  await expect(page.getByRole('img', { name: 'Photo of Toluwalase Olawumi' })).toHaveAttribute('src', '/images/professionals/adaeze-okafor.jpg');
+  const bisi = page.locator('.ws-result', { hasText: 'Bisi Adewale' });
+  await expect(bisi.locator('.ws-avatar')).toHaveText('B');
+  await expect(bisi.getByText('4.8 · 12 reviews')).toBeVisible();
+  await expect(page.locator('.ws-result', { hasText: 'Toluwalase' }).getByText('New on Servix')).toBeVisible();
+  await expect(page.getByRole('link', { name: "View Toluwalase Olawumi's profile" })).toHaveAttribute('href', '/professionals/toluwalase-olawumi');
 });
