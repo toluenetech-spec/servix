@@ -3,6 +3,7 @@
  * consumes. Slugs are exposed as `id`.
  */
 import { effectivePlan } from './plans.js';
+import { mediaUrl } from './storage.js';
 import type {
   Category,
   ProfessionalProfile,
@@ -52,7 +53,7 @@ export function serializeServiceSummary(s: ServiceWithRels) {
     duration: s.durationLabel ?? '',
     location: s.locationLabel ?? (s.isRemote ? 'Remote' : ''),
     availability: s.availability,
-    image: cover?.url ?? null,
+    image: mediaUrl(cover?.url),
     shortDescription: s.shortDescription,
   };
 }
@@ -85,7 +86,7 @@ export function normalizeGallery(media: ServiceMedia[] | undefined): ServiceMedi
     .slice()
     .sort((a, b) => a.position - b.position)
     .map((m) => ({
-      url: m.url,
+      url: mediaUrl(m.url) ?? m.url,
       kind: m.kind === 'video' || m.kind === 'document' ? m.kind : 'image',
       fileName: m.fileName ?? '',
     }));
@@ -137,7 +138,7 @@ export function serializeProfessionalSummary(p: ProWithRels) {
     responseTime: p.responseTimeLabel ?? '',
     memberSince: p.memberSince ?? '',
     availability: p.availability,
-    image: p.imageUrl ?? null,
+    image: mediaUrl(p.imageUrl),
     plan: effectivePlan(p),
   };
 }
@@ -154,7 +155,7 @@ export function serializeProfessionalDetail(p: ProWithRels) {
     portfolio: (p.portfolio ?? [])
       .slice()
       .sort((a, b) => a.position - b.position)
-      .map((i) => ({ id: i.id, title: i.title, category: i.category ?? '', description: i.description ?? '', image: i.mediaUrl ?? null })),
+      .map((i) => ({ id: i.id, title: i.title, category: i.category ?? '', description: i.description ?? '', image: mediaUrl(i.mediaUrl) })),
     details: normalizeProfileDetails(p.details),
   };
 }
@@ -222,7 +223,7 @@ export function serializeUser(u: User) {
     id: u.id,
     email: u.email,
     fullName: u.fullName,
-    avatarUrl: u.avatarUrl ?? null,
+    avatarUrl: mediaUrl(u.avatarUrl),
     role: u.role,
     status: u.status,
     emailVerified: u.emailVerifiedAt != null,

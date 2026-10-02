@@ -1,3 +1,4 @@
+import { mediaUrl } from '../lib/storage.js';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { assertOwnMediaUrl } from './uploads.js';
@@ -60,7 +61,7 @@ export async function accountRoutes(app: FastifyInstance) {
   });
   /* ---------------- saved professionals ---------------- */
   const savedSelect = { id: true, createdAt: true, professional: { select: { slug: true, name: true, title: true, imageUrl: true, locationCity: true, ratingAvg: true, reviewCount: true, verification: true, availability: true, startingPrice: true, currency: true } } } as const;
-  const serializeSaved = (row: { id: string; createdAt: Date; professional: { slug: string; name: string; title: string; imageUrl: string | null; locationCity: string | null; ratingAvg: unknown; reviewCount: number; verification: string; availability: string; startingPrice: bigint | null; currency: string } }) => ({ id: row.id, savedAt: row.createdAt, professional: { ...row.professional, ratingAvg: Number(row.professional.ratingAvg), startingPrice: row.professional.startingPrice === null ? null : Number(row.professional.startingPrice) } });
+  const serializeSaved = (row: { id: string; createdAt: Date; professional: { slug: string; name: string; title: string; imageUrl: string | null; locationCity: string | null; ratingAvg: unknown; reviewCount: number; verification: string; availability: string; startingPrice: bigint | null; currency: string } }) => ({ id: row.id, savedAt: row.createdAt, professional: { ...row.professional, imageUrl: mediaUrl(row.professional.imageUrl), ratingAvg: Number(row.professional.ratingAvg), startingPrice: row.professional.startingPrice === null ? null : Number(row.professional.startingPrice) } });
   app.get('/account/saved', { preHandler: requireAuth }, async (req, reply) => {
     reply.header('Cache-Control', 'no-store'); await accountOverview(req.auth!.sub);
     const rows = await prisma.savedProfessional.findMany({ where: { userId: req.auth!.sub }, orderBy: { createdAt: 'desc' }, take: 200, select: savedSelect });

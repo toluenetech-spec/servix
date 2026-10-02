@@ -95,6 +95,23 @@ export function makeKey(kind: UploadKind, fileName: string, contentType: string)
   return `${kind}/${randomUUID()}.${safeExt(fileName, contentType)}`;
 }
 
+/**
+ * Public URL for a stored media reference. Links are saved with whatever
+ * R2_PUBLIC_BASE_URL was at upload time; if that base later changes (e.g. a
+ * retired host), the key inside the link is still ours, so rebuild the URL
+ * on the current base instead of serving a dead link. Anything that is not
+ * one of our minted keys is returned untouched.
+ */
+export function mediaUrl(stored: string | null | undefined): string | null {
+  if (!stored) return null;
+  const base = resolveStorageEnv().publicBaseUrl.replace(/\/$/, '');
+  if (!base) return stored;
+  if (stored.startsWith(`${base}/`)) return stored;
+  const m = /(?:^|\/)((?:profile|portfolio|service|avatar|resume|service-video|service-document)\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.[a-z0-9]{2,5})$/.exec(stored);
+  if (!m) return stored;
+  return `${base}/${m[1]}`;
+}
+
 /* ---------------- SigV4 (S3-compatible presigned URLs) ---------------- */
 
 interface SigV4Params {

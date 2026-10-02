@@ -57,3 +57,16 @@ describe('GET /media/*', () => {
     expect(missing.json().error.code).toBe('NOT_FOUND');
   });
 });
+
+describe('mediaUrl()', () => {
+  it('rebuilds links saved under a retired base on the current R2_PUBLIC_BASE_URL', async () => {
+    const { mediaUrl } = await import('../src/lib/storage.js');
+    expect(mediaUrl('https://servix-api-ugfs.onrender.com/media/avatar/b9028772-1b1f-41e9-861a-6984fcd981fa.jpg')).toBe('https://api.servix.test/media/avatar/b9028772-1b1f-41e9-861a-6984fcd981fa.jpg');
+    expect(mediaUrl('/media/profile/b9028772-1b1f-41e9-861a-6984fcd981fa.png')).toBe('https://api.servix.test/media/profile/b9028772-1b1f-41e9-861a-6984fcd981fa.png');
+    expect(mediaUrl('https://api.servix.test/media/avatar/b9028772-1b1f-41e9-861a-6984fcd981fa.jpg')).toBe('https://api.servix.test/media/avatar/b9028772-1b1f-41e9-861a-6984fcd981fa.jpg');
+    // Seeded/static images and foreign links are left alone.
+    expect(mediaUrl('/images/professionals/tunde-bakare.jpg')).toBe('/images/professionals/tunde-bakare.jpg');
+    expect(mediaUrl('https://example.com/avatar/not-a-uuid.jpg')).toBe('https://example.com/avatar/not-a-uuid.jpg');
+    expect(mediaUrl(null)).toBeNull();
+  });
+});

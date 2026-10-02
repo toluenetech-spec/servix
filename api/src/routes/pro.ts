@@ -14,7 +14,7 @@ import { requireProfessional } from '../lib/authGuard.js';
 import { ApiError, notFound } from '../lib/errors.js';
 import { parseBody, parsePatchBody } from '../lib/query.js';
 import { serializeProfessionalDetail, serializeServiceDetail } from '../lib/serialize.js';
-import { ALLOWED_IMAGE_TYPES, getStorage, MAX_UPLOAD_BYTES } from '../lib/storage.js';
+import { ALLOWED_IMAGE_TYPES, getStorage, MAX_UPLOAD_BYTES, mediaUrl } from '../lib/storage.js';
 import { audit } from '../lib/audit.js';
 import { assertListingAllowed } from '../lib/plans.js';
 import { assertOwnMediaUrl } from './uploads.js';
@@ -249,7 +249,7 @@ export async function proRoutes(app: FastifyInstance) {
       const item = await prisma.portfolioItem.create({
         data: { ...data, professionalId: req.professionalProfileId!, position: count },
       });
-      return reply.code(201).send({ id: item.id, title: item.title, category: item.category ?? '', description: item.description ?? '', image: item.mediaUrl ?? null });
+      return reply.code(201).send({ id: item.id, title: item.title, category: item.category ?? '', description: item.description ?? '', image: mediaUrl(item.mediaUrl) });
     },
   );
 
