@@ -9,7 +9,8 @@ async function mock(page, options = {}) {
     if (!['localhost', '127.0.0.1'].includes(url.hostname)) return route.abort();
     if (!url.pathname.startsWith('/api/v1/')) return route.continue();
     const path = url.pathname.slice('/api/v1/'.length);
-    if (path === 'auth/refresh') return options.anonymous ? route.fulfill({ status: 401, json: {} }) : route.fulfill({ json: { accessToken: 'ui-test-only', user: { ...user, ...options.user } } });
+    if (path === 'auth/refresh') { options.refreshes = (options.refreshes ?? 0) + 1; return options.anonymous ? route.fulfill({ status: 401, json: {} }) : route.fulfill({ json: { accessToken: `ui-test-only-${options.refreshes}`, user: { ...user, ...options.user } } }); }
+    if (options.expireAfterFirstToken && route.request().headers().authorization === 'Bearer ui-test-only-1') return route.fulfill({ status: 401, json: { error: { code: 'UNAUTHORIZED', message: 'Invalid or expired token', status: 401 } } });
     if (path === 'account/overview') return options.fail ? route.fulfill({ status: 503, json: {} }) : route.fulfill({ json: state });
     if (path === 'account/onboarding') {
       const intent = route.request().postDataJSON().intent;
@@ -130,4 +131,30 @@ test('customer sees saved professionals and empty notifications honestly', async
   await mock(page, { state: { needsChoice:false } });
   await page.goto('/dashboard/saved'); await expect(page.getByRole('heading', { name: 'No saved professionals yet' })).toBeVisible();
   await page.goto('/dashboard/notifications'); await expect(page.getByRole('heading', { name: 'No notifications yet' })).toBeVisible();
+});
+
+test('an expired access token is renewed silently and the page recovers without a reload', async ({page}) => {
+  // Every call made with the first token is rejected as expired; the app must refresh and retry, not show an error.
+  const options = { state: { needsChoice:false }, expireAfterFirstToken: true };
+  await mock(page, options);
+  await page.goto('/dashboard/saved');
+  await expect(page.getByRole('heading', { name: 'No saved professionals yet' })).toBeVisible();
+  await expect(page.getByText('Invalid or expired token')).toHaveCount(0);
+  expect(options.refreshes).toBeGreaterThanOrEqual(2);
+});
+test('a rejected session renewal returns the user to sign-in instead of an error wall', async ({page}) => {
+  const options = { state: { needsChoice:false } };
+  await mock(page, options);
+  await page.goto('/dashboard');
+  await expect(page.getByRole('heading', { name: 'Welcome back, Test.' })).toBeVisible();
+  // From now on the API treats the session as gone: tokens fail and the refresh cookie is rejected.
+  await page.unroute('**/*');
+  await page.route('**/*', route => {
+    const url = new URL(route.request().url());
+    if (!['localhost', '127.0.0.1'].includes(url.hostname)) return route.abort();
+    if (!url.pathname.startsWith('/api/v1/')) return route.continue();
+    return route.fulfill({ status: 401, json: { error: { code: 'UNAUTHORIZED', message: 'Invalid or expired token', status: 401 } } });
+  });
+  await page.getByRole('link', { name: 'Saved professionals', exact: true }).click();
+  await expect(page).toHaveURL(/\/login$/);
 });

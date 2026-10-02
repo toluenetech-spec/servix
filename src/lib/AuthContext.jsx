@@ -33,6 +33,15 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
+  // The API rejected a token renewal: the session is over. Clear the user so
+  // protected screens route back to sign-in instead of erroring.
+  useEffect(() => {
+    if (!authApi.authAvailable) return;
+    const onExpired = () => setUser(null);
+    window.addEventListener(authApi.SESSION_EXPIRED_EVENT, onExpired);
+    return () => window.removeEventListener(authApi.SESSION_EXPIRED_EVENT, onExpired);
+  }, []);
+
   const login = useCallback(async (credentials) => {
     const u = await authApi.login(credentials);
     setUser(u?.security ? null : u);

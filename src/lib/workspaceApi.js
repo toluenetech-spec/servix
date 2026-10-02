@@ -1,7 +1,7 @@
-import { getAccessToken } from './authApi.js';
+import { authorizedFetch } from './authApi.js';
 const BASE = `${import.meta.env.VITE_API_URL?.replace(/\/$/, '') ?? ''}/api/v1`;
 export async function workspaceCall(path, body, method = body === undefined ? 'GET' : 'POST') {
-  const response = await fetch(`${BASE}${path}`, { method, credentials:'include', headers:{ Authorization:`Bearer ${getAccessToken() ?? ''}`, ...(body === undefined ? {} : {'Content-Type':'application/json'}) }, ...(body === undefined ? {} : {body:JSON.stringify(body)}) });
+  const response = await authorizedFetch(`${BASE}${path}`, { method, headers: body === undefined ? {} : {'Content-Type':'application/json'}, ...(body === undefined ? {} : {body:JSON.stringify(body)}) });
   const data=await response.json().catch(()=>({}));
   if(!response.ok){const e=new Error(data.error?.message || 'This request could not be completed. Please try again.');e.status=response.status;e.code=data.error?.code;throw e;}return data;
 }

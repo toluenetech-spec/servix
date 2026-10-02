@@ -46,13 +46,13 @@ async function post(path, body, { auth = false } = {}) {
   // Only send a JSON content type when there IS a body — Fastify rejects
   // an empty body with application/json set (e.g. /auth/refresh, /auth/logout).
   if (body) headers['Content-Type'] = 'application/json';
-  if (auth && accessToken) headers.Authorization = `Bearer ${accessToken}`;
-  const res = await fetch(`${V1}${path}`, {
+  const init = {
     method: 'POST',
     headers,
     credentials: 'include', // refresh cookie
     body: body ? JSON.stringify(body) : undefined,
-  });
+  };
+  const res = auth ? await authorizedFetch(`${V1}${path}`, init) : await fetch(`${V1}${path}`, init);
   if (!res.ok) throw await toApiError(res);
   return res.json();
 }
@@ -83,28 +83,68 @@ export async function logout() {
  * Single-flight: concurrent calls (e.g. React StrictMode double-effects)
  * share ONE request — two parallel refreshes would otherwise trip the
  * token-rotation reuse detection and revoke the whole session family. */
-let resumeInFlight = null;
+let refreshInFlight = null;
+let refreshPending = false;
 
-export function resumeSession() {
-  if (!authAvailable) return Promise.resolve(null);
-  if (!resumeInFlight) {
-    resumeInFlight = post('/auth/refresh')
+/** Renew the access token from the httpOnly refresh cookie (single-flight).
+ * Resolves { ok, user } on success; { ok:false, authFailed } otherwise, where
+ * authFailed=true means the API rejected the session (401/403) rather than a
+ * network hiccup. Never throws. Concurrent callers share one request (token
+ * rotation would otherwise flag a replay); `force` starts a new request when
+ * the previous one has already settled, so a 401 never retries a stale token. */
+function refreshAccessToken({ force = false } = {}) {
+  if (!authAvailable) return Promise.resolve({ ok: false, authFailed: true });
+  if (!refreshInFlight || (force && !refreshPending)) {
+    refreshPending = true;
+    refreshInFlight = post('/auth/refresh')
       .then((data) => {
         accessToken = data.accessToken;
-        return data.user;
+        return { ok: true, user: data.user };
       })
-      .catch(() => {
-        accessToken = null;
-        return null;
+      .catch((err) => {
+        const authFailed = err?.status === 401 || err?.status === 403;
+        if (authFailed) accessToken = null;
+        return { ok: false, authFailed };
       })
       .finally(() => {
-        // allow future explicit resumes (e.g. after logout+login)
+        refreshPending = false;
+        // allow future explicit refreshes (e.g. after logout+login)
         setTimeout(() => {
-          resumeInFlight = null;
+          refreshInFlight = null;
         }, 1000);
       });
   }
-  return resumeInFlight;
+  return refreshInFlight;
+}
+
+export function resumeSession() {
+  return refreshAccessToken().then((result) => (result.ok ? result.user : null));
+}
+
+/** Fired on window when the API says the session is gone (refresh rejected).
+ * AuthContext listens and clears the user so protected screens return to sign-in
+ * instead of showing "Invalid or expired token" errors. */
+export const SESSION_EXPIRED_EVENT = 'servix:session-expired';
+
+/** fetch() for authenticated API calls. Attaches the current access token and,
+ * when the API answers 401 (the 15-minute token lapsed), renews the token from
+ * the refresh cookie once and retries the same request. */
+export async function authorizedFetch(url, init = {}) {
+  const send = () =>
+    fetch(url, {
+      ...init,
+      credentials: 'include',
+      headers: { ...(init.headers ?? {}), ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) },
+    });
+  const usedToken = accessToken;
+  let res = await send();
+  if (res.status === 401 && authAvailable) {
+    // Another call may already have renewed the token; otherwise renew now.
+    const refreshed = accessToken && accessToken !== usedToken ? { ok: true } : await refreshAccessToken({ force: true });
+    if (refreshed.ok) res = await send();
+    else if (refreshed.authFailed && typeof window !== 'undefined') window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+  }
+  return res;
 }
 
 export async function verifyEmail(token) {
@@ -126,10 +166,7 @@ export async function resetPassword({ token, password }) {
 
 export async function fetchMe() {
   if (!accessToken) return null;
-  const res = await fetch(`${V1}/me`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-    credentials: 'include',
-  });
+  const res = await authorizedFetch(`${V1}/me`);
   if (!res.ok) return null;
   const data = await res.json();
   return data.user;
@@ -179,7 +216,7 @@ export async function oauthConnections() {
 export const getResetPasswordPolicy = (token) => post('/auth/reset-password/policy', { token });
 
 export async function getAccountOverview() {
-  const res = await fetch(`${V1}/account/overview`, { headers: { Authorization: `Bearer ${accessToken ?? ''}` }, credentials: 'include' });
+  const res = await authorizedFetch(`${V1}/account/overview`);
   if (!res.ok) throw await toApiError(res);
   return res.json();
 }

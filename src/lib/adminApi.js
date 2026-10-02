@@ -5,7 +5,7 @@
  * SERVER against the database role — this client only carries the access
  * token; a non-admin gets 403 regardless of anything set in the browser.
  */
-import { getAccessToken } from './authApi.js';
+import { authorizedFetch } from './authApi.js';
 
 const BASE = import.meta.env.VITE_API_URL?.replace(/\/$/, '') ?? '';
 const V1 = `${BASE}/api/v1`;
@@ -28,13 +28,10 @@ async function toApiError(res) {
 
 async function call(method, path, body) {
   const headers = {};
-  const token = getAccessToken();
-  if (token) headers.Authorization = `Bearer ${token}`;
   if (body) headers['Content-Type'] = 'application/json';
-  const res = await fetch(`${V1}${path}`, {
+  const res = await authorizedFetch(`${V1}${path}`, {
     method,
     headers,
-    credentials: 'include',
     body: body ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) throw await toApiError(res);

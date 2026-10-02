@@ -3,7 +3,7 @@
  * Authenticated calls only; requires a live API (no demo fallback — the
  * professional workspace is real or honestly unavailable).
  */
-import { getAccessToken } from './authApi.js';
+import { authorizedFetch } from './authApi.js';
 
 const BASE = import.meta.env.VITE_API_URL?.replace(/\/$/, '') ?? '';
 const V1 = `${BASE}/api/v1`;
@@ -26,13 +26,10 @@ async function toApiError(res) {
 
 async function call(method, path, body) {
   const headers = {};
-  const token = getAccessToken();
-  if (token) headers.Authorization = `Bearer ${token}`;
   if (body) headers['Content-Type'] = 'application/json';
-  const res = await fetch(`${V1}${path}`, {
+  const res = await authorizedFetch(`${V1}${path}`, {
     method,
     headers,
-    credentials: 'include',
     body: body ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) throw await toApiError(res);
