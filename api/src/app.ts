@@ -42,6 +42,7 @@ import { billingRoutes } from './routes/billing.js';
 import { teamRoutes } from './routes/teams.js';
 import { productivityRoutes } from './routes/productivity.js';
 import { adminPlanRoutes } from './routes/adminPlans.js';
+import { checkSchema, LATEST_MIGRATION } from './lib/schemaCheck.js';
 
 export async function buildApp() {
   const config = loadConfig();
@@ -172,6 +173,15 @@ export async function buildApp() {
         error: { code: 'INVALID_REQUEST', message: err.message, status: 400 },
       });
     }
+    // Prisma P2021/P2022 = table/column missing: the image is newer than the database (pending manual migration).
+    const prismaCode = (err as { code?: unknown }).code;
+    if (prismaCode === 'P2021' || prismaCode === 'P2022') {
+      app.log.error(err, `database schema behind (pending migration ${LATEST_MIGRATION})`);
+      reply.header('Retry-After', '60');
+      return reply.code(503).send({
+        error: { code: 'SCHEMA_PENDING', message: 'Servix is finishing an update. Please try again in a few minutes.', status: 503 },
+      });
+    }
     app.log.error(err);
     return reply.code(500).send({
       error: { code: 'INTERNAL_ERROR', message: 'Something went wrong', status: 500 },
@@ -200,8 +210,12 @@ export async function buildApp() {
     checks.queue = await queueHealthy();
     const storageEnv = resolveStorageEnv();
     checks.storage = !storageEnv.enabled || Boolean(storageEnv.bucket && storageEnv.accessKeyId);
+    let pendingMigration: string | null = null;
+    if (checks.database) {
+      try { const schema = await checkSchema(); checks.schema = schema.ok; pendingMigration = schema.pendingMigration; } catch { checks.schema = false; }
+    } else checks.schema = false;
     const ready = Object.values(checks).every(Boolean);
-    return reply.code(ready ? 200 : 503).send({ ready, checks });
+    return reply.code(ready ? 200 : 503).send({ ready, checks, ...(pendingMigration ? { pendingMigration, hint: `Apply api/docs/manual-subscriptions-upgrade.sql (migration ${pendingMigration}) on the database; no restart needed.` } : {}) });
   });
 
   /* ---------------- Routes ---------------- */

@@ -63,7 +63,10 @@ All routes are under `/api/v1`, JSON, bearer auth unless noted. Errors use the s
 Migration `20261004000000_subscriptions_entitlements`: `users.plan_slug/plan_expires_at/custom_limits`,
 `plans.limits`, `plan_subscriptions.user_id`, `proposals.label/private_note`, tables `organizations`,
 `organization_members`, `usage_periods`, `ai_usage_events`, `saved_searches`, `profile_versions`.
-Production: apply once with `api/docs/manual-subscriptions-upgrade.sql` (guarded, idempotent).
+Production: apply once with `api/docs/manual-subscriptions-upgrade.sql` (guarded, idempotent). Until it has run, a
+newer API image reports `/readyz` → 503 `{ ready:false, checks.schema:false, pendingMigration }` and every
+request that needs the new columns gets 503 `SCHEMA_PENDING` instead of a crash or a 500; readiness flips to
+true automatically once the migration is applied (no restart).
 Seed (`prisma/seed.ts`) upserts the five plans and deactivates unknown slugs; it never deletes plans.
 
 ## Local verification

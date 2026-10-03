@@ -12,6 +12,7 @@ import { loadConfig, validateProductionConfig } from './lib/config.js';
 import { prisma } from './lib/db.js';
 import { bootstrapAdmin } from './routes/auth.js';
 import { scheduleRepeatables, startWorker, stopWorker } from './lib/jobs.js';
+import { checkSchema, LATEST_MIGRATION } from './lib/schemaCheck.js';
 
 const config = loadConfig();
 
@@ -25,8 +26,21 @@ if (problems.length > 0) {
 
 const app = await buildApp();
 
-/* Idempotent admin bootstrap (server-side only). */
-await bootstrapAdmin();
+/* Schema gap detection: migrations are applied manually; a newer image must not crash on an older database.
+   /healthz stays up, /readyz reports the pending migration, requests needing the new columns fail cleanly. */
+let schemaOk = false;
+try {
+  const schema = await checkSchema(true);
+  schemaOk = schema.ok;
+  if (!schema.ok) app.log.error({ missing: schema.missing }, `DATABASE SCHEMA BEHIND: apply migration ${LATEST_MIGRATION} (api/docs/manual-subscriptions-upgrade.sql). The API is up but not ready until then.`);
+} catch (err) {
+  app.log.error(err, 'schema check failed (database unreachable?) — continuing so /healthz can report');
+}
+
+/* Idempotent admin bootstrap (server-side only). Skipped while the schema is behind; it re-runs on the next start. */
+if (schemaOk) {
+  try { await bootstrapAdmin(); } catch (err) { app.log.error(err, 'admin bootstrap failed — continuing'); }
+}
 
 /* Background worker: inline by default; external process in production. */
 let repeatTimer: NodeJS.Timeout | null = null;

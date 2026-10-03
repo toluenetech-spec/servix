@@ -149,7 +149,10 @@ admin tabs. Unknown entitlement state (request failed) **never locks the UI** �
 
 ## 10. Rollout (owner actions)
 
-1. Run `api/docs/manual-subscriptions-upgrade.sql` once in the Neon SQL Editor (production `neondb`)
-   **before** the API deploy finishes starting — it is guarded and re-runnable.
+1. Run `api/docs/manual-subscriptions-upgrade.sql` once in the Neon SQL Editor (production `neondb`).
+   It is guarded and re-runnable. Order no longer matters: an API image that is newer than the database
+   stays alive (`/healthz` 200), reports `ready:false` + `pendingMigration` on `/readyz`, answers requests
+   with 503 `SCHEMA_PENDING` ("Servix is finishing an update"), and becomes ready the moment the script has
+   run — no restart needed (`api/src/lib/schemaCheck.ts`).
 2. Deploy (automatic from the branch). No new environment variables.
 3. Optional: in Admin → Plans & organisations, adjust prices/limits; grant Enterprise to organisations.

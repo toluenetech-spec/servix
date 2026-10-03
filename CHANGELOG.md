@@ -37,6 +37,9 @@ All notable changes to the Servix public website.
   explanation and a path back.
 - Seed upserts plans (no `deleteMany`) and marks unknown slugs inactive.
 - Error envelope now forwards `meta` for plan/quota errors.
+- Schema-gap safety: a newer API image on an older database no longer crashes at boot — `/healthz` stays
+  up, `/readyz` reports `pendingMigration`, affected requests answer 503 `SCHEMA_PENDING`, and readiness
+  recovers automatically once the manual migration has run (`api/src/lib/schemaCheck.ts`).
 
 ### Tests
 - New: `api/tests/entitlements-local.test.ts` (13), `api/tests/manual-subscriptions-sql-local.test.ts` (2),
