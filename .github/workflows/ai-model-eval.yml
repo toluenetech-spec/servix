@@ -1,0 +1,74 @@
+name: AI model evaluation (audit only)
+
+# Audit tooling. Boots the REAL Servix API on a throwaway PostgreSQL inside the
+# runner and scores candidate models (NVIDIA Build, OpenAI-compatible) on Servix
+# tasks. Touches no production system. Results are uploaded as an artifact and
+# written to the job summary. The API key is read ONLY from the repository
+# secret NVIDIA_API_KEY and is never printed.
+
+on:
+  workflow_dispatch:
+    inputs:
+      models:
+        description: 'Comma-separated model ids to test (blank = auto-detect GLM 5.3, GLM 5.3 Flash, Kimi K3, Nemotron 3.5 Lightning, DeepSeek V4.1 Flash + Llama 3.3 70B baseline)'
+        required: false
+        default: ''
+  push:
+    branches: [arena/01a0dc4c-servix]
+    paths:
+      - 'api/scripts/aiModelEval.ts'
+      - '.github/workflows/ai-model-eval.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+
+      - name: Install API dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Evaluate models against the real Servix API
+        env:
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          MODELS_INPUT: ${{ github.event.inputs.models }}
+        run: |
+          if [ -z "$NVIDIA_API_KEY" ]; then
+            echo "::error::Repository secret NVIDIA_API_KEY is not set (Settings → Secrets and variables → Actions)."
+            exit 2
+          fi
+          ARGS=""
+          if [ -n "$MODELS_INPUT" ]; then ARGS="--models $MODELS_INPUT"; fi
+          npx tsx scripts/aiModelEval.ts --out "$GITHUB_WORKSPACE/ai-eval" $ARGS
+
+      - name: Publish summary
+        if: always()
+        run: |
+          if [ -f "$GITHUB_WORKSPACE/ai-eval/results.md" ]; then
+            cat "$GITHUB_WORKSPACE/ai-eval/results.md" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No results produced." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ai-eval-results
+          path: ai-eval
+          if-no-files-found: ignore

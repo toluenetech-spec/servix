@@ -18,3 +18,6 @@ api/src/generated
 # Generated, synthetic email review gallery
 /.email-preview/
 .local-previews/
+
+# AI model evaluation output (audit tooling)
+/ai-eval/
