@@ -24,6 +24,19 @@ import {
 
 const AI_RATE = { rateLimit: { max: 20, timeWindow: '1 minute' } };
 
+/** OpenAPI body descriptions so the /docs console offers an editor. Validation itself is zod (422). */
+const str = (description: string, example?: string) => ({ type: 'string', description: example ? `${description} (e.g. "${example}")` : description });
+const DOC = {
+  assistant: { type: 'object', properties: { messages: { type: 'array', items: { type: 'object', properties: { role: { type: 'string', enum: ['user', 'assistant'] }, content: { type: 'string' } } }, description: 'e.g. [{"role":"user","content":"Who can design a logo for my bakery in Lagos?"}]' } } },
+  searchIntent: { type: 'object', properties: { query: str('What the customer typed', 'logo designer in Lagos under 30k') } },
+  improve: { type: 'object', properties: { focus: { type: 'string', enum: ['all', 'about', 'title', 'gigs', 'skills', 'pricing'] } } },
+  pricing: { type: 'object', properties: { categorySlug: str('Category slug', 'graphic-design'), brief: str('Optional description of the job'), deliveryDays: { type: 'integer' } } },
+  explain: { type: 'object', properties: { topic: str('e.g. payments, trust, requests, kyc, plans, achievements', 'payments'), context: str('Optional extra context') } },
+  proposal: { type: 'object', properties: { requestId: str('Open request id (uuid)'), notes: str('Optional notes from the professional') } },
+  drafts: { type: 'object', properties: { kind: { type: 'string', enum: ['request_brief', 'gig_description', 'client_message', 'profile_about'] }, input: str('Rough notes', 'Restaurant website with menu and WhatsApp ordering, budget 150-250k'), tone: { type: 'string', enum: ['friendly', 'professional', 'brief'] } } },
+  empty: { type: 'object', properties: {} },
+} as const;
+
 async function requireAi(_req: FastifyRequest, _reply: FastifyReply): Promise<void> {
   if (!aiEnabled()) throw new ApiError(503, 'FEATURE_DISABLED', `${FEATURE_FLAGS.ai.label} is not enabled on this Servix instance yet.`);
 }
@@ -41,72 +54,72 @@ const meta = <T>(r: { model: string; alias: string; fallbackUsed: boolean; attem
 
 export async function aiRoutes(app: FastifyInstance) {
   attachAiLogger({ info: (o, m) => app.log.info(o, m), warn: (o, m) => app.log.warn(o, m) });
-  const auth = { preHandler: [requireAi, requireAuth], config: AI_RATE };
-  const pro = { preHandler: [requireAi, requireProfessional], config: AI_RATE };
+  const auth = { preHandler: [requireAi, requireAuth], config: AI_RATE, attachValidation: true as const };
+  const pro = { preHandler: [requireAi, requireProfessional], config: AI_RATE, attachValidation: true as const };
 
-  app.post('/ai/assistant', { ...auth, schema: { tags: ['ai'], summary: 'AI Concierge — grounded assistant over real Servix data' } }, async (req) => {
+  app.post('/ai/assistant', { ...auth, schema: { tags: ['ai'], summary: 'AI Concierge — grounded assistant over real Servix data', body: DOC.assistant } }, async (req) => {
     const input = parseBody(assistantInput, req.body);
     const r = await getAi().router.run(assistantTask(input, await toolContext(req)));
     return meta(r, { answer: r.value });
   });
 
-  app.post('/ai/search/intent', { preHandler: [requireAi], config: AI_RATE, schema: { tags: ['ai'], summary: 'Natural-language query → validated professional-search filters' } }, async (req) => {
+  app.post('/ai/search/intent', { preHandler: [requireAi], config: AI_RATE, attachValidation: true, schema: { tags: ['ai'], summary: 'Natural-language query → validated professional-search filters', body: DOC.searchIntent } }, async (req) => {
     const input = parseBody(searchIntentInput, req.body);
     const r = await getAi().router.run(await searchIntentTask(input));
     return meta(r, { filters: r.value });
   });
 
-  app.post('/ai/opportunities/match', { ...pro, schema: { tags: ['ai'], summary: 'Rank open requests for the signed-in professional' } }, async (req) => {
+  app.post('/ai/opportunities/match', { ...pro, schema: { tags: ['ai'], summary: 'Rank open requests for the signed-in professional', body: DOC.empty } }, async (req) => {
     const task = await jobMatchingTask(await toolContext(req));
     if ('shortCircuit' in task) return { ...task.shortCircuit, ai: null };
     const r = await getAi().router.run(task);
     return meta(r, r.value);
   });
 
-  app.post('/ai/opportunities/radar', { ...pro, schema: { tags: ['ai'], summary: 'Opportunity Radar — what is new this week' } }, async (req) => {
+  app.post('/ai/opportunities/radar', { ...pro, schema: { tags: ['ai'], summary: 'Opportunity Radar — what is new this week', body: DOC.empty } }, async (req) => {
     const task = await opportunityRadarTask(await toolContext(req));
     if ('shortCircuit' in task) return { ...task.shortCircuit, ai: null };
     const r = await getAi().router.run(task);
     return meta(r, r.value);
   });
 
-  app.post('/ai/profile/analysis', { ...pro, schema: { tags: ['ai'], summary: 'Analyse the signed-in professional’s profile' } }, async (req) => {
+  app.post('/ai/profile/analysis', { ...pro, schema: { tags: ['ai'], summary: 'Analyse the signed-in professional’s profile', body: DOC.empty } }, async (req) => {
     const r = await getAi().router.run(await profileAnalysisTask(await toolContext(req)));
     return meta(r, r.value);
   });
 
-  app.post('/ai/profile/improve', { ...pro, schema: { tags: ['ai'], summary: 'Concrete profile improvement suggestions' } }, async (req) => {
+  app.post('/ai/profile/improve', { ...pro, schema: { tags: ['ai'], summary: 'Concrete profile improvement suggestions', body: DOC.improve } }, async (req) => {
     const input = parseBody(improvementInput, req.body ?? {});
     const r = await getAi().router.run(await profileImprovementTask(input, await toolContext(req)));
     return meta(r, r.value);
   });
 
-  app.post('/ai/pricing/guidance', { ...auth, schema: { tags: ['ai'], summary: 'Pricing guidance from real Servix price data' } }, async (req) => {
+  app.post('/ai/pricing/guidance', { ...auth, schema: { tags: ['ai'], summary: 'Pricing guidance from real Servix price data', body: DOC.pricing } }, async (req) => {
     const input = parseBody(pricingInput, req.body);
     const r = await getAi().router.run(await pricingGuidanceTask(input, await toolContext(req)));
     return meta(r, r.value);
   });
 
-  app.post<{ Params: { id: string } }>('/ai/bookings/:id/health', { ...auth, schema: { tags: ['ai'], summary: 'Project health explanation for a booking you are party to' } }, async (req) => {
+  app.post<{ Params: { id: string } }>('/ai/bookings/:id/health', { ...auth, schema: { tags: ['ai'], summary: 'Project health explanation for a booking you are party to', body: DOC.empty } }, async (req) => {
     const id = z.string().uuid().safeParse(req.params.id);
     if (!id.success) throw new ApiError(404, 'NOT_FOUND', 'Booking not found');
     const r = await getAi().router.run(await projectHealthTask(id.data, await toolContext(req)));
     return meta(r, r.value);
   });
 
-  app.post('/ai/explain', { ...auth, schema: { tags: ['ai'], summary: '“What does this mean?” — explain a Servix concept' } }, async (req) => {
+  app.post('/ai/explain', { ...auth, schema: { tags: ['ai'], summary: '“What does this mean?” — explain a Servix concept', body: DOC.explain } }, async (req) => {
     const input = parseBody(explainInput, req.body);
     const r = await getAi().router.run(explanationTask(input));
     return meta(r, { answer: r.value });
   });
 
-  app.post('/ai/proposals/draft', { ...pro, schema: { tags: ['ai'], summary: 'Draft a proposal for an open request (nothing is submitted)' } }, async (req) => {
+  app.post('/ai/proposals/draft', { ...pro, schema: { tags: ['ai'], summary: 'Draft a proposal for an open request (nothing is submitted)', body: DOC.proposal } }, async (req) => {
     const input = parseBody(proposalInput, req.body);
     const r = await getAi().router.run(await proposalTask(input, await toolContext(req)));
     return meta(r, { draft: r.value });
   });
 
-  app.post('/ai/drafts', { ...auth, schema: { tags: ['ai'], summary: 'Background drafting: request brief, gig description, message, about' } }, async (req) => {
+  app.post('/ai/drafts', { ...auth, schema: { tags: ['ai'], summary: 'Background drafting: request brief, gig description, message, about', body: DOC.drafts } }, async (req) => {
     const input = parseBody(draftInput, req.body);
     const task = await draftingTask(input, await toolContext(req));
     if (task.kind === 'request_brief') { const r = await getAi().router.run(task.spec); return meta(r, { kind: task.kind, draft: r.value }); }
