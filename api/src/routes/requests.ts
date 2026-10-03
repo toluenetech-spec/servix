@@ -27,7 +27,7 @@ import { assertOwnMediaUrl } from './uploads.js';
 
 const CUSTOM_WORK_SLUG_PREFIX = 'custom-work-';
 
-const requestBody = z.object({
+export const requestBody = z.object({
   title: z.string().trim().min(6, 'Give the request a clear title (at least 6 characters).').max(140),
   categorySlug: z.string().trim().min(1, 'Choose a category.').max(100),
   description: z.string().trim().max(5000).default(''),
@@ -43,7 +43,7 @@ const requestBody = z.object({
   extraRequirements: z.string().trim().max(3000).nullable().optional(),
 });
 
-const proposalBody = z.object({
+export const proposalBody = z.object({
   cover: z.string().trim().min(30, 'Write at least a short paragraph (30 characters) about how you would approach this.').max(5000),
   price: z.number().int().min(1000, 'Minimum proposal is ₦1,000.').max(100_000_000),
   deliveryDays: z.number().int().min(1).max(365),

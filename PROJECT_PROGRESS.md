@@ -380,6 +380,21 @@ Editor; 2) deploy the API; 3) promote the frontend; 4) switch flags on one at a
 time in Railway (`TRUST_ENABLED`, `ACHIEVEMENTS_ENABLED`, `COMPARE_ENABLED`,
 `REQUESTS_ENABLED`) and re-check `/readyz` + `GET /api/v1/features`.
 
+## 11i. Servix AI model routing layer (2026-10-03, flag-gated, OFF)
+
+Provider-agnostic AI layer in `api/src/ai/` with eleven departments routed by configuration
+(DeepSeek V4 Flash primary · MiniMax M2.7 drafting · GLM 5.3 Flash fallback), controlled fallback,
+strict/normalised structured output, read-only tools, payment isolation, internal telemetry.
+Endpoints under `/api/v1/ai/*` answer 503 `FEATURE_DISABLED` until `AI_ENABLED=true` + `AI_API_KEY`
+are set on the API host. No frontend UI yet. Details: `api/docs/AI_ROUTING.md`; model evaluation:
+`docs/ai-eval/DAHL_EVALUATION_REPORT.md`.
+
+Verified in the sandbox: `tsc` clean, API build, 35 new tests green, existing local suites
+(36) green, root tests 14/14, Vite production build, and an HTTP smoke against the real local
+stack with a scripted OpenAI-compatible server (drift normalisation, tool use over real rows,
+department routing, bounded failure, no key in logs). Not verified: live Dahl traffic from
+production (needs the key on Railway — owner action).
+
 ## 12. Known Issues / Remaining Tasks
 
 - Service-detail availability preview is generated client-side (clearly

@@ -13,7 +13,7 @@ import {
   serializeServiceSummary,
 } from '../lib/serialize.js';
 
-function buildWhere(
+export function buildWhere(
   q: ReturnType<typeof professionalQuerySchema.parse>,
 ): Prisma.ProfessionalProfileWhereInput {
   const where: Prisma.ProfessionalProfileWhereInput = {};
@@ -32,7 +32,7 @@ function buildWhere(
   return where;
 }
 
-function buildOrderBy(sort: string): Prisma.ProfessionalProfileOrderByWithRelationInput[] {
+export function buildOrderBy(sort: string): Prisma.ProfessionalProfileOrderByWithRelationInput[] {
   switch (sort) {
     case 'rating':
       return [{ ratingAvg: 'desc' }, { reviewCount: 'desc' }, { id: 'asc' }];

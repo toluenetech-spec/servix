@@ -2,6 +2,32 @@
 
 All notable changes to the Servix public website.
 
+## 0.8.0 — 2026-10-03 (Servix AI model routing layer — flag-gated, OFF)
+
+### Added
+- `api/src/ai/*` + `api/src/routes/ai.ts`: provider-agnostic AI routing layer. Eleven departments
+  (assistant, search intent, job matching, opportunity radar, profile analysis/improvement, pricing
+  guidance, project health, explanations, proposal generation, background drafting) mapped by
+  configuration to model aliases (DeepSeek V4 Flash primary; MiniMax M2.7 for drafting; GLM 5.3 Flash
+  fallback). Bounded retries, one repair round for invalid structured output, task deadline,
+  controlled errors (`AI_UNAVAILABLE`, `AI_INVALID_OUTPUT`, `AI_TIMEOUT`).
+- Strict schemas + normalisation of categories, dates, naira, enums and ids before anything reaches the
+  app; drafts validated with the real `requestBody`/`proposalBody` schemas. No department writes.
+- Read-only, allow-listed tools over real rows; payments/payouts/ledger/refunds/KYC/admin unreachable
+  (statically enforced by tests). API key server-side only, scrubbed from errors, never logged.
+- Internal telemetry (model, department, duration, success, fallback, tokens, error codes) at
+  `GET /api/v1/admin/ai/status` and `/admin/ai/telemetry/recent`.
+- Feature flag `AI_ENABLED` (shown in `GET /api/v1/features` as `ai`), env documented in `api/.env.example`;
+  docs in `api/docs/AI_ROUTING.md`; evaluation report `docs/ai-eval/DAHL_EVALUATION_REPORT.md`.
+
+### Changed
+- `routes/professionals.ts` exports `buildWhere`/`buildOrderBy`; `routes/requests.ts` exports
+  `requestBody`/`proposalBody` (reuse only — behaviour unchanged).
+
+### Tests
+- `api/tests/ai-router.test.ts` (23 unit tests) and `api/tests/ai-local.test.ts` (12 integration tests on an
+  isolated PostgreSQL with a scripted provider). Existing suites unchanged and green.
+
 ## 0.7.0 — 2026-10-02 (Next-generation marketplace, block 1 — flag-gated)
 
 ### Added

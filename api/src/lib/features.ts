@@ -18,6 +18,7 @@ export const FEATURE_FLAGS = {
   business: { env: 'BUSINESS_ENABLED', label: 'Business workspace' },
   pricing: { env: 'PRICING_INSIGHTS_ENABLED', label: 'Price intelligence' },
   community: { env: 'COMMUNITY_ENABLED', label: 'Community, messages & network' },
+  ai: { env: 'AI_ENABLED', label: 'Servix AI (assistant, drafting, matching)' },
 } as const;
 
 export type FeatureKey = keyof typeof FEATURE_FLAGS;

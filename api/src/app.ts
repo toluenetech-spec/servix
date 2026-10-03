@@ -37,6 +37,7 @@ import { adminRoutes } from './routes/admin.js';
 import { kycRoutes } from './routes/kyc.js';
 import { marketplaceRoutes } from './routes/marketplace.js';
 import { requestRoutes } from './routes/requests.js';
+import { aiRoutes } from './routes/ai.js';
 
 export async function buildApp() {
   const config = loadConfig();
@@ -221,6 +222,7 @@ export async function buildApp() {
       await kycRoutes(v1); // /kyc/* + /admin/kyc/*
       await marketplaceRoutes(v1); // /features, trust, compare, achievements, verified portfolio
       await requestRoutes(v1); // /requests/* + /proposals/* (REQUESTS_ENABLED)
+      await aiRoutes(v1); // /ai/* (AI_ENABLED) + /admin/ai/*
     },
     { prefix: '/api/v1' },
   );
