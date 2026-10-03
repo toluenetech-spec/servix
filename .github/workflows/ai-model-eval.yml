@@ -4,7 +4,7 @@ name: AI model evaluation (audit only)
 # runner and scores candidate models (NVIDIA Build, OpenAI-compatible) on Servix
 # tasks. Touches no production system. Results are uploaded as an artifact and
 # written to the job summary. The API key is read ONLY from the repository
-# secret NVIDIA_API_KEY and is never printed.
+# secret NVIDIA_API_KEY and is never printed. Runs on each push that touches it.
 
 on:
   workflow_dispatch:
