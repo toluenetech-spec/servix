@@ -133,13 +133,17 @@ export function parseAiMarkdown(text) {
 /** Inline nodes: { t:'text', v } | { t:'b'|'i', c:[…] } | { t:'code', v }. */
 export function parseInline(text) {
   const out = [];
-  const re = /(\*\*|__)(.+?)\1|(`)([^`]+)\3|(?<![\w*])(\*|_)([^*_\s](?:[^*_]*?[^*_\s])?)\5(?![\w*])/g;
+  // No lookbehind: Safari before 16.4 (older iPhones/iPads) throws "invalid group specifier name" at parse
+  // time, which takes down every page that imports this module. The emphasis branch captures the preceding
+  // character (or start of string) instead and re-emits it as text.
+  const re = /(\*\*|__)(.+?)\1|(`)([^`]+)\3|(^|[^\w*])(\*|_)([^*_\s](?:[^*_]*?[^*_\s])?)\6(?![\w*])/g;
   let i = 0; let m;
   while ((m = re.exec(text))) {
-    if (m.index > i) out.push({ t: 'text', v: text.slice(i, m.index) });
+    const lead = m[5] ?? '';
+    if (m.index + lead.length > i) out.push({ t: 'text', v: text.slice(i, m.index + lead.length) });
     if (m[2] != null) out.push({ t: 'b', c: parseInline(m[2]) });
     else if (m[4] != null) out.push({ t: 'code', v: m[4] });
-    else out.push({ t: 'i', c: parseInline(m[6]) });
+    else out.push({ t: 'i', c: parseInline(m[7]) });
     i = m.index + m[0].length;
   }
   if (i < text.length) out.push({ t: 'text', v: text.slice(i) });

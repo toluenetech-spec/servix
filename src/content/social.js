@@ -11,5 +11,5 @@ export const PUBLIC_ROUTES = {
 export function safeCanonical(pathname) {
   // Never put tokens, booking IDs, private URLs or arbitrary user input in share metadata.
   const path = pathname.split(/[?#]/)[0];
-  return SITE_ORIGIN + (Object.hasOwn(PUBLIC_ROUTES, path) ? path : '/');
+  return SITE_ORIGIN + (Object.prototype.hasOwnProperty.call(PUBLIC_ROUTES, path) ? path : '/');
 }
