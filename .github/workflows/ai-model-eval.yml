@@ -1,16 +1,20 @@
 name: AI model evaluation (audit only)
 
 # Audit tooling. Boots the REAL Servix API on a throwaway PostgreSQL inside the
-# runner and scores candidate models (NVIDIA Build, OpenAI-compatible) on Servix
-# tasks. Touches no production system. Results are uploaded as an artifact and
-# written to the job summary. The API key is read ONLY from the repository
-# secret NVIDIA_API_KEY and is never printed. Runs on each push that touches it.
+# runner and scores candidate models on Servix tasks. Touches no production
+# system. Results are uploaded as artifacts and written to the job summary.
+# API keys are read ONLY from repository secrets and are never printed.
+#
+#   AI_API_KEY     → Dahl (https://inference.dahl.global/v1)
+#   NVIDIA_API_KEY → NVIDIA Build (https://integrate.api.nvidia.com/v1)
+#
+# A provider whose secret is missing is skipped with a notice, not a failure.
 
 on:
   workflow_dispatch:
     inputs:
       models:
-        description: 'Comma-separated model ids to test (blank = auto-detect GLM 5.3, GLM 5.3 Flash, Kimi K3, Nemotron 3.5 Lightning, DeepSeek V4.1 Flash + Llama 3.3 70B baseline)'
+        description: 'Comma-separated model ids to test (blank = auto-detect by name)'
         required: false
         default: ''
   push:
@@ -24,8 +28,21 @@ permissions:
 
 jobs:
   evaluate:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - provider: dahl
+            base_url: https://inference.dahl.global/v1
+            secret_name: AI_API_KEY
+            min_gap_ms: '1200'
+          - provider: nvidia
+            base_url: https://integrate.api.nvidia.com/v1
+            secret_name: NVIDIA_API_KEY
+            min_gap_ms: '1600'
+    name: ${{ matrix.provider }}
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 110
     defaults:
       run:
         working-directory: api
@@ -46,12 +63,15 @@ jobs:
 
       - name: Evaluate models against the real Servix API
         env:
-          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          AI_API_KEY: ${{ secrets[matrix.secret_name] }}
+          AI_BASE_URL: ${{ matrix.base_url }}
+          AI_MIN_GAP_MS: ${{ matrix.min_gap_ms }}
+          AI_MODEL_BUDGET_MS: '900000'
           MODELS_INPUT: ${{ github.event.inputs.models }}
         run: |
-          if [ -z "$NVIDIA_API_KEY" ]; then
-            echo "::error::Repository secret NVIDIA_API_KEY is not set (Settings → Secrets and variables → Actions)."
-            exit 2
+          if [ -z "$AI_API_KEY" ]; then
+            echo "::notice::Secret ${{ matrix.secret_name }} is not set — skipping ${{ matrix.provider }}."
+            exit 0
           fi
           ARGS=""
           if [ -n "$MODELS_INPUT" ]; then ARGS="--models $MODELS_INPUT"; fi
@@ -60,6 +80,7 @@ jobs:
       - name: Publish summary
         if: always()
         run: |
+          echo "## ${{ matrix.provider }}" >> "$GITHUB_STEP_SUMMARY"
           if [ -f "$GITHUB_WORKSPACE/ai-eval/results.md" ]; then
             cat "$GITHUB_WORKSPACE/ai-eval/results.md" >> "$GITHUB_STEP_SUMMARY"
           else
@@ -69,6 +90,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: ai-eval-results
+          name: ai-eval-${{ matrix.provider }}
           path: ai-eval
           if-no-files-found: ignore
