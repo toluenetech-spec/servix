@@ -17,11 +17,14 @@ import { formatPrice } from '../../lib/format.js';
 import * as bookingApi from '../../lib/bookingApi.js';
 import { STATUS_META } from './BookingsPage.jsx';
 import { getRebookDraft } from '../../lib/marketplaceApi.js';
+import { useFeatures } from '../../lib/useFeatures.js';
+import { BookingHealth, ExplainButton } from '../../components/ai/AiInsights.jsx';
 
 export default function BookingDetailPage() {
   useDocumentMeta({ title: 'Booking', description: 'Servix booking details.' });
   const { id } = useParams();
   const { user, initializing } = useAuth();
+  const { ai } = useFeatures();
   const showToast = useToast();
 
   const [booking, setBooking] = useState(null);
@@ -111,7 +114,7 @@ export default function BookingDetailPage() {
 
       <div className="card" style={{ padding: 'var(--space-6)', display: 'grid', gap: 'var(--space-5)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
-          <Badge variant={meta.variant}>{meta.label}</Badge>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flexWrap: 'wrap' }}><Badge variant={meta.variant}>{meta.label}</Badge>{ai && <ExplainButton topic={`booking status: ${meta.label}`} context={`Booking ${booking.reference} is ${booking.status}. The user is the ${isPro ? 'professional' : 'customer'}.`} />}</span>
           <strong style={{ fontSize: 'var(--text-lg)' }}>{formatPrice(booking.amount)}</strong>
         </div>
 
@@ -203,6 +206,8 @@ export default function BookingDetailPage() {
           )}
         </div>
       </div>
+
+      {ai && <div style={{ marginTop: 'var(--space-5)' }}><BookingHealth bookingId={booking.id} status={booking.status} /></div>}
 
       {/* -------- modals -------- */}
       <Modal open={modal === 'cancel'} onClose={() => setModal(null)} title="Cancel this booking?">

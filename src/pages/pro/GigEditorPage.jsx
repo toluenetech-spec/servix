@@ -22,6 +22,8 @@ import { getCategories } from '../../lib/api.js';
 import { formatPrice } from '../../lib/format.js';
 import * as proApi from '../../lib/proApi.js';
 import { uploadFile, UPLOAD_LIMITS, formatBytes } from '../../lib/uploadApi.js';
+import { useFeatures } from '../../lib/useFeatures.js';
+import { AiTextDraft } from '../../components/ai/AiDrafting.jsx';
 
 export const GIG_STEPS = ['Overview', 'Pricing', 'Description & FAQ', 'Requirements', 'Gallery', 'Publish'];
 const DELIVERY_OPTIONS = [1, 2, 3, 4, 5, 7, 10, 14, 21, 30, 45, 60, 90];
@@ -77,6 +79,7 @@ function toPayload(g) {
 export default function GigEditorPage() {
   const { id } = useParams();
   const isNew = !id;
+  const { ai: aiOn } = useFeatures();
   useDocumentMeta({ title: isNew ? 'Create a gig' : 'Edit gig', description: 'Describe the service you offer on Servix.' });
   const { user, initializing, authAvailable } = useAuth();
   const navigate = useNavigate();
@@ -330,6 +333,7 @@ export default function GigEditorPage() {
             <Field label="Full description" required error={errors.description} hint={`What you deliver, how you work, what you need from the client. ${gig.description.length}/5000 (minimum 50).`}>
               {(props) => <textarea {...props} className="textarea" rows={10} maxLength={5000} value={gig.description} onChange={(e) => patch({ description: e.target.value })} />}
             </Field>
+            {aiOn && <AiTextDraft kind="gig_description" seed={[gig.title, gig.shortDescription].filter(Boolean).join(' — ')} onUse={(text) => patch({ description: text.slice(0, 5000) })} />}
             <div className="field">
               <span className="field__label">Frequently asked questions</span>
               <ListEditor

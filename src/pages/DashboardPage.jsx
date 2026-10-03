@@ -10,11 +10,13 @@ import { useDocumentMeta } from '../lib/useDocumentMeta.js';
 import { Button } from '../components/ui/Button.jsx';
 import { DashboardSkeleton, ListSkeleton, StatsSkeleton } from '../components/ui/States.jsx';
 import { Modal } from '../components/ui/Modal.jsx';
+import { useFeatures } from '../lib/useFeatures.js';
 import './dashboard.css';
 const applicationLabels = { pending: 'Draft', under_review: 'Under review', approved: 'Approved', rejected: 'Needs attention' };
 export default function DashboardPage() {
   useDocumentMeta({ title: 'Your Dashboard', description: 'Your private Servix account overview.' });
   const { user, initializing, authAvailable } = useAuth();
+  const { ai } = useFeatures();
   const navigate = useNavigate();
   const [overview, setOverview] = useState(null);
   const [bookings, setBookings] = useState(null);
@@ -66,6 +68,7 @@ export default function DashboardPage() {
     <div className="dashboard-grid">
       <Link to={overview.canManageServices ? "/dashboard/work" : "/bookings"} className="dashboard-card"><span className="eyebrow">My bookings</span><h2>Your services, organised.</h2><p>Track requests, review progress and find your booking details.</p><span className="dashboard-arrow">View bookings →</span></Link>
       <Link to={kind === 'professional' ? (overview.plan === 'free' ? '/dashboard/plan' : '/dashboard/gigs') : '/professionals/apply'} className="dashboard-card"><span className="eyebrow">{kind === 'professional' ? (overview.plan === 'free' ? 'Servix Pro' : 'Professional space') : 'Professional space'}</span><h2>{kind === 'professional' ? (overview.plan === 'free' ? 'Upgrade to Servix Pro.' : 'Make room for your next client.') : 'Share what you do best.'}</h2><p>{kind === 'professional' ? (overview.plan === 'free' ? 'More service listings and detailed analytics, billed monthly with no auto-renewal.' : 'Manage services, bookings, earnings and your public profile.') : `Application: ${applicationLabels[overview.applicationStatus] || 'Not started'}. Approval is required before you can offer services.`}</p><span className="dashboard-arrow">{kind === 'professional' ? (overview.plan === 'free' ? 'See plans' : 'Open workspace') : 'View application'} →</span></Link>
+      {ai && <Link to="/dashboard/ai" className="dashboard-card" data-testid="ai-dashboard-card"><span className="eyebrow">Servix AI</span><h2>{overview.canManageServices ? 'Find the work that fits you.' : 'Ask Servix anything.'}</h2><p>{overview.canManageServices ? 'Matching requests, a profile check-up, pricing guidance and an assistant — all grounded in real Servix data.' : 'Describe what you need, get budget guidance from real listings, and understand every step of a booking.'}</p><span className="dashboard-arrow">Open Servix AI →</span></Link>}
       <Link to="/dashboard/verification" className="dashboard-card"><span className="eyebrow">Account security</span><h2>Stay connected. Stay protected.</h2><p>{overview.emailVerified ? 'Email verified.' : 'Email verification needed.'} Manage Google/GitHub connections. Keep your authenticator, passkey and recovery codes private.</p><span className="dashboard-arrow">Manage sign-in →</span></Link>
     </div>
     <section className="dashboard-recent"><div className="dashboard-section-head"><h2>{overview.canManageServices ? "Recent client bookings" : "Recent bookings"}</h2><Link to={overview.canManageServices ? "/dashboard/work" : "/bookings"}>View all →</Link></div>

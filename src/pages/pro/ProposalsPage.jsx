@@ -10,6 +10,7 @@ import { Icon } from '../../components/ui/Icon.jsx';
 import { formatPrice } from '../../lib/format.js';
 import { useResource, PageHead, LoadState, Empty, dateLabel } from '../dashboard/shared.jsx';
 import { RequestCard } from '../requests/RequestsPage.jsx';
+import { ProposalDraftAssist } from '../../components/ai/AiDrafting.jsx';
 import '../../components/marketplace/marketplace.css';
 
 function Disabled() { return <><PageHead title="Requests from customers" description="Not switched on yet." /><section className="ws-panel"><Empty icon="inbox" title="Coming soon" description="Customers will soon be able to post requests you can propose on." to="/dashboard/gigs" label="Manage my gigs" /></section></>; }
@@ -59,7 +60,7 @@ function Browse() {
 const EMPTY = { cover: '', price: '', deliveryDays: '', serviceSlug: '', milestones: '' };
 
 function BrowseDetail() {
-  const { id } = useParams(); const navigate = useNavigate(); const toast = useToast();
+  const { id } = useParams(); const navigate = useNavigate(); const toast = useToast(); const { ai } = useFeatures();
   const r = useResource(() => getBrowseRequest(id), [id]);
   const [form, setForm] = useState(EMPTY); const [editing, setEditing] = useState(false); const [busy, setBusy] = useState(''); const [errors, setErrors] = useState({});
   useDocumentMeta({ title: r.data?.title ?? 'Request', description: 'Customer request details.' });
@@ -116,6 +117,7 @@ function BrowseDetail() {
           {showForm && (
             <section className="ws-panel">
               <h2>{mine?.status === 'submitted' ? 'Edit your proposal' : 'Send a proposal'}</h2>
+              {ai && <div style={{ marginBottom: 16 }}><ProposalDraftAssist requestId={q.id} form={form} onFill={(next) => { setForm(next); setErrors({}); toast('Draft placed in the form — adjust the price and wording before sending.', 'success'); }} /></div>}
               <form className="ws-form" style={{ maxWidth: 'none' }} onSubmit={submit} noValidate>
                 <label>Your approach
                   <textarea rows={6} value={form.cover} onChange={set('cover')} maxLength={5000} placeholder="How would you tackle this? What will the customer receive, and what do you need from them?" aria-invalid={Boolean(errors.cover)} />

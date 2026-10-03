@@ -103,3 +103,13 @@ be assumed production-grade on Dahl's free tier; `AI_BASE_URL` can point elsewhe
   `RUN_LOCAL_AI_TESTS=1 npx vitest run tests/ai-local.test.ts` — flag gating, every department endpoint,
   audience checks, fallback via HTTP + telemetry, invalid JSON → 502, category/date normalisation accepted
   by the real `POST /requests`, over-budget/invented-gig handling, project-health derivation, strangers → 404.
+
+## Frontend (follows the flag)
+
+`src/lib/useFeatures.js` reads `ai` from `GET /api/v1/features`; every AI component returns `null` while it is
+false, so a disabled instance shows no AI UI at all. Client: `src/lib/aiApi.js` (POST only, abortable, 75 s cap);
+pure mappers and error copy in `src/lib/aiHelpers.js`. Surfaces: smart search (`/professionals`), assistant
+launcher (workspace shell) and hub (`/dashboard/ai`), request-brief assist (request editor), proposal draft
+(proposal page), text drafts (gig editor, profile About), booking explain + project health (booking page).
+The browser never submits anything on the AI's behalf: drafts are placed in the ordinary forms and go through
+the usual validated endpoints when the user saves/sends.

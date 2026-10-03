@@ -1,5 +1,5 @@
 /** Customer: create or edit a service request (draft until published). Server validation errors are shown per field. */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { createRequest, getRequest, updateRequest, requestAction } from '../../lib/marketplaceApi.js';
 import { getCategories } from '../../lib/api.js';
@@ -7,6 +7,8 @@ import { useDocumentMeta } from '../../lib/useDocumentMeta.js';
 import { useToast } from '../../components/ui/Toast.jsx';
 import { PageHead } from '../dashboard/shared.jsx';
 import { PageSkeleton } from '../../components/ui/States.jsx';
+import { useFeatures } from '../../lib/useFeatures.js';
+import { RequestBriefAssist } from '../../components/ai/AiDrafting.jsx';
 import '../../components/marketplace/marketplace.css';
 
 const EMPTY = { title: '', categorySlug: '', description: '', budgetType: 'fixed', budgetMin: '', budgetMax: '', deadlineAt: '', isRemote: true, location: '', requiredSkills: '', extraRequirements: '' };
@@ -16,8 +18,8 @@ export default function RequestEditorPage() {
   const { id } = useParams();
   const editing = Boolean(id);
   useDocumentMeta({ title: editing ? 'Edit request' : 'Post a request', description: 'Tell professionals what you need.' });
-  const navigate = useNavigate(); const toast = useToast();
-  const [form, setForm] = useState(EMPTY); const [categories, setCategories] = useState([]);
+  const navigate = useNavigate(); const toast = useToast(); const { ai } = useFeatures();
+  const [form, setForm] = useState(EMPTY); const [categories, setCategories] = useState([]); const formRef = useRef(null);
   const [loading, setLoading] = useState(editing); const [busy, setBusy] = useState(''); const [errors, setErrors] = useState({}); const [status, setStatus] = useState('draft');
 
   useEffect(() => { getCategories().then((c) => setCategories(c.items ?? c)).catch(() => setCategories([])); }, []);
@@ -69,7 +71,8 @@ export default function RequestEditorPage() {
     <PageHead title={editing ? 'Edit request' : 'Post a request'} description="Be specific about the outcome you want — professionals quote more accurately and you get fewer back-and-forth questions. Nothing is charged until you accept a proposal." />
     {locked && <div className="ws-alert">This request is {status} and can no longer be edited. <Link to={`/dashboard/requests/${id}`}>Back to the request</Link>.</div>}
     <section className="ws-panel">
-      <form className="ws-form" style={{ maxWidth: 820 }} onSubmit={(e) => { e.preventDefault(); save(false); }} noValidate>
+      {ai && !locked && <RequestBriefAssist form={form} disabled={Boolean(busy)} onFill={(next) => { setForm(next); setErrors({}); toast('Draft filled in — review every field, then save or publish.', 'success'); setTimeout(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50); }} />}
+      <form ref={formRef} className="ws-form" style={{ maxWidth: 820 }} onSubmit={(e) => { e.preventDefault(); save(false); }} noValidate>
         <div className="req-form-grid">
           <label className="full">Title
             <input value={form.title} onChange={set('title')} maxLength={140} placeholder="e.g. Brand identity for a new bakery" aria-invalid={Boolean(errors.title)} disabled={locked} />

@@ -172,7 +172,8 @@ export class AiRouter {
 
   private finish<T>(task: TaskSpec<T>, content: string | null, toolsUsed: string[]): { value: T; text: string | null; toolsUsed: string[] } {
     if (task.output.kind === 'text') {
-      const text = (content ?? '').trim();
+      // Never leak internal scaffolding if a model echoes the untrusted-data wrapper back.
+      const text = (content ?? '').replace(/<<<(?:END_)?UNTRUSTED_DATA[^>]*>>>/g, '').replace(/\n{3,}/g, '\n\n').trim();
       if (!text) throw new InvalidOutput('empty answer', content);
       return { value: text as unknown as T, text, toolsUsed };
     }

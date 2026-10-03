@@ -10,6 +10,8 @@ import { useFetch } from '../lib/useFetch.js';
 import { useDocumentMeta } from '../lib/useDocumentMeta.js';
 import { getProfessionals } from '../lib/api.js';
 import { categories } from '../data/categories.js';
+import { useFeatures } from '../lib/useFeatures.js';
+import { SmartSearch } from '../components/ai/SmartSearch.jsx';
 
 const PAGE_SIZE = 6;
 
@@ -140,6 +142,7 @@ export default function ProfessionalsPage() {
   });
 
   const [searchParams, setSearchParams] = useSearchParams();
+  const { ai } = useFeatures();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [page, setPage] = useState(1);
 
@@ -169,7 +172,16 @@ export default function ProfessionalsPage() {
   }
 
   const ratingOpt = RATING_OPTIONS.find((r) => r.id === filters.rating) || RATING_OPTIONS[0];
-  const priceOpt = PRICE_OPTIONS.find((p) => p.id === filters.price) || PRICE_OPTIONS[0];
+  // A bare number (e.g. from Servix AI smart search) is an exact custom cap; otherwise one of the presets.
+  const customPrice = !PRICE_OPTIONS.some((p) => p.id === filters.price) && /^\d+$/.test(filters.price) ? Number(filters.price) : null;
+  const priceOpt = customPrice ? { id: filters.price, label: `Up to ₦${customPrice.toLocaleString('en-NG')}`, value: customPrice } : PRICE_OPTIONS.find((p) => p.id === filters.price) || PRICE_OPTIONS[0];
+
+  function applyAiFilters(params) {
+    const next = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) if (v) next.set(k, v);
+    setSearchParams(next, { replace: true });
+    setPage(1);
+  }
   const availOpt =
     AVAILABILITY_OPTIONS.find((a) => a.id === filters.availability) || AVAILABILITY_OPTIONS[0];
 
@@ -215,6 +227,8 @@ export default function ProfessionalsPage() {
             Profiles shown are demonstration content for the pre-launch platform.
           </p>
         </header>
+
+        {ai && <SmartSearch categories={categories} onApply={applyAiFilters} />}
 
         <div className="toolbar" role="search">
           <div className="input-wrap">

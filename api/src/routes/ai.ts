@@ -49,6 +49,14 @@ async function toolContext(req: FastifyRequest): Promise<ToolContext> {
   return { userId: user.id, role: user.role as ToolContext['role'], professionalProfileId: user.professionalProfile?.id ?? null };
 }
 
+/** Attach real request facts (from the DB, never from the model) to match/radar items so the UI can render links. */
+async function withRequests<T extends { requestId: string }>(items: T[]): Promise<Array<T & { request: { id: string; title: string; categoryName: string; budgetMin: number | null; budgetMax: number | null; deadlineAt: string | null; proposalCount: number } | null }>> {
+  const ids = [...new Set(items.map((i) => i.requestId))];
+  const rows = ids.length ? await prisma.serviceRequest.findMany({ where: { id: { in: ids } }, select: { id: true, title: true, budgetMinKobo: true, budgetMaxKobo: true, deadlineAt: true, proposalCount: true, category: { select: { name: true } } } }) : [];
+  const byId = new Map(rows.map((r) => [r.id, { id: r.id, title: r.title, categoryName: r.category.name, budgetMin: r.budgetMinKobo == null ? null : Number(r.budgetMinKobo) / 100, budgetMax: r.budgetMaxKobo == null ? null : Number(r.budgetMaxKobo) / 100, deadlineAt: r.deadlineAt?.toISOString() ?? null, proposalCount: r.proposalCount }]));
+  return items.map((i) => ({ ...i, request: byId.get(i.requestId) ?? null }));
+}
+
 const meta = <T>(r: { model: string; alias: string; fallbackUsed: boolean; attempts: number; durationMs: number; toolsUsed: string[]; usage: { promptTokens: number; completionTokens: number } }, value: T) =>
   ({ ...value, ai: { model: r.alias, fallbackUsed: r.fallbackUsed, durationMs: r.durationMs, toolsUsed: r.toolsUsed } });
 
@@ -73,14 +81,14 @@ export async function aiRoutes(app: FastifyInstance) {
     const task = await jobMatchingTask(await toolContext(req));
     if ('shortCircuit' in task) return { ...task.shortCircuit, ai: null };
     const r = await getAi().router.run(task);
-    return meta(r, r.value);
+    return meta(r, { ...r.value, matches: await withRequests(r.value.matches) });
   });
 
   app.post('/ai/opportunities/radar', { ...pro, schema: { tags: ['ai'], summary: 'Opportunity Radar — what is new this week', body: DOC.empty } }, async (req) => {
     const task = await opportunityRadarTask(await toolContext(req));
     if ('shortCircuit' in task) return { ...task.shortCircuit, ai: null };
     const r = await getAi().router.run(task);
-    return meta(r, r.value);
+    return meta(r, { ...r.value, highlights: await withRequests(r.value.highlights) });
   });
 
   app.post('/ai/profile/analysis', { ...pro, schema: { tags: ['ai'], summary: 'Analyse the signed-in professional’s profile', body: DOC.empty } }, async (req) => {

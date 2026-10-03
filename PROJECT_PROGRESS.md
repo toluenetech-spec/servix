@@ -386,8 +386,21 @@ Provider-agnostic AI layer in `api/src/ai/` with eleven departments routed by co
 (DeepSeek V4 Flash primary · MiniMax M2.7 drafting · GLM 5.3 Flash fallback), controlled fallback,
 strict/normalised structured output, read-only tools, payment isolation, internal telemetry.
 Endpoints under `/api/v1/ai/*` answer 503 `FEATURE_DISABLED` until `AI_ENABLED=true` + `AI_API_KEY`
-are set on the API host. No frontend UI yet. Details: `api/docs/AI_ROUTING.md`; model evaluation:
+are set on the API host. Details: `api/docs/AI_ROUTING.md`; model evaluation:
 `docs/ai-eval/DAHL_EVALUATION_REPORT.md`.
+
+**Live since 2026-10-03** on Railway (`ai: true` in `/features`; first production call to DeepSeek via Dahl
+returned validated search filters in ~26 s — free-tier queueing; paid tier needed before customer use).
+
+### 11j. Servix AI user interface (2026-10-03)
+
+Frontend surfaces that follow the `ai` flag (nothing renders when it is off): smart search on
+`/professionals`, assistant launcher + `/dashboard/ai` hub (role-aware tabs), request-brief → form,
+proposal draft → form, gig/profile text drafts, booking “what does this mean?” and project-health panel,
+dashboard card and sidebar link. Every AI result is a suggestion the user explicitly inserts or reads;
+the UI never submits anything on the AI’s behalf. Error copy is plain-language and provider-free.
+Verified: root tests 20/20, Playwright 92/92 (6 new), API `tsc`/35 AI tests green, visual check on the
+real local stack (desktop + 390 px mobile) with a scripted provider.
 
 Verified in the sandbox: `tsc` clean, API build, 35 new tests green, existing local suites
 (36) green, root tests 14/14, Vite production build, and an HTTP smoke against the real local

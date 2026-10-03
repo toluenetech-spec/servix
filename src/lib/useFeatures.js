@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { getFeatures, marketplaceAvailable } from './marketplaceApi.js';
 
-const OFF = Object.freeze({ requests: false, compare: false, achievements: false, trust: false, projects: false, crm: false, packages: false, business: false, pricing: false, community: false });
+const OFF = Object.freeze({ requests: false, compare: false, achievements: false, trust: false, projects: false, crm: false, packages: false, business: false, pricing: false, community: false, ai: false });
 let cache = null; let inflight = null;
 export function loadFeatures() {
   if (cache) return Promise.resolve(cache);

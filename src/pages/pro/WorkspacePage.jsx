@@ -24,6 +24,8 @@ import { ChipPicker, SelectWithOther } from '../../components/onboarding/OptionP
 import { LANGUAGES, LANGUAGE_LEVELS, optionsFor } from '../../data/professionCatalog.js';
 import '../../components/onboarding/onboarding.css';
 import { Link as RouterLink } from 'react-router-dom';
+import { useFeatures } from '../../lib/useFeatures.js';
+import { AiTextDraft } from '../../components/ai/AiDrafting.jsx';
 
 const TABS = [
   { id: 'bookings', label: 'Bookings' },
@@ -319,7 +321,7 @@ function ServicesTab({ categories }) {
 /* ---------------- profile tab ---------------- */
 
 function ProfileTab({ categories, profile, onProfileChange }) {
-  const showToast = useToast();
+  const showToast = useToast(); const { ai: aiOn } = useFeatures();
   const [values, setValues] = useState({
     title: profile.title ?? '',
     about: profile.about ?? '',
@@ -469,6 +471,7 @@ function ProfileTab({ categories, profile, onProfileChange }) {
             />
           )}
         </Field>
+        {aiOn && <AiTextDraft kind="profile_about" seed={values.title} onUse={(text) => setValues((v) => ({ ...v, about: text }))} />}
 
         <Field label="Skills" error={errors.skills} hint="Tap the skills you offer (up to 15). Use “Other” for anything not listed.">
           {(props) => (

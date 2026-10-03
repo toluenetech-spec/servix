@@ -2,6 +2,31 @@
 
 All notable changes to the Servix public website.
 
+## 0.8.1 — 2026-10-03 (Servix AI user interface — follows the `ai` flag)
+
+### Added
+- Frontend AI surfaces, all hidden unless `GET /api/v1/features` reports `ai: true`:
+  - **Smart search** on `/professionals` (no account needed): a sentence becomes validated directory filters
+    (real category slugs, naira cap, availability window) applied to the URL; chips show what was understood.
+  - **Assistant** launcher on every workspace page + `/dashboard/ai` hub (tabs: Assistant, Opportunities,
+    Profile coach, Pricing/Budget guide — professional tabs only for approved professionals).
+  - **Request editor**: “Describe it in your own words” → structured draft → fills the form (nothing posted).
+  - **Proposal page**: “Draft with Servix AI” → price/days/cover/milestones placed in the form (nothing sent).
+  - **Gig editor** and **Profile → About**: “Draft with Servix AI” text drafts inserted only on “Use this text”.
+  - **Booking page**: “What does this mean?” next to the status and a “Where does this project stand?” panel
+    (status badge computed by the backend; only wording is AI-written).
+  - Dashboard card and sidebar link “Servix AI”.
+- `src/lib/aiApi.js` (abortable client, 75 s client cap), `src/lib/aiHelpers.js` (pure mappers + plain-language
+  error copy that never exposes provider details), `src/components/ai/*`, `src/pages/dashboard/AiPage.jsx`.
+- API: `/ai/opportunities/match` and `/ai/opportunities/radar` now attach real request facts (`request.title`,
+  category, budget, deadline, proposal count — read from the database) to each item so the UI can link to them.
+  Text answers strip any echoed internal “untrusted data” markers.
+
+### Tests
+- `tests/aiHelpers.test.js` (6 node tests) and `tests/browser/ai.spec.js` (6 Playwright journeys with a mocked
+  API: flag-off hides everything, smart search → filters, brief → form, assistant + booking health/explain,
+  professional hub + proposal draft, provider outage copy). Full browser suite 92/92.
+
 ## 0.8.0 — 2026-10-03 (Servix AI model routing layer — flag-gated, OFF)
 
 ### Added

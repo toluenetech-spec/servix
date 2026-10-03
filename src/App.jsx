@@ -50,6 +50,7 @@ const RequestsPage = lazy(() => import('./pages/requests/RequestsPage.jsx'));
 const RequestEditorPage = lazy(() => import('./pages/requests/RequestEditorPage.jsx'));
 const RequestDetailPage = lazy(() => import('./pages/requests/RequestDetailPage.jsx'));
 const ProposalsPage = lazy(() => import('./pages/pro/ProposalsPage.jsx'));
+const AiPage = lazy(() => import('./pages/dashboard/AiPage.jsx'));
 
 function RouteFallback() {
   // Shown only while a page's code is downloading; each page then renders its own skeleton.
@@ -105,6 +106,7 @@ export default function App() {
             <Route path="/dashboard/proposals" element={<ProposalsPage section="browse" />} />
             <Route path="/dashboard/proposals/mine" element={<ProposalsPage section="mine" />} />
             <Route path="/dashboard/proposals/requests/:id" element={<ProposalsPage section="detail" />} />
+            <Route path="/dashboard/ai" element={<AiPage />} />
             <Route path="/dashboard/plan" element={<PlanPage />} />
             <Route path="/dashboard/analytics" element={<AnalyticsPage />} />
             <Route path="/dashboard/availability" element={<AvailabilityPage />} />
