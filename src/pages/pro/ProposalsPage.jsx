@@ -11,6 +11,10 @@ import { formatPrice } from '../../lib/format.js';
 import { useResource, PageHead, LoadState, Empty, dateLabel } from '../dashboard/shared.jsx';
 import { RequestCard } from '../requests/RequestsPage.jsx';
 import { ProposalDraftAssist } from '../../components/ai/AiDrafting.jsx';
+import { useEntitlements } from '../../lib/useEntitlements.js';
+import { organizeProposal } from '../../lib/marketplaceApi.js';
+import { getSavedSearches, saveSearch, deleteSavedSearch } from '../../lib/workspaceApi.js';
+import { UpgradeNotice, PlanTag, LimitChip } from '../../components/plans/PlanBits.jsx';
 import '../../components/marketplace/marketplace.css';
 
 function Disabled() { return <><PageHead title="Requests from customers" description="Not switched on yet." /><section className="ws-panel"><Empty icon="inbox" title="Coming soon" description="Customers will soon be able to post requests you can propose on." to="/dashboard/gigs" label="Manage my gigs" /></section></>; }
@@ -27,14 +31,21 @@ function Tabs({ active }) {
   return <div className="ws-tabs" role="tablist"><Link role="tab" aria-selected={active === 'browse'} className="btn" style={{ padding: '9px 16px', fontSize: 12, background: active === 'browse' ? '#12372a' : '#fff', color: active === 'browse' ? '#fff' : '#78846e' }} to="/dashboard/proposals">Open requests</Link><Link role="tab" aria-selected={active === 'mine'} className="btn" style={{ padding: '9px 16px', fontSize: 12, background: active === 'mine' ? '#12372a' : '#fff', color: active === 'mine' ? '#fff' : '#78846e' }} to="/dashboard/proposals/mine">My proposals</Link></div>;
 }
 
+const ADVANCED_KEYS = ['remote', 'sort', 'skills', 'location', 'deadlineBefore'];
+
 function Browse() {
   useDocumentMeta({ title: 'Open requests', description: 'Customer requests you can propose on.' });
   const [params, setParams] = useSearchParams();
-  const filters = { category: params.get('category') || '', remote: params.get('remote') || 'any', sort: params.get('sort') || 'newest', q: params.get('q') || '', minBudget: params.get('minBudget') || '', maxBudget: params.get('maxBudget') || '', page: Number(params.get('page') || 1) };
+  const ent = useEntitlements();
+  const advanced = ent.can('advanced_filters');
+  const filters = { category: params.get('category') || '', remote: params.get('remote') || 'any', sort: params.get('sort') || 'newest', q: params.get('q') || '', minBudget: params.get('minBudget') || '', maxBudget: params.get('maxBudget') || '', skills: params.get('skills') || '', location: params.get('location') || '', page: Number(params.get('page') || 1) };
   const [categories, setCategories] = useState([]);
   useEffect(() => { getCategories().then((c) => setCategories(c.items ?? c)).catch(() => {}); }, []);
   const r = useResource(() => browseRequests({ ...filters, pageSize: 12 }), [params.toString()]);
   const setF = (k, v) => { const n = new URLSearchParams(params); if (v) n.set(k, v); else n.delete(k); if (k !== 'page') n.delete('page'); setParams(n, { replace: true }); };
+  const usesAdvanced = filters.remote !== 'any' || filters.sort !== 'newest' || filters.skills || filters.location;
+  const lockedStyle = advanced ? undefined : { opacity: 0.55 };
+  const lock = (k) => (e) => { if (!advanced) { e.preventDefault(); return; } setF(k, e.target.value); };
   return <>
     <PageHead title="Requests from customers" description="Customers describe what they need and a budget; you reply with a price, timeline and approach. One live proposal per request." />
     <Tabs active="browse" />
@@ -42,19 +53,44 @@ function Browse() {
       <div className="req-form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))' }}>
         <label className="ws-form" style={{ display: 'grid', gap: 6, fontSize: 12, fontWeight: 600 }}>Search<input value={filters.q} onChange={(e) => setF('q', e.target.value)} placeholder="Keyword" /></label>
         <label className="ws-form" style={{ display: 'grid', gap: 6, fontSize: 12, fontWeight: 600 }}>Category<select value={filters.category} onChange={(e) => setF('category', e.target.value)}><option value="">All</option>{categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
-        <label className="ws-form" style={{ display: 'grid', gap: 6, fontSize: 12, fontWeight: 600 }}>Work<select value={filters.remote} onChange={(e) => setF('remote', e.target.value)}><option value="any">Remote or on-site</option><option value="remote">Remote only</option><option value="onsite">On-site only</option></select></label>
         <label className="ws-form" style={{ display: 'grid', gap: 6, fontSize: 12, fontWeight: 600 }}>Min budget (₦)<input type="number" inputMode="numeric" value={filters.minBudget} onChange={(e) => setF('minBudget', e.target.value)} /></label>
-        <label className="ws-form" style={{ display: 'grid', gap: 6, fontSize: 12, fontWeight: 600 }}>Sort<select value={filters.sort} onChange={(e) => setF('sort', e.target.value)}><option value="newest">Newest</option><option value="deadline">Deadline soonest</option><option value="budget-high">Budget high → low</option><option value="budget-low">Budget low → high</option></select></label>
+        <label className="ws-form" style={{ display: 'grid', gap: 6, fontSize: 12, fontWeight: 600, ...lockedStyle }}><span>Work{!advanced && <PlanTag plan="go" />}</span><select value={filters.remote} onChange={lock('remote')} aria-disabled={!advanced} data-testid="filter-remote"><option value="any">Remote or on-site</option><option value="remote">Remote only</option><option value="onsite">On-site only</option></select></label>
+        <label className="ws-form" style={{ display: 'grid', gap: 6, fontSize: 12, fontWeight: 600, ...lockedStyle }}><span>Skills{!advanced && <PlanTag plan="go" />}</span><input value={filters.skills} onChange={lock('skills')} readOnly={!advanced} placeholder="e.g. figma, branding" /></label>
+        <label className="ws-form" style={{ display: 'grid', gap: 6, fontSize: 12, fontWeight: 600, ...lockedStyle }}><span>Location{!advanced && <PlanTag plan="go" />}</span><input value={filters.location} onChange={lock('location')} readOnly={!advanced} placeholder="City" /></label>
+        <label className="ws-form" style={{ display: 'grid', gap: 6, fontSize: 12, fontWeight: 600, ...lockedStyle }}><span>Sort{!advanced && <PlanTag plan="go" />}</span><select value={filters.sort} onChange={lock('sort')} aria-disabled={!advanced} data-testid="filter-sort"><option value="newest">Newest</option><option value="deadline">Deadline soonest</option><option value="budget-high">Budget high → low</option><option value="budget-low">Budget low → high</option></select></label>
       </div>
+      {!advanced && ent.ready && <div style={{ marginTop: 14 }}><UpgradeNotice title="Advanced filters are included from the Go plan" body="Filter by remote/on-site, skills and location, and sort by deadline or budget. Keyword, category and budget filters are always free." upgradeTo="go" compact /></div>}
+      <SavedSearches params={params} setParams={setParams} canSave={advanced} ent={ent} />
     </section>
-    <LoadState skeleton="cards" label="Loading open requests…" resource={r}>{(data) => (
-      !data.items.length ? <section className="ws-panel"><Empty icon="inbox" title="No open requests match" description="Try widening the filters, or check back later — new requests appear here as soon as customers publish them." /></section>
+    {r.error?.meta ? <UpgradeNotice error={r.error} onDismiss={() => { const n = new URLSearchParams(params); ADVANCED_KEYS.forEach((k) => n.delete(k)); setParams(n, { replace: true }); }} /> : null}
+    <LoadState skeleton="cards" label="Loading open requests…" resource={r.error?.meta ? { ...r, error: null, data: { items: [], total: 0, pageSize: 12, page: 1 } } : r}>{(data) => (
+      !data.items.length ? <section className="ws-panel"><Empty icon="inbox" title={usesAdvanced && !advanced ? 'Those filters need the Go plan' : 'No open requests match'} description={usesAdvanced && !advanced ? 'Remove the advanced filters to see open requests on your current plan.' : 'Try widening the filters, or check back later — new requests appear here as soon as customers publish them.'} /></section>
         : <>
           <div className="req-grid">{data.items.map((item) => <RequestCard key={item.id} r={item} to={`/dashboard/proposals/requests/${item.id}`} extra={<div className="ws-actions" style={{ alignItems: 'center' }}>{item.myProposal ? <span className="ws-chip">You proposed</span> : <Link className="btn btn--primary" to={`/dashboard/proposals/requests/${item.id}`}>View &amp; propose</Link>}<small className="ws-muted" style={{ marginLeft: 'auto' }}>Posted {dateLabel(item.publishedAt || item.createdAt)} · {item.customer?.displayName}</small></div>} />)}</div>
           {data.total > data.pageSize && <div className="ws-actions" style={{ marginTop: 20, justifyContent: 'center' }}><button className="btn btn--secondary" disabled={filters.page <= 1} onClick={() => setF('page', String(filters.page - 1))}>Previous</button><span className="ws-muted">Page {data.page} of {Math.ceil(data.total / data.pageSize)}</span><button className="btn btn--secondary" disabled={data.page * data.pageSize >= data.total} onClick={() => setF('page', String(filters.page + 1))}>Next</button></div>}
         </>
     )}</LoadState>
   </>;
+}
+
+/** Saved searches for the open-requests browser (every plan has a small allowance; the API enforces it). */
+function SavedSearches({ params, setParams, ent }) {
+  const toast = useToast();
+  const r = useResource(getSavedSearches);
+  const [name, setName] = useState(''); const [busy, setBusy] = useState(false); const [planError, setPlanError] = useState(null);
+  const current = Object.fromEntries([...params.entries()].filter(([k]) => k !== 'page'));
+  const items = r.data?.items ?? [];
+  async function save(e) {
+    e.preventDefault(); setBusy(true); setPlanError(null);
+    try { await saveSearch('requests', name.trim(), current); setName(''); toast('Search saved.', 'success'); r.reload(); } catch (err) { if (err.meta) setPlanError(err); else toast(err.message, 'error'); } finally { setBusy(false); }
+  }
+  async function remove(id) { try { await deleteSavedSearch(id); r.reload(); } catch (err) { toast(err.message, 'error'); } }
+  return <div style={{ marginTop: 16, borderTop: '1px solid #edf0e8', paddingTop: 14 }} data-testid="saved-searches">
+    <div className="ws-actions" style={{ alignItems: 'center', justifyContent: 'space-between' }}><strong style={{ fontSize: 12 }}>Saved searches <LimitChip used={items.length} allowed={ent.limit('saved_searches')} unit="saved" /></strong>
+      <form onSubmit={save} className="ws-actions"><input aria-label="Name this search" value={name} onChange={(e) => setName(e.target.value)} placeholder="Name this search" maxLength={80} style={{ border: '1px solid #d7dfd0', borderRadius: 6, padding: '7px 9px', fontSize: 12 }} /><button className="btn btn--secondary" type="submit" disabled={busy || !name.trim() || Object.keys(current).length === 0} style={{ fontSize: 12, padding: '7px 12px' }}>{busy ? 'Saving…' : 'Save current filters'}</button></form></div>
+    {planError && <div style={{ marginTop: 10 }}><UpgradeNotice error={planError} compact onDismiss={() => setPlanError(null)} /></div>}
+    {items.length > 0 && <div className="ws-actions" style={{ marginTop: 10 }}>{items.map((s) => <span key={s.id} className="ws-chip gray" style={{ gap: 6, textTransform: 'none' }}><button type="button" className="ai-link" style={{ fontSize: 11, textDecoration: 'none' }} onClick={() => setParams(new URLSearchParams(Object.entries(s.params).map(([k, v]) => [k, String(v)])), { replace: true })}>{s.name}</button><button type="button" aria-label={`Delete saved search ${s.name}`} onClick={() => remove(s.id)} style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', color: '#8a9585' }}>×</button></span>)}</div>}
+  </div>;
 }
 
 const EMPTY = { cover: '', price: '', deliveryDays: '', serviceSlug: '', milestones: '' };
@@ -146,14 +182,37 @@ function BrowseDetail() {
 
 function MyProposals() {
   useDocumentMeta({ title: 'My proposals', description: 'Proposals you sent on Servix requests.' });
-  const r = useResource(listMyProposals);
+  const toast = useToast(); const ent = useEntitlements();
+  const [params, setParams] = useSearchParams();
+  const pipeline = { status: params.get('status') || '', label: params.get('label') || '', sort: params.get('sort') || 'updated' };
+  const r = useResource(() => listMyProposals(pipeline), [params.toString()]);
+  const [editing, setEditing] = useState(null); const [draft, setDraft] = useState({ label: '', privateNote: '' }); const [busy, setBusy] = useState(false); const [planError, setPlanError] = useState(null);
+  const setF = (k, v) => { const n = new URLSearchParams(params); if (v && v !== 'updated') n.set(k, v); else n.delete(k); setParams(n, { replace: true }); };
+  const organization = r.data?.access?.organization ?? ent.can('proposal_organization'); const hasPipeline = r.data?.access?.pipeline ?? ent.can('proposal_pipeline');
+  async function saveOrganize(p) {
+    setBusy(true); setPlanError(null);
+    try { const updated = await organizeProposal(p.id, { label: draft.label.trim() || null, privateNote: draft.privateNote.trim() || null }); r.setData((d) => ({ ...d, items: d.items.map((x) => (x.id === p.id ? { ...x, label: updated.label, privateNote: updated.privateNote } : x)) })); setEditing(null); toast('Saved.', 'success'); } catch (err) { if (err.meta) setPlanError(err); else toast(err.message, 'error'); } finally { setBusy(false); }
+  }
   return <>
     <PageHead title="My proposals" description="Every proposal you sent, with its outcome. Accepted proposals become bookings in Client bookings once the customer pays." />
     <Tabs active="mine" />
+    <section className="ws-panel" data-testid="proposal-pipeline">
+      <div className="req-form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', opacity: hasPipeline ? 1 : 0.55 }}>
+        <label className="ws-form" style={{ display: 'grid', gap: 6, fontSize: 12, fontWeight: 600 }}><span>Status{!hasPipeline && <PlanTag plan="pro" />}</span><select value={pipeline.status} aria-disabled={!hasPipeline} onChange={(e) => hasPipeline && setF('status', e.target.value)}><option value="">All</option>{Object.entries(PROPOSAL_STATUS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
+        <label className="ws-form" style={{ display: 'grid', gap: 6, fontSize: 12, fontWeight: 600 }}><span>Label{!hasPipeline && <PlanTag plan="pro" />}</span><select value={pipeline.label} aria-disabled={!hasPipeline} onChange={(e) => hasPipeline && setF('label', e.target.value)}><option value="">All</option>{(r.data?.labels ?? []).map((l) => <option key={l} value={l}>{l}</option>)}</select></label>
+        <label className="ws-form" style={{ display: 'grid', gap: 6, fontSize: 12, fontWeight: 600 }}><span>Sort{!hasPipeline && <PlanTag plan="pro" />}</span><select value={pipeline.sort} aria-disabled={!hasPipeline} onChange={(e) => hasPipeline && setF('sort', e.target.value)}><option value="updated">Recently updated</option><option value="newest">Newest</option><option value="price-high">Price high → low</option><option value="price-low">Price low → high</option></select></label>
+      </div>
+      {ent.ready && !organization && <div style={{ marginTop: 14 }}><UpgradeNotice title="Organise your proposals" body="Add labels and private notes to proposals from the Go plan; filter and sort the whole pipeline on Pro." upgradeTo="go" compact /></div>}
+      {ent.ready && organization && !hasPipeline && <div style={{ marginTop: 14 }}><UpgradeNotice title="Pipeline view is part of the Pro plan" body="Filter by status or label and sort by price or date. Labels and notes already work on your plan." upgradeTo="pro" compact /></div>}
+      {planError && <div style={{ marginTop: 14 }}><UpgradeNotice error={planError} compact onDismiss={() => setPlanError(null)} /></div>}
+    </section>
     <LoadState skeleton="cards" label="Loading proposals…" resource={r}>{(data) => (
       !data.items.length ? <section className="ws-panel"><Empty icon="inbox" title="No proposals yet" description="Browse open requests and send your first proposal." to="/dashboard/proposals" label="See open requests" /></section>
-        : <section className="ws-panel"><div className="ws-record-table"><table><thead><tr><th>REQUEST</th><th>YOUR PRICE</th><th>DELIVERY</th><th>STATUS</th><th>SENT</th></tr></thead><tbody>
-          {data.items.map((p) => <tr key={p.id}><td><Link to={`/dashboard/proposals/requests/${p.request.id}`}>{p.request.title}</Link><small>{p.request.category?.name} · request {REQUEST_STATUS[p.request.status]?.label}</small></td><td>{formatPrice(p.price)}</td><td>{p.deliveryDays} d</td><td><span className={`ws-chip ${p.status === 'accepted' ? '' : 'gray'}`}>{PROPOSAL_STATUS[p.status]}</span>{p.booking && <small><Link to={`/bookings/${p.booking.id}`}>{p.booking.reference}</Link></small>}</td><td>{dateLabel(p.createdAt)}</td></tr>)}
+        : <section className="ws-panel"><div className="ws-record-table"><table><thead><tr><th>REQUEST</th><th>YOUR PRICE</th><th>DELIVERY</th><th>STATUS</th><th>SENT</th>{organization && <th>LABEL & NOTES</th>}</tr></thead><tbody>
+          {data.items.map((p) => <tr key={p.id}><td><Link to={`/dashboard/proposals/requests/${p.request.id}`}>{p.request.title}</Link><small>{p.request.category?.name} · request {REQUEST_STATUS[p.request.status]?.label}</small></td><td>{formatPrice(p.price)}</td><td>{p.deliveryDays} d</td><td><span className={`ws-chip ${p.status === 'accepted' ? '' : 'gray'}`}>{PROPOSAL_STATUS[p.status]}</span>{p.booking && <small><Link to={`/bookings/${p.booking.id}`}>{p.booking.reference}</Link></small>}</td><td>{dateLabel(p.createdAt)}</td>
+            {organization && <td>{editing === p.id ? <form onSubmit={(e) => { e.preventDefault(); saveOrganize(p); }} style={{ display: 'grid', gap: 6, minWidth: 180 }}><input aria-label="Label" value={draft.label} maxLength={40} placeholder="Label (e.g. Follow up)" onChange={(e) => setDraft((d) => ({ ...d, label: e.target.value }))} style={{ border: '1px solid #d7dfd0', borderRadius: 6, padding: '6px 8px', fontSize: 12 }} /><textarea aria-label="Private note" rows={2} value={draft.privateNote} maxLength={2000} placeholder="Private note (only you see this)" onChange={(e) => setDraft((d) => ({ ...d, privateNote: e.target.value }))} style={{ border: '1px solid #d7dfd0', borderRadius: 6, padding: '6px 8px', fontSize: 12 }} /><div className="ws-actions"><button className="btn btn--primary" type="submit" disabled={busy} style={{ fontSize: 11, padding: '6px 10px' }}>Save</button><button className="btn btn--ghost" type="button" onClick={() => setEditing(null)} style={{ fontSize: 11, padding: '6px 10px' }}>Cancel</button></div></form>
+              : <>{p.label ? <span className="ws-chip" style={{ textTransform: 'none' }}>{p.label}</span> : <span className="ws-muted" style={{ fontSize: 11 }}>No label</span>}{p.privateNote && <small style={{ whiteSpace: 'pre-wrap' }}>{p.privateNote}</small>}<small><button type="button" className="ai-link" style={{ fontSize: 11 }} onClick={() => { setEditing(p.id); setDraft({ label: p.label ?? '', privateNote: p.privateNote ?? '' }); }}>Edit</button></small></>}</td>}
+          </tr>)}
         </tbody></table></div></section>
     )}</LoadState>
   </>;

@@ -28,7 +28,7 @@ export const faqs = {
     },
     {
       q: 'How much does it cost to join?',
-      a: 'You can start with a free profile. Paid plans add more listings, visibility and business tools. All pricing shown is introductory and subject to change before launch.',
+      a: 'You can start with a free profile. Go (₦5,000), Pro (₦15,000) and Team (₦35,000) add more listings and proposals, advanced filters, deeper analytics, team workspaces and a bigger monthly Servix AI allowance. Enterprise is arranged with Servix.',
     },
     {
       q: 'How do I get verified?',

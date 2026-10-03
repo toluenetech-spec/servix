@@ -63,7 +63,13 @@ export interface RunOptions {
   onDelta?: (text: string) => void;
   /** Cancels everything (e.g. the client disconnected). */
   signal?: AbortSignal;
+  /** Per-call hedge delay override (ms). Lower = earlier parallel fallback (priority plans). 0 disables hedging. */
+  hedgeAfterMs?: number;
 }
+
+/** Attached to the ApiError thrown by `run()` so metering can record failed tasks (tokens spent, attempts). */
+export interface AiRunFailure { usage: ChatUsage; attempts: number; fallbackUsed: boolean; durationMs: number; errorCode: string }
+export const aiFailureOf = (e: unknown): AiRunFailure | null => (e && typeof e === 'object' && 'aiFailure' in e ? (e as { aiFailure: AiRunFailure }).aiFailure : null);
 
 type ModelOutcome<T> = { ok: true; value: { value: T; text: string | null; toolsUsed: string[] }; usage: ChatUsage; attempts: number } | { ok: false; error: { code: string; message: string }; attempts: number; usage: ChatUsage };
 
@@ -104,16 +110,20 @@ export class AiRouter {
     };
     const fail = (): never => {
       this.telemetry.recordTask({ department: task.department, ok: false, durationMs: Date.now() - startedAt, modelUsed: null, aliasUsed: null, fallbackUsed: chain.length > 1, attempts: totalAttempts, errorCode: lastError?.code });
-      if (opts.signal?.aborted) throw new ApiError(499, 'AI_CANCELLED', 'Request cancelled.');
-      if (lastError?.code === 'invalid_output') throw new ApiError(502, 'AI_INVALID_OUTPUT', 'Servix AI returned an answer we could not verify. Nothing was saved — please try again.');
-      if (lastError?.code === 'deadline' || lastError?.code === 'timeout') throw new ApiError(504, 'AI_TIMEOUT', 'Servix AI took too long to answer. Please try again.');
-      throw new ApiError(503, 'AI_UNAVAILABLE', 'Servix AI is busy right now. Please try again in a moment.');
+      const err = opts.signal?.aborted ? new ApiError(499, 'AI_CANCELLED', 'Request cancelled.')
+        : lastError?.code === 'invalid_output' ? new ApiError(502, 'AI_INVALID_OUTPUT', 'Servix AI returned an answer we could not verify. Nothing was saved — please try again.')
+        : lastError?.code === 'deadline' || lastError?.code === 'timeout' ? new ApiError(504, 'AI_TIMEOUT', 'Servix AI took too long to answer. Please try again.')
+        : new ApiError(503, 'AI_UNAVAILABLE', 'Servix AI is busy right now. Please try again in a moment.');
+      const failure: AiRunFailure = { usage: { ...usage }, attempts: totalAttempts, fallbackUsed: next > 1, durationMs: Date.now() - startedAt, errorCode: opts.signal?.aborted ? 'cancelled' : (lastError?.code ?? 'unavailable') };
+      (err as ApiError & { aiFailure: AiRunFailure }).aiFailure = failure;
+      throw err;
     };
 
     start(next++);
     for (;;) {
-      const canHedge: boolean = this.cfg.hedgeAfterMs > 0 && (claimedBy as number | null) === null && next < chain.length && !opts.signal?.aborted;
-      const hedgeIn = canHedge ? Math.max(0, this.cfg.hedgeAfterMs - (Date.now() - lastStart)) : Infinity;
+      const hedgeAfterMs: number = opts.hedgeAfterMs ?? this.cfg.hedgeAfterMs;
+      const canHedge: boolean = hedgeAfterMs > 0 && (claimedBy as number | null) === null && next < chain.length && !opts.signal?.aborted;
+      const hedgeIn = canHedge ? Math.max(0, hedgeAfterMs - (Date.now() - lastStart)) : Infinity;
       let timer: NodeJS.Timeout | undefined;
       const hedge: Promise<'hedge'> | null = canHedge ? new Promise<'hedge'>((r) => { timer = setTimeout(() => r('hedge'), hedgeIn); }) : null;
       const settled: 'hedge' | { i: number; out: ModelOutcome<T> } = await Promise.race([...running.values(), ...(hedge ? [hedge] : [])]);

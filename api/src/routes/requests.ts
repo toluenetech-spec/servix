@@ -24,6 +24,8 @@ import { bookingRef } from '../lib/bookingService.js';
 import { platformFeeKobo } from '../lib/refundPolicy.js';
 import { mediaUrl } from '../lib/storage.js';
 import { assertOwnMediaUrl } from './uploads.js';
+import { entitlementsFor, assertWithinLimit, assertFeature, canAccess } from '../lib/entitlements/index.js';
+import { periodStart } from '../lib/entitlements/usage.js';
 
 const CUSTOM_WORK_SLUG_PREFIX = 'custom-work-';
 
@@ -182,6 +184,13 @@ export async function requestRoutes(app: FastifyInstance) {
 
   app.post('/requests', { ...customer, config: createLimit, schema: { tags: ['requests'], summary: 'Create a request (draft)', security: [{ bearerAuth: [] }] } }, async (req, reply) => {
     const body = parseBody(requestBody, req.body);
+    const ent = await entitlementsFor(req);
+    const [monthCount, activeCount] = await Promise.all([
+      prisma.serviceRequest.count({ where: { customerId: req.auth!.sub, createdAt: { gte: periodStart() } } }),
+      prisma.serviceRequest.count({ where: { customerId: req.auth!.sub, status: { in: ['draft', 'open', 'paused'] } } }),
+    ]);
+    assertWithinLimit(ent, 'monthly_requests', monthCount, 1);
+    assertWithinLimit(ent, 'active_requests', activeCount, 1);
     const row = await prisma.serviceRequest.create({ data: await toRequestData(body, req.auth!.sub), include: requestInclude });
     return reply.code(201).send({ ...serializeRequest(row, 'owner'), publishProblems: publishProblems(row) });
   });
@@ -292,6 +301,11 @@ export async function requestRoutes(app: FastifyInstance) {
 
   app.get('/requests/browse', { ...professional, schema: { tags: ['requests'], summary: 'Open requests for professionals (filters + sorts)', security: [{ bearerAuth: [] }] } }, async (req) => {
     const q = browseQuery.parse(req.query ?? {});
+    // Advanced filters (skills, deadline, location, remote, non-default sorting) are a Go+ capability; basic
+    // category / budget / keyword filtering is available to everyone.
+    const usesAdvanced = Boolean(q.deadlineBefore || q.location || q.remote !== 'any' || (q.skills && q.skills.length) || (q.sort && q.sort !== 'newest'));
+    const ent = await entitlementsFor(req);
+    if (usesAdvanced) assertFeature(ent, 'advanced_filters');
     const where: Prisma.ServiceRequestWhereInput = { status: 'open', customerId: { not: req.auth!.sub } };
     if (q.category) where.category = { slug: q.category };
     if (q.minBudget != null) where.OR = [{ budgetMaxKobo: { gte: kobo(q.minBudget)! } }, { budgetMaxKobo: null, budgetMinKobo: { gte: kobo(q.minBudget)! } }];
@@ -328,6 +342,13 @@ export async function requestRoutes(app: FastifyInstance) {
     const service = body.serviceSlug ? await prisma.service.findFirst({ where: { slug: body.serviceSlug, professionalId: req.professionalProfileId!, status: 'active' }, select: { id: true } }) : null;
     if (body.serviceSlug && !service) throw new ApiError(422, 'VALIDATION_ERROR', 'Please check the highlighted fields.', { serviceSlug: 'Choose one of your active gigs.' });
     for (const a of body.attachments) assertOwnMediaUrl(a.url, 'attachments');
+    const ent = await entitlementsFor(req);
+    const [monthCount, activeCount] = await Promise.all([
+      prisma.proposal.count({ where: { professionalId: req.professionalProfileId!, createdAt: { gte: periodStart() } } }),
+      prisma.proposal.count({ where: { professionalId: req.professionalProfileId!, status: 'submitted' } }),
+    ]);
+    assertWithinLimit(ent, 'monthly_proposals', monthCount, 1);
+    assertWithinLimit(ent, 'active_proposals', activeCount, 1);
     try {
       const created = await prisma.$transaction(async (tx) => {
         const p = await tx.proposal.create({ data: { requestId: r.id, professionalId: req.professionalProfileId!, serviceId: service?.id ?? null, cover: body.cover, priceKobo: BigInt(body.price) * 100n, deliveryDays: body.deliveryDays, milestones: body.milestones, attachments: body.attachments, proposedStartAt: body.proposedStartAt ? new Date(body.proposedStartAt) : null }, include: proposalInclude });
@@ -342,9 +363,33 @@ export async function requestRoutes(app: FastifyInstance) {
     }
   });
 
-  app.get('/proposals/mine', { ...professional, schema: { tags: ['requests'], summary: 'My proposals', security: [{ bearerAuth: [] }] } }, async (req) => {
-    const rows = await prisma.proposal.findMany({ where: { professionalId: req.professionalProfileId! }, orderBy: { updatedAt: 'desc' }, take: 100, include: { ...proposalInclude, request: { include: requestInclude } } });
-    return { items: rows.map((p) => ({ ...serializeProposal(p), request: serializeRequest(p.request, 'professional') })) };
+  const mineQuery = z.object({
+    status: z.enum(['submitted', 'withdrawn', 'rejected', 'accepted']).optional(),
+    label: z.string().trim().min(1).max(40).optional(),
+    sort: z.enum(['updated', 'newest', 'price-high', 'price-low']).default('updated'),
+  });
+  app.get('/proposals/mine', { ...professional, schema: { tags: ['requests'], summary: 'My proposals (pipeline filters on Pro+)', security: [{ bearerAuth: [] }] } }, async (req) => {
+    const q = mineQuery.parse(req.query ?? {});
+    const ent = await entitlementsFor(req);
+    const organization = canAccess(ent, 'proposal_organization');
+    if (q.status || q.label || q.sort !== 'updated') assertFeature(ent, 'proposal_pipeline');
+    const orderBy: Prisma.ProposalOrderByWithRelationInput = q.sort === 'newest' ? { createdAt: 'desc' } : q.sort === 'price-high' ? { priceKobo: 'desc' } : q.sort === 'price-low' ? { priceKobo: 'asc' } : { updatedAt: 'desc' };
+    const rows = await prisma.proposal.findMany({ where: { professionalId: req.professionalProfileId!, ...(q.status ? { status: q.status } : {}), ...(q.label ? { label: q.label } : {}) }, orderBy, take: 100, include: { ...proposalInclude, request: { include: requestInclude } } });
+    const labels = organization ? [...new Set(rows.map((p) => p.label).filter((l): l is string => !!l))].sort() : [];
+    return {
+      access: { organization, pipeline: canAccess(ent, 'proposal_pipeline') },
+      labels,
+      items: rows.map((p) => ({ ...serializeProposal(p), label: organization ? p.label : null, privateNote: organization ? p.privateNote : null, request: serializeRequest(p.request, 'professional') })),
+    };
+  });
+
+  app.patch<{ Params: { id: string } }>('/proposals/:id/organize', { ...professional, schema: { tags: ['requests'], summary: 'Set a private label / note on my proposal (Go+)', security: [{ bearerAuth: [] }] } }, async (req) => {
+    assertFeature(await entitlementsFor(req), 'proposal_organization');
+    const body = parseBody(z.object({ label: z.string().trim().max(40).nullable().optional(), privateNote: z.string().trim().max(2000).nullable().optional() }).strict(), req.body);
+    const p = await prisma.proposal.findFirst({ where: { id: req.params.id, professionalId: req.professionalProfileId! }, select: { id: true } });
+    if (!p) throw notFound('PROPOSAL_NOT_FOUND', 'Proposal not found');
+    const row = await prisma.proposal.update({ where: { id: p.id }, data: { ...(body.label !== undefined ? { label: body.label || null } : {}), ...(body.privateNote !== undefined ? { privateNote: body.privateNote || null } : {}) }, select: { id: true, label: true, privateNote: true } });
+    return row;
   });
 
   app.patch<{ Params: { id: string } }>('/proposals/:id', { ...professional, schema: { tags: ['requests'], summary: 'Edit a submitted proposal', security: [{ bearerAuth: [] }] } }, async (req) => {

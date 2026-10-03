@@ -31,7 +31,7 @@ function ProfessionalCard({ item }) {
         ) : (
           <span className="ws-muted">New on Servix</span>
         )}
-        {item.plan && item.plan !== 'free' && <span className="ws-chip">Servix Pro</span>}
+        {item.plan && ['pro', 'team', 'enterprise'].includes(item.plan) && <span className="ws-chip">Servix {item.plan === 'pro' ? 'Pro' : item.plan === 'team' ? 'Team' : 'Enterprise'}</span>}
         {item.availability === 'available' && <span className="ws-chip">Available</span>}
       </div>
       <div className="ws-actions">

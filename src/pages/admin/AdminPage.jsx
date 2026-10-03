@@ -27,6 +27,7 @@ import { useAuth } from '../../lib/AuthContext.jsx';
 import { useDocumentMeta } from '../../lib/useDocumentMeta.js';
 import { formatPrice } from '../../lib/format.js';
 import * as adminApi from '../../lib/adminApi.js';
+import { PlansTab, AiUsageTab } from './AdminPlanTabs.jsx';
 
 const TABS = [
   { id: 'overview', label: 'Overview' },
@@ -40,6 +41,8 @@ const TABS = [
   { id: 'trust', label: 'Trust & achievements' },
   { id: 'payouts', label: 'Payouts' },
   { id: 'subscriptions', label: 'Plan subscriptions' },
+  { id: 'plans', label: 'Plans & organisations' },
+  { id: 'ai', label: 'AI usage' },
   { id: 'notifications', label: 'Send notification' },
   { id: 'audit', label: 'Audit Log' },
 ];
@@ -779,6 +782,8 @@ export default function AdminPage() {
         {tab === 'overview' && <OverviewTab />}
         {tab === 'analytics' && <AnalyticsTab />}
         {tab === 'subscriptions' && <SubscriptionsTab />}
+        {tab === 'plans' && <PlansTab />}
+        {tab === 'ai' && <AiUsageTab />}
         {tab === 'notifications' && <NotificationsTab />}
         {tab === 'applications' && <ApplicationsTab />}
         {tab === 'identity' && <IdentityTab />}

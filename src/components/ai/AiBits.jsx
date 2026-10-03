@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '../ui/Icon.jsx';
 import { aiErrorMessage, parseAiMarkdown } from '../../lib/aiHelpers.js';
+import { UpgradeNotice } from '../plans/PlanBits.jsx';
 import './ai.css';
 
 /* The "S" of the Servix wordmark (public/brand/favicon.svg), used as the assistant's face. */
@@ -52,8 +53,12 @@ export function AiThinking({ label = 'Thinking…', onCancel }) {
   return <div className="ai-thinking" role="status" aria-live="polite"><span className="ai-thinking__dots" aria-hidden="true"><i /><i /><i /></span><span>{label}{slow && ' Still working — this can take a little while.'}</span>{onCancel && <button type="button" className="ai-link" onClick={onCancel}>Stop</button>}</div>;
 }
 
+export const AI_QUOTA_EVENT = 'servix:ai-quota';
+
 export function AiError({ error, onRetry }) {
   if (!error || error.code === 'CANCELLED') return null;
+  // Plan boundaries (allowance used up, tool not on this plan) get the calm upgrade card instead of a red error.
+  if (error.meta?.kind) return <UpgradeNotice error={error} compact />;
   return <div className="ai-error" role="alert"><Icon name="alert" size={15} /><span>{aiErrorMessage(error)}</span>{onRetry && <button type="button" className="ai-link" onClick={onRetry}>Try again</button>}</div>;
 }
 
@@ -77,7 +82,12 @@ export function useAiTask() {
     ctrl.current?.abort();
     const c = new AbortController(); ctrl.current = c;
     setState({ busy: true, error: null, data: null });
-    try { const data = await fn(c.signal); if (!c.signal.aborted) setState({ busy: false, error: null, data }); return data; }
+    try {
+      const data = await fn(c.signal);
+      if (!c.signal.aborted) setState({ busy: false, error: null, data });
+      if (data?.ai?.quota) window.dispatchEvent(new CustomEvent(AI_QUOTA_EVENT, { detail: data.ai.quota }));
+      return data;
+    }
     catch (error) { if (!c.signal.aborted) setState({ busy: false, error, data: null }); return null; }
   }, []);
   const reset = useCallback(() => { ctrl.current?.abort(); setState({ busy: false, error: null, data: null }); }, []);

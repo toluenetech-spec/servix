@@ -423,6 +423,21 @@ a redesigned `/dashboard/ai` (hero, segmented switcher, main column + rail). Ver
 390 px. Honest limit: streaming and hedging improve perceived and tail latency; Dahl's free-tier queueing
 before the first token is outside our control — a paid tier or another `AI_BASE_URL` remains the fix.
 
+## 11l. Subscriptions, entitlements and feature access (2026-10-03, 0.9.0)
+
+Five plans for every account (Free / Go ₦5,000 / Pro ₦15,000 / Team ₦35,000 / Enterprise custom,
+admin-assigned) driven by one typed catalogue (`api/src/lib/entitlements/catalog.ts`) and one engine
+(`canAccess / getLimit / canUseAI`, 403 `PLAN_LIMIT` / `PLAN_FEATURE` / `AI_QUOTA_EXCEEDED` with `meta`).
+Existing listings, portfolio, proposals, requests, saved professionals and analytics are enforced through
+it; new Go+/Pro+ productivity (advanced filters, saved searches, proposal labels/pipeline, profile versions,
+exports); Servix AI token metering with atomic reservations, 75/90/100 % levels and failures never billed;
+Team workspace (invites, roles, pooled AI tokens, per-member caps, Enterprise audit); Admin *Plans &
+organisations* and *AI usage* tabs. Downgrades keep all data. Payments untouched; AI never reaches them.
+Verified: API `tsc`, entitlements 13/13 + Neon-script 2/2 + all local suites, root 23/23, Playwright
+100/100 (8 new), live browser smoke on the real local stack. Owner action: run
+`api/docs/manual-subscriptions-upgrade.sql` once on Neon before/with the deploy. Details:
+`docs/SUBSCRIPTION_ENTITLEMENT_PLAN.md`, `api/docs/ENTITLEMENTS.md`.
+
 ## 12. Known Issues / Remaining Tasks
 
 - Service-detail availability preview is generated client-side (clearly

@@ -68,6 +68,7 @@ npm run typecheck
 npm run build
 RUN_LOCAL_SECURITY_TESTS=1 RUN_LOCAL_OTP_TESTS=1 RUN_LOCAL_OAUTH_TESTS=1 npx vitest run tests/security-local.test.ts tests/security-crypto.test.ts tests/email-otp-crypto.test.ts tests/email-otp-local.test.ts tests/oauth-provider.test.ts tests/oauth-local.test.ts
 RUN_LOCAL_COMMUNITY_TESTS=1 RUN_LOCAL_WORKSPACE_TESTS=1 npx vitest run tests/community-local.test.ts tests/workspace-features-local.test.ts
+RUN_LOCAL_ENTITLEMENT_TESTS=1 npx vitest run tests/entitlements-local.test.ts tests/manual-subscriptions-sql-local.test.ts   # plans, quotas, teams, Neon script
 npm audit
 
 # Full-stack local preview (no Neon, no live payments or email)

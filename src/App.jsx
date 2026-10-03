@@ -17,6 +17,8 @@ const MessagesPage = lazy(() => import('./pages/dashboard/MessagesPage.jsx'));
 const NotificationsPage = lazy(() => import('./pages/dashboard/NotificationsPage.jsx'));
 const SavedPage = lazy(() => import('./pages/dashboard/SavedPage.jsx'));
 const PlanPage = lazy(() => import('./pages/dashboard/PlanPage.jsx'));
+const TeamPage = lazy(() => import('./pages/dashboard/TeamPage.jsx'));
+const JoinTeamPage = lazy(() => import('./pages/JoinTeamPage.jsx'));
 const AnalyticsPage = lazy(() => import('./pages/dashboard/AnalyticsPage.jsx'));
 const AvailabilityPage = lazy(() => import('./pages/dashboard/AvailabilityPage.jsx'));
 const ReviewsPage = lazy(() => import('./pages/dashboard/ReviewsPage.jsx'));
@@ -108,6 +110,8 @@ export default function App() {
             <Route path="/dashboard/proposals/requests/:id" element={<ProposalsPage section="detail" />} />
             <Route path="/dashboard/ai" element={<AiPage />} />
             <Route path="/dashboard/plan" element={<PlanPage />} />
+            <Route path="/dashboard/team" element={<TeamPage />} />
+            <Route path="/join-team" element={<JoinTeamPage />} />
             <Route path="/dashboard/analytics" element={<AnalyticsPage />} />
             <Route path="/dashboard/availability" element={<AvailabilityPage />} />
             <Route path="/dashboard/reviews" element={<ReviewsPage />} />

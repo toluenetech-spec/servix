@@ -5,6 +5,7 @@ import { assertOwnMediaUrl } from './uploads.js';
 import { prisma } from '../lib/db.js';
 import { notifySafely } from '../lib/notifications.js';
 import { requireAuth } from '../lib/authGuard.js';
+import { entitlementsFor, assertWithinLimit } from '../lib/entitlements/index.js';
 import { ApiError } from '../lib/errors.js';
 import { parseBody } from '../lib/query.js';
 import { accountOverview, ONBOARDING_ACTION } from '../lib/accountOverview.js';
@@ -74,6 +75,8 @@ export async function accountRoutes(app: FastifyInstance) {
     const profile = await prisma.professionalProfile.findUnique({ where: { slug: profileSlug }, select: { id: true, userId: true } });
     if (!profile) throw new ApiError(404, 'NOT_FOUND', 'No professional found.');
     if (profile.userId === req.auth!.sub) throw new ApiError(400, 'VALIDATION_ERROR', 'You cannot save your own profile.');
+    const already = await prisma.savedProfessional.findUnique({ where: { userId_professionalId: { userId: req.auth!.sub, professionalId: profile.id } }, select: { id: true } });
+    if (!already) assertWithinLimit(await entitlementsFor(req), 'saved_professionals', await prisma.savedProfessional.count({ where: { userId: req.auth!.sub } }), 1);
     const row = await prisma.savedProfessional.upsert({ where: { userId_professionalId: { userId: req.auth!.sub, professionalId: profile.id } }, create: { userId: req.auth!.sub, professionalId: profile.id }, update: {}, select: savedSelect });
     return serializeSaved(row);
   });
@@ -84,6 +87,8 @@ export async function accountRoutes(app: FastifyInstance) {
     const profile = await prisma.professionalProfile.findUnique({ where: { slug }, select: { id: true, userId: true } });
     if (!profile) throw new ApiError(404, 'NOT_FOUND', 'No professional found.');
     if (profile.userId === req.auth!.sub) throw new ApiError(400, 'VALIDATION_ERROR', 'You cannot save your own profile.');
+    const already = await prisma.savedProfessional.findUnique({ where: { userId_professionalId: { userId: req.auth!.sub, professionalId: profile.id } }, select: { id: true } });
+    if (!already) assertWithinLimit(await entitlementsFor(req), 'saved_professionals', await prisma.savedProfessional.count({ where: { userId: req.auth!.sub } }), 1);
     const row = await prisma.savedProfessional.upsert({ where: { userId_professionalId: { userId: req.auth!.sub, professionalId: profile.id } }, create: { userId: req.auth!.sub, professionalId: profile.id, preferred: body.preferred ?? false, note: body.note ?? null }, update: { ...(body.preferred === undefined ? {} : { preferred: body.preferred }), ...(body.note === undefined ? {} : { note: body.note || null }) }, select: savedSelect });
     if (body.preferred && profile.userId) await notifySafely({ userId: profile.userId, type: 'professional.preferred', title: 'A customer marked you as a preferred professional', body: 'They can rebook you in one tap from their saved list.', link: '/dashboard/analytics' });
     return serializeSaved(row);

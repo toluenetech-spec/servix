@@ -16,6 +16,7 @@ async function toError(res) {
   err.status = payload?.error?.status ?? res.status;
   err.code = payload?.error?.code;
   if (payload?.error?.errors) err.errors = payload.error.errors;
+  if (payload?.error?.meta) err.meta = payload.error.meta;
   return err;
 }
 
@@ -75,7 +76,8 @@ export const rejectProposal = (id, pid, reason) => call('POST', `/requests/${enc
 export const browseRequests = (params) => call('GET', `/requests/browse${params ? `?${new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== '')))}` : ''}`);
 export const getBrowseRequest = (id) => call('GET', `/requests/browse/${enc(id)}`);
 export const submitProposal = (requestId, body) => call('POST', `/requests/${enc(requestId)}/proposals`, body);
-export const listMyProposals = () => call('GET', '/proposals/mine');
+export const listMyProposals = (params) => call('GET', `/proposals/mine${params && Object.values(params).some(Boolean) ? `?${new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== '' && v !== 'updated')))}` : ''}`);
+export const organizeProposal = (id, body) => call('PATCH', `/proposals/${enc(id)}/organize`, body);
 export const updateProposal = (id, body) => call('PATCH', `/proposals/${enc(id)}`, body);
 export const withdrawProposal = (id) => call('POST', `/proposals/${enc(id)}/withdraw`, {});
 

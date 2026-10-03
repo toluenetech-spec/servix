@@ -4,6 +4,7 @@
  */
 import { Link } from 'react-router-dom';
 import { Icon } from '../ui/Icon.jsx';
+import { UpgradeNotice } from '../plans/PlanBits.jsx';
 import { matchOpportunities, opportunityRadar, profileAnalysis, profileImprove } from '../../lib/aiApi.js';
 import { formatPrice } from '../../lib/format.js';
 import { aiMarkdownToPlain } from '../../lib/aiHelpers.js';
@@ -60,7 +61,7 @@ export function OpportunityRadar() {
 
 const FOCUS = [['all', 'Everything'], ['about', 'About section'], ['title', 'Headline'], ['gigs', 'My gigs'], ['skills', 'Skills'], ['pricing', 'Pricing']];
 
-export function ProfileCoach() {
+export function ProfileCoach({ improveAllowed = true, improvePlan = 'pro' }) {
   const analysis = useAiTask(); const improve = useAiTask();
   const runAnalysis = () => analysis.run((signal) => profileAnalysis({ signal }));
   const runImprove = (focus) => improve.run((signal) => profileImprove(focus, { signal }));
@@ -83,7 +84,8 @@ export function ProfileCoach() {
     <section className="ws-panel" data-testid="ai-profile-improve">
       <div className="ai-panel__head"><h2 style={{ margin: 0 }}>Concrete improvements</h2><AiTag small /></div>
       <p className="ws-muted">Specific, copy-ready suggestions. Pick a focus or let it look at everything.</p>
-      <div className="ai-chips" style={{ marginBottom: 6 }}>{FOCUS.map(([v, l]) => <button type="button" key={v} className="ai-chip" style={{ cursor: 'pointer', border: 0 }} disabled={improve.busy} onClick={() => runImprove(v)}>{l}</button>)}</div>
+      {!improveAllowed && <UpgradeNotice title="Concrete improvements are part of the Pro plan" body="The check-up above is included in your plan; copy-ready rewrites of your About section and gigs come with Pro." upgradeTo={improvePlan} compact />}
+      <div className="ai-chips" style={{ marginBottom: 6, opacity: improveAllowed ? 1 : 0.5 }}>{FOCUS.map(([v, l]) => <button type="button" key={v} className="ai-chip" style={{ cursor: improveAllowed ? 'pointer' : 'not-allowed', border: 0 }} disabled={improve.busy || !improveAllowed} onClick={() => runImprove(v)}>{l}</button>)}</div>
       {improve.busy && <AiThinking label="Writing suggestions…" onCancel={improve.cancel} />}
       <AiError error={improve.error} onRetry={() => runImprove('all')} />
       {s && !improve.busy && <div style={{ marginTop: 12 }}>

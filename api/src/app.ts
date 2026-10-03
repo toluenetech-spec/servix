@@ -38,6 +38,10 @@ import { kycRoutes } from './routes/kyc.js';
 import { marketplaceRoutes } from './routes/marketplace.js';
 import { requestRoutes } from './routes/requests.js';
 import { aiRoutes } from './routes/ai.js';
+import { billingRoutes } from './routes/billing.js';
+import { teamRoutes } from './routes/teams.js';
+import { productivityRoutes } from './routes/productivity.js';
+import { adminPlanRoutes } from './routes/adminPlans.js';
 
 export async function buildApp() {
   const config = loadConfig();
@@ -150,6 +154,7 @@ export async function buildApp() {
         error: { code: err.code, message: err.message, status: err.status },
       };
       if (err.errors) (body.error as Record<string, unknown>).errors = err.errors;
+      if (err.meta) (body.error as Record<string, unknown>).meta = err.meta;
       return reply.code(err.status).send(body);
     }
     if (err.statusCode === 429) {
@@ -223,6 +228,10 @@ export async function buildApp() {
       await marketplaceRoutes(v1); // /features, trust, compare, achievements, verified portfolio
       await requestRoutes(v1); // /requests/* + /proposals/* (REQUESTS_ENABLED)
       await aiRoutes(v1); // /ai/* (AI_ENABLED) + /admin/ai/*
+      await billingRoutes(v1); // /me/entitlements + /billing/* (plans for every account)
+      await teamRoutes(v1); // /team/* (Team / Enterprise workspaces)
+      await productivityRoutes(v1); // saved searches, CSV exports, profile versions
+      await adminPlanRoutes(v1); // /admin/plans, /admin/organizations, /admin/ai/usage
     },
     { prefix: '/api/v1' },
   );

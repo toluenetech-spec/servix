@@ -13,7 +13,7 @@ export default function PricingPage() {
   useDocumentMeta({
     title: 'Pricing for Professionals',
     description:
-      'Servix pricing plans for professionals — start free, upgrade for more listings, visibility and business tools. Introductory pricing, subject to change.',
+      'Servix plans — Free, Go, Pro, Team and Enterprise. Start free; upgrade for more capacity, advanced tools, team workspaces and more Servix AI.',
   });
 
   const { data: plans, loading, error, retry } = useFetch(() => getPricingPlans(), []);
@@ -23,20 +23,20 @@ export default function PricingPage() {
       <div className="container">
         <header className="page-hero" style={{ textAlign: 'center', maxWidth: '42rem', marginInline: 'auto' }}>
           <span className="eyebrow">Pricing</span>
-          <h1>Simple plans for professionals</h1>
+          <h1>Simple plans for everyone on Servix</h1>
           <p className="page-hero__desc" style={{ marginInline: 'auto' }}>
-            Browsing and booking is always free for customers. Professionals
-            choose the plan that fits their practice.
+            Browsing and booking is always free. Every account starts on Free; upgrade for more capacity,
+            advanced tools, a team workspace and more Servix AI each month.
           </p>
           <p className="trust-strip__note" style={{ marginTop: 'var(--space-4)' }}>
-            Introductory pricing shown — plans and prices are subject to change before launch.
+            Billed monthly through the Servix payment provider. No auto-renewal — you are never charged without choosing to pay.
           </p>
         </header>
 
         <section className="section" style={{ paddingTop: 'var(--space-6)' }} aria-label="Plans">
           {loading && (
             <div className="pricing-grid">
-              {[1, 2, 3].map((i) => (
+              {[1, 2, 3, 4, 5].map((i) => (
                 <Skeleton key={i} height="28rem" />
               ))}
             </div>
@@ -62,8 +62,8 @@ export default function PricingPage() {
                     <p className="plan__tagline">{plan.tagline}</p>
                   </div>
                   <p className="plan__price">
-                    <strong>{plan.price === 0 ? 'Free' : formatPrice(plan.price)}</strong>
-                    <span>{plan.price === 0 ? plan.period : plan.period}</span>
+                    <strong>{plan.price === 0 ? (plan.id === 'enterprise' ? 'Custom' : 'Free') : formatPrice(plan.price)}</strong>
+                    <span>{plan.id === 'enterprise' ? 'arranged with Servix' : plan.period}</span>
                   </p>
                   <ul className="plan__features">
                     {plan.features.map((feature) => (
@@ -74,7 +74,7 @@ export default function PricingPage() {
                     ))}
                   </ul>
                   <Button
-                    to={plan.id === 'business' ? '/contact' : '/register'}
+                    to={plan.id === 'enterprise' ? '/contact?topic=enterprise' : plan.id === 'free' ? '/register' : '/dashboard/plan'}
                     variant={plan.highlighted ? 'primary' : 'secondary'}
                     block
                   >
@@ -98,11 +98,15 @@ export default function PricingPage() {
               },
               {
                 q: 'Can I change plans later?',
-                a: 'Yes. You will be able to upgrade or downgrade at any time once billing launches, with changes applied at your next billing cycle.',
+                a: 'Yes. Upgrade at any time from Plan & usage in your workspace; a new plan starts a fresh 30-day term immediately. You can move back to Free whenever you like — nothing is deleted, you simply cannot add items above the Free limits until you are under them again.',
               },
               {
-                q: 'Is this final pricing?',
-                a: 'No — the plans shown are introductory placeholders and may change before the platform launches. Billing is not yet enabled.',
+                q: 'What are Servix AI tokens?',
+                a: 'Every Servix AI request (assistant, drafts, matching, coaching) uses tokens for the question and the answer. Each plan includes a monthly allowance that resets on the 1st; you can see exactly how much you have used in your workspace, with a heads-up at 75% and 90%. Failed requests are never counted.',
+              },
+              {
+                q: 'How do Team and Enterprise work?',
+                a: 'Team gives you a workspace for up to 5 people who share one plan and one AI token pool, with a team dashboard and shared view of live work. Enterprise adds custom limits, an audit log with export, and priority support — contact Servix to set it up.',
               },
               ...faqs.professionals.slice(1, 3),
             ]}

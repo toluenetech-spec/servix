@@ -117,7 +117,7 @@ export default function ProfessionalProfilePage() {
           <h1>
             {pro.name}
             {pro.verified && <VerifiedBadge />}
-            {pro.plan && pro.plan !== 'free' && <Badge variant="brand"><Icon name="crown" size={13} /> Servix Pro</Badge>}
+            {pro.plan && ['pro', 'team', 'enterprise'].includes(pro.plan) && <Badge variant="brand"><Icon name="crown" size={13} /> Servix {pro.plan === 'pro' ? 'Pro' : pro.plan === 'team' ? 'Team' : 'Enterprise'}</Badge>}
           </h1>
           <p className="profile-head__title">{pro.title}</p>
           <div className="profile-head__meta">

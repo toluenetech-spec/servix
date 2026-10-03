@@ -23,6 +23,7 @@ async function toApiError(res) {
   err.status = payload?.error?.status ?? res.status;
   err.code = payload?.error?.code;
   if (payload?.error?.errors) err.errors = payload.error.errors;
+  if (payload?.error?.meta) err.meta = payload.error.meta;
   return err;
 }
 
@@ -83,6 +84,16 @@ export const getAnalytics = (days = 30) => call('GET', `/admin/analytics?days=${
 export const getBroadcasts = (params) => call('GET', `/admin/notifications${qs(params)}`);
 export const sendBroadcast = (body) => call('POST', '/admin/notifications', body);
 export const getSubscriptions = (params) => call('GET', `/admin/subscriptions${qs(params)}`);
+
+/* plans, organisations, per-account plan grants, AI usage analytics */
+export const getPlans = () => call('GET', '/admin/plans');
+export const updatePlan = (slug, body) => call('PATCH', `/admin/plans/${encodeURIComponent(slug)}`, body);
+export const getOrganizations = (params) => call('GET', `/admin/organizations${qs(params)}`);
+export const updateOrganization = (id, body) => call('PATCH', `/admin/organizations/${encodeURIComponent(id)}`, body);
+export const grantUserPlan = (id, body) => call('POST', `/admin/users/${encodeURIComponent(id)}/plan`, body);
+export const getUserAiUsage = (id) => call('GET', `/admin/users/${encodeURIComponent(id)}/ai-usage`);
+export const getAiUsage = (params) => call('GET', `/admin/ai/usage${qs(params)}`);
+export const getAiUsageEvents = (params) => call('GET', `/admin/ai/usage/events${qs(params)}`);
 
 /* identity verification (KYC) */
 export const getKycQueue = (params) => call('GET', `/admin/kyc/pending${qs(params)}`);

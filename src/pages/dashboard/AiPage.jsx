@@ -15,6 +15,9 @@ import { AiChat } from '../../components/ai/AiAssistant.jsx';
 import { PricingGuide } from '../../components/ai/AiInsights.jsx';
 import { OpportunityMatches, OpportunityRadar, ProfileCoach } from '../../components/ai/AiProTools.jsx';
 import { AiAvatar, AiNote } from '../../components/ai/AiBits.jsx';
+import { useAiMeter, AiUsageCard, AiQuotaBanner } from '../../components/ai/AiUsage.jsx';
+import { useEntitlements, minPlanFor } from '../../lib/useEntitlements.js';
+import { PlanTag, UpgradeNotice } from '../../components/plans/PlanBits.jsx';
 import '../../components/marketplace/marketplace.css';
 
 const TAB_COPY = {
@@ -32,7 +35,13 @@ export default function AiPage() {
   const professional = Boolean(ws?.overview?.canManageServices);
   const [params, setParams] = useSearchParams();
   const [categories, setCategories] = useState([]);
+  const ent = useEntitlements();
+  const meter = useAiMeter();
   useEffect(() => { getCategories().then((c) => setCategories(c.items ?? c)).catch(() => setCategories([])); }, []);
+  // Which AI tools the plan includes (the API enforces the same list). Locked tabs stay visible with a plan tag.
+  const TAB_DEPTS = { assistant: ['assistant'], opportunities: ['job_matching'], profile: ['profile_analysis'], pricing: ['pricing_guidance'] };
+  const unlocked = (k) => !ent.ready || TAB_DEPTS[k].every((d) => ent.canUseAi(d));
+  const neededPlan = (k) => minPlanFor(ent.entitlements, { department: TAB_DEPTS[k][0] });
   if (!ready) return <PageSkeleton variant="panel" label="Loading Servix AI…" />;
   if (!ai) return <><PageHead title="Servix AI" description="Not switched on yet." /><section className="ws-panel"><Empty icon="sparkle" title="Coming soon" description="Servix AI helpers are not enabled on this account yet." to="/dashboard" label="Back to overview" /></section></>;
 
@@ -55,7 +64,7 @@ export default function AiPage() {
           <p>{professional ? 'Find the requests that fit you, sharpen your profile, price with confidence and ask anything about Servix — all grounded in real Servix data.' : 'Ask anything about professionals, prices or how Servix works, and get budget guidance from real Servix listings.'}</p>
         </div>
         <div className="ai-hero__chips" role="tablist" aria-label="Servix AI tools">
-          {tabs.map(([k, l]) => <button type="button" key={k} role="tab" aria-selected={tab === k} onClick={() => select(k)} style={tab === k ? { background: '#f7f4ec', color: '#12372a', fontWeight: 600 } : undefined}>{l}</button>)}
+          {tabs.map(([k, l]) => <button type="button" key={k} role="tab" aria-selected={tab === k} onClick={() => select(k)} style={tab === k ? { background: '#f7f4ec', color: '#12372a', fontWeight: 600 } : undefined}>{l}{!unlocked(k) && <PlanTag plan={neededPlan(k)} />}</button>)}
         </div>
         <div className="ai-hero__status"><i aria-hidden="true" />Private to your account · never books, pays or edits anything for you</div>
       </div>
@@ -63,21 +72,26 @@ export default function AiPage() {
 
     <div className="ai-layout">
       <div className="ai-main">
+        <AiQuotaBanner meter={meter} />
         <div>
           <h2 style={{ fontSize: 18, margin: '0 0 4px', color: '#12372a' }}>{copy.title}</h2>
           <p className="ws-muted" style={{ margin: 0 }}>{copy.lead}</p>
         </div>
-        {tab === 'assistant' && <section className="ai-card ai-card--chat"><AiChat role={role} /></section>}
-        {tab === 'opportunities' && <>
-          <OpportunityMatches />
-          <OpportunityRadar />
-          <p className="ws-muted">Prefer to look yourself? <Link to="/dashboard/proposals">Browse all open requests</Link>.</p>
-        </>}
-        {tab === 'profile' && <ProfileCoach />}
-        {tab === 'pricing' && <section className="ai-card"><PricingGuide categories={categories} audience={professional ? 'professional' : 'customer'} /></section>}
+        {!unlocked(tab) ? <UpgradeNotice title={`${copy.title} is part of the ${neededPlan(tab) ? neededPlan(tab)[0].toUpperCase() + neededPlan(tab).slice(1) : 'Go'} plan`} body="Your plan includes the assistant, explanations, smart search and the pricing guide. Upgrade to add this tool — nothing else changes." upgradeTo={neededPlan(tab)} />
+          : <>
+            {tab === 'assistant' && <section className="ai-card ai-card--chat"><AiChat role={role} /></section>}
+            {tab === 'opportunities' && <>
+              <OpportunityMatches />
+              {ent.canUseAi('opportunity_radar') ? <OpportunityRadar /> : <UpgradeNotice title="Weekly opportunity radar" body="What is moving in your category this week — part of the Pro plan." upgradeTo={minPlanFor(ent.entitlements, { department: 'opportunity_radar' })} compact />}
+              <p className="ws-muted">Prefer to look yourself? <Link to="/dashboard/proposals">Browse all open requests</Link>.</p>
+            </>}
+            {tab === 'profile' && <ProfileCoach improveAllowed={ent.canUseAi('profile_improvement')} improvePlan={minPlanFor(ent.entitlements, { department: 'profile_improvement' })} />}
+            {tab === 'pricing' && <section className="ai-card"><PricingGuide categories={categories} audience={professional ? 'professional' : 'customer'} /></section>}
+          </>}
       </div>
 
       <aside className="ai-rail" aria-label="About Servix AI">
+        <AiUsageCard meter={meter} />
         <section className="ai-card">
           <h3>What it can do</h3>
           <ul>

@@ -36,12 +36,7 @@ describe.skipIf(process.env.RUN_LOCAL_WORKSPACE_TESTS !== '1')('workspace featur
       }
     } finally { await client.end(); }
     prisma = (await import('../src/lib/db.js')).prisma;
-    // The pricing catalogue lives in the plans table (seeded in real environments); mirror the three live tiers here.
-    await prisma.plan.createMany({ data: [
-      { slug: 'free', name: 'Free', price: 0n, position: 0, features: ['Public professional profile'] },
-      { slug: 'professional', name: 'Servix Pro', price: 15000n, position: 1, highlighted: true, features: ['Up to 10 service listings'] },
-      { slug: 'business', name: 'Business', price: 40000n, position: 2, features: ['Unlimited service listings'] },
-    ] });
+    /* Plans (free/go/pro/team/enterprise) are inserted by the subscriptions migration itself. */
     app = await (await import('../src/app.js')).buildApp(); await app.ready();
   });
   afterAll(async () => { await app?.close(); await prisma?.$disconnect(); if (cluster) await cluster.stop(); if (directory) await rm(directory, { recursive: true, force: true }); });
@@ -95,15 +90,18 @@ describe.skipIf(process.env.RUN_LOCAL_WORKSPACE_TESTS !== '1')('workspace featur
     expect((await call(customer.token, 'account/saved')).json()).toEqual([]);
   });
 
-  it('free plan limits listings, Servix Pro only activates after provider verification, and the public profile shows the plan', async () => {
+  it('free plan limits listings, paid plans only activate after provider verification, and the public profile shows the plan', async () => {
     const pro = await account('professional'); const customer = await account();
     const plan = (await call(pro.token, 'pro/plan')).json();
-    expect(plan).toMatchObject({ current: 'free', limits: { listings: 2, analytics: false }, usage: { listings: 0 } });
-    expect(plan.plans.map((p: { slug: string }) => p.slug)).toEqual(['free', 'professional', 'business']);
+    expect(plan).toMatchObject({ current: 'free', limits: { listings: 2 }, usage: { listings: 0 } });
+    expect(plan.features).not.toContain('analytics_detailed');
+    expect(plan.plans.map((p: { slug: string }) => p.slug)).toEqual(['free', 'go', 'pro', 'team', 'enterprise']);
+    // Plans are for every account now: customers use /billing/plan; the legacy /pro/plan alias stays professional-only.
     expect((await call(customer.token, 'pro/plan')).statusCode).toBe(403);
-    expect((await call(pro.token, 'pro/plan/checkout', { plan: 'business' })).statusCode).toBe(422);
+    expect((await call(customer.token, 'billing/plan')).json().current).toBe('free');
+    expect((await call(pro.token, 'pro/plan/checkout', { plan: 'enterprise' })).statusCode).toBe(422);
     expect((await call(pro.token, 'pro/plan/checkout', { plan: 'free' })).statusCode).toBe(422);
-    const checkout = (await call(pro.token, 'pro/plan/checkout', { plan: 'professional' })).json();
+    const checkout = (await call(pro.token, 'pro/plan/checkout', { plan: 'pro' })).json();
     expect(checkout.reference).toMatch(/^sub-/); expect(checkout.authorizationUrl).toContain(checkout.reference);
     // Starting checkout changes nothing until the provider confirms payment.
     expect((await call(pro.token, 'pro/plan')).json().current).toBe('free');
@@ -115,20 +113,22 @@ describe.skipIf(process.env.RUN_LOCAL_WORKSPACE_TESTS !== '1')('workspace featur
     expect(await activateSubscription(checkout.reference)).toBe(true);
     expect(await activateSubscription(checkout.reference)).toBe(false); // idempotent
     const upgraded = (await call(pro.token, 'pro/plan')).json();
-    expect(upgraded).toMatchObject({ current: 'professional', label: 'Servix Pro', limits: { listings: 10, analytics: true } });
+    expect(upgraded).toMatchObject({ current: 'pro', label: 'Pro', limits: { listings: 15 } });
+    expect(upgraded.features).toContain('analytics_advanced');
     expect(new Date(upgraded.expiresAt).getTime()).toBeGreaterThan(Date.now());
     expect((await call(pro.token, 'account/notifications')).json().items.some((n: { type: string }) => n.type === 'plan.activated')).toBe(true);
     const publicProfile = (await app.inject({ method: 'GET', url: `/api/v1/professionals/${pro.slug}` })).json();
-    expect(publicProfile.plan).toBe('professional');
-    // Listing caps follow the effective plan: 10 on Servix Pro, 2 on Free.
+    expect(publicProfile.plan).toBe('pro');
+    // Listing caps follow the effective plan: 15 on Pro, 2 on Free.
     const { assertListingAllowed } = await import('../src/lib/plans.js');
+    const { resolveEntitlements } = await import('../src/lib/entitlements/index.js');
     const category = await prisma.category.create({ data: { slug: randomUUID(), name: 'Testing' } });
     for (let i = 0; i < 2; i++) await prisma.service.create({ data: { slug: randomUUID(), professionalId: pro.professionalId!, categoryId: category.id, title: `Listing ${i}`, shortDescription: 'Short', description: 'Long', price: 1000n } });
-    await expect(assertListingAllowed(pro.professionalId!)).resolves.toBeUndefined();
+    await expect(assertListingAllowed(pro.professionalId!, await resolveEntitlements(pro.user.id))).resolves.toBeUndefined();
     // An expired paid plan behaves as free again.
-    await prisma.professionalProfile.update({ where: { id: pro.professionalId! }, data: { planExpiresAt: new Date(Date.now() - 1000) } });
+    await prisma.user.update({ where: { id: pro.user.id }, data: { planExpiresAt: new Date(Date.now() - 1000) } });
     expect((await call(pro.token, 'pro/plan')).json()).toMatchObject({ current: 'free', expired: true });
-    await expect(assertListingAllowed(pro.professionalId!)).rejects.toMatchObject({ status: 403, code: 'PLAN_LIMIT' });
+    await expect(assertListingAllowed(pro.professionalId!, await resolveEntitlements(pro.user.id))).rejects.toMatchObject({ status: 403, code: 'PLAN_LIMIT' });
   });
 
   it('professional analytics, availability and reviews are own-data only', async () => {

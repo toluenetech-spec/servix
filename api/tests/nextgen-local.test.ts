@@ -40,14 +40,16 @@ describe.skipIf(process.env.RUN_LOCAL_NEXTGEN_TESTS !== '1')('next-gen marketpla
       }
     } finally { await client.end(); }
     prisma = (await import('../src/lib/db.js')).prisma;
-    await prisma.plan.createMany({ data: [{ slug: 'free', name: 'Free', price: 0n, position: 0, features: [] }, { slug: 'professional', name: 'Servix Pro', price: 15000n, position: 1, features: [] }] });
+    /* Plans (free/go/pro/team/enterprise) are inserted by the subscriptions migration itself. */
     categoryId = (await prisma.category.create({ data: { slug: 'design', name: 'Design' } })).id;
     app = await (await import('../src/app.js')).buildApp(); await app.ready();
   });
   afterAll(async () => { await app?.close(); await prisma?.$disconnect(); if (cluster) await cluster.stop(); if (directory) await rm(directory, { recursive: true, force: true }); });
 
   async function account(role: 'customer' | 'professional' | 'admin' = 'customer', fullName = 'Adaeze Okafor') {
-    const user = await prisma.user.create({ data: { email: `${randomUUID()}@example.test`, fullName, role, status: 'active', emailVerifiedAt: new Date(), passwordHash: 'test-only', kycStatus: role === 'professional' ? 'verified' : 'unverified' } });
+    const user = await prisma.user.create({ data: { email: `${randomUUID()}@example.test`, fullName, role, status: 'active', emailVerifiedAt: new Date(), passwordHash: 'test-only', kycStatus: role === 'professional' ? 'verified' : 'unverified',
+      // These suites exercise marketplace/AI behaviour, not plan limits: give every account the Pro plan (entitlements have their own suite).
+      planSlug: 'pro', planExpiresAt: new Date(Date.now() + 30 * 86_400_000) } });
     let profile: { id: string; slug: string } | null = null;
     if (role === 'professional') {
       profile = await prisma.professionalProfile.create({ data: { userId: user.id, name: fullName, title: 'Designer', slug: `pro-${randomUUID().slice(0, 8)}`, categoryId, verification: 'verified' }, select: { id: true, slug: true } });

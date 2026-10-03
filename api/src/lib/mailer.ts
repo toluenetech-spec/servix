@@ -234,3 +234,12 @@ export function kycOutcomeMail(to: string, outcome: 'approved' | 'rejected', rea
     html: `<p>We could not verify your identity on Servix.</p><p><strong>Reason:</strong> ${why.replace(/</g, '&lt;')}</p><p>You can submit fresh documents at any time: <a href="${link}">Identity verification</a></p>`,
   };
 }
+export function teamInviteMail(to: string, teamName: string, inviterName: string, token: string): Mail {
+  return brandedMail(to, `${inviterName} invited you to ${teamName} on Servix`, {
+    category: 'Team', status: 'Invitation', preheader: `Join ${teamName} on Servix to share work, requests and AI tools with your team.`,
+    title: `You’re invited to ${teamName}.`,
+    paragraphs: [`${inviterName} has invited you to join the ${teamName} workspace on Servix. Accept the invitation to work alongside your team, share service requests and proposals, and use the team’s Servix AI allowance.`],
+    action: { label: 'Accept invitation', url: emailAppLink('/join-team', { token }) },
+    note: { title: 'This invitation expires in 7 days', text: 'If you were not expecting this invitation you can ignore this email. Accepting requires a Servix account with this email address.' },
+  });
+}

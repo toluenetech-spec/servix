@@ -8,6 +8,7 @@ import { Icon } from '../ui/Icon.jsx';
 import { Avatar } from '../ui/Avatar.jsx';
 import { DashboardSkeleton, ListSkeleton, Skeleton } from '../ui/States.jsx';
 import { useFeatures } from '../../lib/useFeatures.js';
+import { useEntitlements } from '../../lib/useEntitlements.js';
 import { AiAssistantLauncher } from '../ai/AiAssistant.jsx';
 import './workspace.css';
 import './kyc.css';
@@ -16,10 +17,12 @@ export const useWorkspace = () => useContext(Context);
 export const NOTIFICATIONS_EVENT = 'servix:notifications-changed';
 
 /* Navigation is role-aware: only sections the account can actually use are shown. */
-function buildNavigation({ user, overview, features = {} }) {
+function buildNavigation({ user, overview, features = {}, plan = {} }) {
   const admin = user.role === 'admin';
   const professional = Boolean(overview?.canManageServices);
-  const onFreePlan = professional && (overview?.plan ?? 'free') === 'free';
+  const onFreePlan = (plan.plan ?? overview?.plan ?? 'free') === 'free';
+  const planLink = ['/dashboard/plan', onFreePlan ? 'Upgrade your plan' : `${plan.label ?? 'Your'} plan`, 'crown'];
+  const teamLink = plan.organization || plan.can?.('team_workspace') ? [['/dashboard/team', 'Team workspace', 'users']] : [];
   if (admin) return [
     ['Platform', [
       ['/admin', 'Overview', 'grid', 'overview'],
@@ -32,6 +35,8 @@ function buildNavigation({ user, overview, features = {} }) {
       ['/admin?tab=trust', 'Trust & achievements', 'shield', 'trust'],
       ['/admin?tab=payouts', 'Payouts', 'wallet', 'payouts'],
       ['/admin?tab=subscriptions', 'Plan subscriptions', 'crown', 'subscriptions'],
+      ['/admin?tab=plans', 'Plans & organisations', 'layers', 'plans'],
+      ['/admin?tab=ai', 'AI usage', 'sparkle', 'ai'],
       ['/admin?tab=notifications', 'Send notification', 'megaphone', 'notifications'],
       ['/admin?tab=audit', 'Audit log', 'shield', 'audit'],
     ]],
@@ -62,9 +67,10 @@ function buildNavigation({ user, overview, features = {} }) {
       ...(features.requests ? [['/dashboard/requests', 'My requests', 'inbox']] : []),
       ['/dashboard/saved', 'Saved professionals', 'bookmark'],
       ['/dashboard/payments', 'Payments', 'credit-card'],
+      ...teamLink,
     ]],
     ['Account', [
-      ['/dashboard/plan', onFreePlan ? 'Upgrade to Servix Pro' : 'Servix Pro plan', 'crown'],
+      planLink,
       ['/dashboard/identity', 'Identity verification', 'shield'],
       ['/dashboard/verification', 'Verification', 'shield'],
       ['/dashboard/settings', 'Settings', 'settings'],
@@ -81,8 +87,10 @@ function buildNavigation({ user, overview, features = {} }) {
       ['/dashboard/network', 'My network', 'users'],
       ['/dashboard/payments', 'Payments', 'credit-card'],
       ['/dashboard/notifications', 'Notifications', 'bell'],
+      ...teamLink,
     ]],
     ['Account', [
+      planLink,
       ['/professionals/apply', overview?.kind === 'applicant' ? 'My professional application' : 'Become a professional', 'briefcase'],
       ['/dashboard/identity', 'Identity verification', 'shield'],
       ['/dashboard/verification', 'Verification', 'shield'],
@@ -101,16 +109,17 @@ function isActive(to, location) {
 export function WorkspaceShell({ children }) {
   const { user, initializing, logout } = useAuth(); const navigate = useNavigate(); const location = useLocation(); const { pathname } = location;
   const features = useFeatures();
+  const plan = useEntitlements();
   const [overview, setOverview] = useState(null); const [menu, setMenu] = useState(false); const [query, setQuery] = useState(''); const [signingOut, setSigningOut] = useState(false); const [error, setError] = useState('');
   useEffect(() => { let alive = true; if (user) getAccountOverview().then(value => { if (alive) setOverview(value); }).catch(() => { if (alive) setOverview(null); }); return () => { alive = false; }; }, [user?.id, pathname]);
   useEffect(() => { setMenu(false); }, [pathname]);
   useEffect(() => { const close = e => { if (e.key === 'Escape') setMenu(false); }; window.addEventListener('keydown', close); return () => window.removeEventListener('keydown', close); }, []);
   if (initializing) return <div className="ws-layout"><aside className="ws-sidebar" aria-hidden="true"><Skeleton height="1.6rem" width="6rem" style={{ margin: '0 12px 30px' }} />{Array.from({ length: 7 }, (_, i) => <Skeleton key={i} height="2.4rem" style={{ marginBottom: 6, borderRadius: 7 }} />)}</aside><div className="ws-body"><header className="ws-topbar" aria-hidden="true"><Skeleton height="2rem" width="40%" /></header><main className="ws-content"><DashboardSkeleton label="Loading your workspace…" /></main></div></div>;
   if (!user) return <Navigate to="/login" replace />;
-  const professional = overview?.canManageServices; const role = user.role === 'admin' ? 'Administrator' : professional ? (overview?.plan && overview.plan !== 'free' ? 'Servix Pro professional' : 'Professional') : overview?.kind === 'applicant' ? 'Professional applicant' : 'Customer';
-  const sections = buildNavigation({ user, overview, features });
+  const professional = overview?.canManageServices; const role = user.role === 'admin' ? 'Administrator' : professional ? (plan.plan !== 'free' ? `Servix ${plan.label} professional` : 'Professional') : overview?.kind === 'applicant' ? 'Professional applicant' : 'Customer';
+  const sections = buildNavigation({ user, overview, features, plan });
   const kyc = user.role === 'admin' ? null : (overview?.kycStatus ?? user.kycStatus ?? null);
-  return <Context.Provider value={{ overview, user }}><div className="ws-layout">
+  return <Context.Provider value={{ overview, user, plan }}><div className="ws-layout">
     <a className="skip-link" href="#workspace-main">Skip to workspace</a>
     {menu && <button className="ws-menu-scrim" onClick={() => setMenu(false)} aria-label="Close navigation" />}
     <aside className={`ws-sidebar ${menu ? 'is-open' : ''}`} aria-label="Workspace navigation" id="workspace-navigation">

@@ -1,6 +1,6 @@
 import { ProviderButtons } from './ProviderButtons.jsx';
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { AuthShell } from './AuthShell.jsx';
 import { Button } from '../../components/ui/Button.jsx';
 import { Field } from '../../components/ui/Field.jsx';
@@ -19,6 +19,9 @@ export default function LoginPage() {
 
   const showToast = useToast();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  // Only same-origin paths are honoured, so a crafted link can never bounce someone to another site.
+  const nextPath = /^\/(?!\/)[\w\-./?=&%]*$/.test(searchParams.get('next') ?? '') ? searchParams.get('next') : '/dashboard';
   const { login, authAvailable } = useAuth();
   const [values, setValues] = useState({ email: '', password: '' });
   const [errors, setErrors] = useState({});
@@ -45,7 +48,7 @@ export default function LoginPage() {
       const result = await login({ email: values.email, password: values.password });
       if (result?.security) { navigate('/security-check', { state: result.security }); return; }
       showToast('Welcome back.', 'success');
-      navigate('/dashboard', { replace: true });
+      navigate(nextPath, { replace: true });
     } catch (err) {
       if (err.errors) setErrors(err.errors);
       else if (err.status === 401) setErrors({ password: 'Incorrect email or password.' });

@@ -13,16 +13,18 @@ import { requireProfessional } from '../lib/authGuard.js';
 import { ApiError } from '../lib/errors.js';
 import { parseBody } from '../lib/query.js';
 import { audit } from '../lib/audit.js';
-import { planSummary, startPlanCheckout, verifySubscription } from '../lib/plans.js';
+import { planSummaryFor, startPlanCheckout, verifySubscription } from '../lib/plans.js';
+import { entitlementsFor, canAccess } from '../lib/entitlements/index.js';
 
 const guard = { preHandler: requireProfessional };
 const dayKey = (d: Date) => d.toISOString().slice(0, 10);
 
 export async function proWorkspaceRoutes(app: FastifyInstance) {
   /* ---------------- plan ---------------- */
-  app.get('/pro/plan', { ...guard, schema: { tags: ['professional'], summary: 'Current plan, limits, usage and catalogue', security: [{ bearerAuth: [] }] } }, async (req, reply) => {
+  // Legacy aliases of /billing/* (kept for older clients; same logic, user-based).
+  app.get('/pro/plan', { ...guard, schema: { tags: ['professional'], summary: 'Current plan, limits, usage and catalogue (alias of /billing/plan)', security: [{ bearerAuth: [] }] } }, async (req, reply) => {
     reply.header('Cache-Control', 'no-store');
-    return planSummary(req.professionalProfileId!);
+    return planSummaryFor(await entitlementsFor(req));
   });
   app.post('/pro/plan/checkout', { ...guard, config: { rateLimit: { max: 5, timeWindow: '1 minute' } }, schema: { tags: ['professional'], summary: 'Start a plan upgrade checkout', security: [{ bearerAuth: [] }] } }, async (req, reply) => {
     reply.header('Cache-Control', 'no-store');
@@ -30,15 +32,16 @@ export async function proWorkspaceRoutes(app: FastifyInstance) {
     const user = await prisma.user.findUniqueOrThrow({ where: { id: req.auth!.sub } });
     if (!user.emailVerifiedAt) throw new ApiError(403, 'EMAIL_UNVERIFIED', 'Verify your email before upgrading.');
     const appBase = process.env.APP_BASE_URL ?? 'http://localhost:5173';
-    return startPlanCheckout(req.professionalProfileId!, user.id, user.email, plan, appBase);
+    return startPlanCheckout(user.id, user.email, plan, appBase);
   });
   app.post('/pro/plan/verify', { ...guard, config: { rateLimit: { max: 20, timeWindow: '1 minute' } }, schema: { tags: ['professional'], summary: 'Verify a plan payment after returning from checkout', security: [{ bearerAuth: [] }] } }, async (req, reply) => {
     reply.header('Cache-Control', 'no-store');
     const { reference } = parseBody(z.object({ reference: z.string().min(1).max(120) }).strict(), req.body);
-    const owned = await prisma.planSubscription.findFirst({ where: { reference, professionalId: req.professionalProfileId! } });
+    const owned = await prisma.planSubscription.findFirst({ where: { reference, OR: [{ userId: req.auth!.sub }, { professionalId: req.professionalProfileId! }] } });
     if (!owned) throw new ApiError(404, 'NOT_FOUND', 'Unknown plan reference.');
     const status = await verifySubscription(reference);
-    return { status, plan: await planSummary(req.professionalProfileId!) };
+    req.entitlements = undefined;
+    return { status, plan: await planSummaryFor(await entitlementsFor(req)) };
   });
 
   /* ---------------- analytics ---------------- */
@@ -75,9 +78,14 @@ export async function proWorkspaceRoutes(app: FastifyInstance) {
       listAchievements(proId),
     ]);
     const viewsByService = Object.fromEntries(serviceViews);
-    return {
+    // Plan-based depth. Basic figures for everyone; trends/breakdowns on Go+; application & profile performance on Pro+.
+    const ent = await entitlementsFor(req);
+    const detailed = canAccess(ent, 'analytics_detailed');
+    const advanced = canAccess(ent, 'analytics_advanced');
+    const base = {
       days, since: since.toISOString(),
-      views: { profile: profileViews.get(proId) ?? 0, services: [...serviceViews.values()].reduce((a, b) => a + b, 0), byService: viewsByService },
+      access: { plan: ent.plan, detailed, advanced },
+      views: { profile: profileViews.get(proId) ?? 0, services: [...serviceViews.values()].reduce((a, b) => a + b, 0), byService: detailed ? viewsByService : {} },
       reliability: trust.reliability, repeatCustomers: trust.repeatCustomers, response: trust.response,
       achievements, verifiedProjects: trust.verifiedProjects,
       totals: {
@@ -88,9 +96,48 @@ export async function proWorkspaceRoutes(app: FastifyInstance) {
         medianResponseHours: responded ? Number(responses.sort((a, b) => a - b)[Math.floor(responded / 2)]!.toFixed(1)) : null,
         activeServices: services.filter(s => s.status === 'active').length, totalServices: services.length,
       },
-      series: Object.entries(series).map(([date, v]) => ({ date, ...v })), statusCounts, ratingBreakdown,
-      services: [...byService.entries()].map(([id, v]) => ({ id, ...v })).sort((a, b) => b.bookings - a.bookings).slice(0, 8),
+      ratingBreakdown,
+      series: detailed ? Object.entries(series).map(([date, v]) => ({ date, ...v })) : [],
+      statusCounts: detailed ? statusCounts : {},
+      services: detailed ? [...byService.entries()].map(([id, v]) => ({ id, ...v })).sort((a, b) => b.bookings - a.bookings).slice(0, 8) : [],
+      performance: null as null | Record<string, unknown>,
     };
+    if (advanced) {
+      const [proposals, savedCount, prevViews] = await Promise.all([
+        prisma.proposal.findMany({ where: { professionalId: proId, createdAt: { gte: since } }, select: { status: true, priceKobo: true, createdAt: true, updatedAt: true, booking: { select: { id: true } } } }),
+        prisma.savedProfessional.count({ where: { professionalId: proId } }),
+        viewTotals('professional', [proId], new Date(since.getTime() - days * 86_400_000)),
+      ]);
+      const sent = proposals.length;
+      const accepted = proposals.filter((p) => p.status === 'accepted').length;
+      const rejected = proposals.filter((p) => p.status === 'rejected').length;
+      const withdrawn = proposals.filter((p) => p.status === 'withdrawn').length;
+      const pending = proposals.filter((p) => p.status === 'submitted').length;
+      const decided = proposals.filter((p) => p.status === 'accepted' || p.status === 'rejected');
+      const decisionHours = decided.map((p) => (p.updatedAt.getTime() - p.createdAt.getTime()) / 3_600_000).sort((a, b) => a - b);
+      const profileViewsNow = profileViews.get(proId) ?? 0;
+      const profileViewsPrev = Math.max(0, (prevViews.get(proId) ?? 0) - profileViewsNow);
+      const weekly: Record<string, { sent: number; accepted: number }> = {};
+      for (const p of proposals) { const d = new Date(p.createdAt); d.setUTCDate(d.getUTCDate() - d.getUTCDay()); const k = dayKey(d); weekly[k] ??= { sent: 0, accepted: 0 }; weekly[k].sent += 1; if (p.status === 'accepted') weekly[k].accepted += 1; }
+      base.performance = {
+        applications: {
+          sent, accepted, rejected, withdrawn, pending,
+          acceptanceRate: decided.length ? Math.round((accepted / decided.length) * 100) : null,
+          averagePrice: sent ? Math.round(proposals.reduce((a, p) => a + Number(p.priceKobo) / 100, 0) / sent) : null,
+          medianDecisionHours: decisionHours.length ? Number(decisionHours[Math.floor(decisionHours.length / 2)]!.toFixed(1)) : null,
+          bookingsFromProposals: proposals.filter((p) => p.booking).length,
+          weekly: Object.entries(weekly).sort(([a], [b]) => a.localeCompare(b)).map(([week, v]) => ({ week, ...v })),
+        },
+        profile: {
+          views: profileViewsNow, previousViews: profileViewsPrev,
+          viewsChangePercent: profileViewsPrev ? Math.round(((profileViewsNow - profileViewsPrev) / profileViewsPrev) * 100) : null,
+          viewToBookingRate: profileViewsNow ? Number(((bookings.length / profileViewsNow) * 100).toFixed(1)) : null,
+          savedByCustomers: savedCount,
+          repeatCustomerRate: trust.repeatCustomers,
+        },
+      };
+    }
+    return base;
   });
 
   /* ---------------- availability ---------------- */

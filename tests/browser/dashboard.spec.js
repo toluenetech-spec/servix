@@ -29,6 +29,7 @@ async function mock(page, options = {}) {
     if (path === 'account/notifications/read') return route.fulfill({ json: { updated: 0, unread: 0 } });
     if (path === 'account/saved') return route.fulfill({ json: [] });
     if (path === 'account/insights') return route.fulfill({ json: { statusCounts: {}, monthly: [], upcoming: [], pendingReviews: [] } });
+    if (path === 'me/entitlements' || path === 'billing/plan') return route.fulfill({ json: { current: options.plan ?? 'free', label: options.plan === 'pro' ? 'Pro' : 'Free', source: 'account', own: { plan: options.plan ?? 'free' }, expiresAt: null, expired: false, organization: null, features: options.plan === 'pro' ? ['advanced_filters', 'analytics_detailed', 'analytics_advanced'] : [], limits: { listings: options.plan === 'pro' ? 15 : 2, monthly_ai_tokens: 20000 }, usage: { listings: 1 }, aiDepartments: ['assistant'], ai: { used: 0, allowed: 20000, remaining: 20000, percent: 0, level: 'ok', resetAt: '2026-11-01T00:00:00.000Z' }, period: { start: '2026-10-01T00:00:00.000Z', resetAt: '2026-11-01T00:00:00.000Z' }, plans: [{ slug: 'free', name: 'Free', price: 0, rank: 0, purchasable: false, limits: {}, capabilities: [], aiDepartments: [], features: [] }, { slug: 'pro', name: 'Pro', price: 15000, rank: 2, purchasable: true, limits: {}, capabilities: [], aiDepartments: [], features: [] }], subscriptions: [] } });
     if (path === 'pro/plan') return route.fulfill({ json: { current: options.plan ?? 'free', label: options.plan === 'professional' ? 'Servix Pro' : 'Free', expiresAt: null, expired: false, limits: { listings: 2, analytics: false, label: 'Free' }, usage: { listings: 0 }, plans: [], subscriptions: [] } });
     if (path === 'pro/analytics') return route.fulfill({ json: { days: 30, since: new Date().toISOString(), totals: { bookings: 0, completed: 0, cancelled: 0, earnings: 0, uniqueClients: 0, ratingAvg: 0, reviewCount: 0, completedProjects: 0, responseRate: null, medianResponseHours: null, activeServices: 0, totalServices: 0 }, series: [], byStatus: {}, topServices: [] } });
     if (path === 'pro/earnings') return route.fulfill({ json: { payable: 0, lifetimeEarnings: 0, payouts: [] } });
@@ -107,16 +108,16 @@ for(const path of ['messages','network'])test(`${path} is honest when disabled a
 test('approved professional on the free plan sees an upgrade link instead of the apply tab', async ({page}) => {
   await mock(page, { state: { kind:'professional', needsChoice:false, canManageServices:true, plan:'free' }, user: { role:'professional' } });
   await page.goto('/dashboard');
-  await expect(page.getByRole('link', { name: 'Upgrade to Servix Pro', exact: true })).toHaveAttribute('href', '/dashboard/plan');
+  await expect(page.getByRole('link', { name: 'Upgrade your plan', exact: true })).toHaveAttribute('href', '/dashboard/plan');
   await expect(page.getByRole('link', { name: 'Become a professional', exact: true })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Analytics', exact: true })).toBeVisible();
 });
-test('professional already on Servix Pro sees the plan tab, not an upgrade prompt', async ({page}) => {
-  await mock(page, { state: { kind:'professional', needsChoice:false, canManageServices:true, plan:'professional' }, user: { role:'professional' }, plan: 'professional' });
+test('professional already on Pro sees the plan tab, not an upgrade prompt', async ({page}) => {
+  await mock(page, { state: { kind:'professional', needsChoice:false, canManageServices:true, plan:'pro' }, user: { role:'professional' }, plan: 'pro' });
   await page.goto('/dashboard/plan');
-  await expect(page.getByRole('link', { name: 'Servix Pro plan', exact: true })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Upgrade to Servix Pro', exact: true })).toHaveCount(0);
-  await expect(page.getByRole('heading', { name: 'Servix Pro plan' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Pro plan', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Upgrade your plan', exact: true })).toHaveCount(0);
+  await expect(page.getByTestId('plan-current')).toHaveText('Pro');
 });
 test('notification bell shows the unread count and opens the inbox', async ({page}) => {
   const notifications = [{ id: 'n1', type: 'admin.broadcast', title: 'Servix maintenance tonight', body: 'Payments pause from 23:00 for 10 minutes.', link: '/dashboard', readAt: null, createdAt: new Date().toISOString() }];

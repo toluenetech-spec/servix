@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { getProAnalytics, getPlan } from '../../lib/workspaceApi.js';
+import { getProAnalytics } from '../../lib/workspaceApi.js';
+import { UpgradeNotice } from '../../components/plans/PlanBits.jsx';
+import { ExportButton } from './TeamPage.jsx';
 import { useDocumentMeta } from '../../lib/useDocumentMeta.js';
 import { formatPrice } from '../../lib/format.js';
 import { LineChart, BarChart, Donut, HBars } from '../../components/dashboard/Charts.jsx';
@@ -12,8 +14,10 @@ import { useToast } from '../../components/ui/Toast.jsx';
 const STATUS_LABEL = { pending_payment: 'Awaiting payment', requested: 'Requested', accepted: 'Accepted', in_progress: 'In progress', delivered: 'Delivered', completed: 'Completed', declined: 'Declined', cancelled: 'Cancelled', disputed: 'Disputed', refunded: 'Refunded' };
 export default function AnalyticsPage() {
   useDocumentMeta({ title: 'Analytics', description: 'Your Servix performance metrics.' });
-  const [days, setDays] = useState(30); const r = useResource(() => Promise.all([getProAnalytics(days), getPlan()]).then(([analytics, plan]) => ({ ...analytics, plan })), [days]);
-  const a = r.data; const t = a?.totals; const detailed = a?.plan?.limits?.analytics;
+  const [days, setDays] = useState(30); const r = useResource(() => getProAnalytics(days), [days]);
+  // Depth is decided by the API from the account's plan (`access`): basic for Free, detailed on Go+, advanced on Pro+.
+  const a = r.data; const t = a?.totals; const detailed = Boolean(a?.access?.detailed); const advanced = Boolean(a?.access?.advanced);
+  const exportBase = `${import.meta.env.VITE_API_URL?.replace(/\/$/, '') ?? ''}/api/v1/exports`;
   const features = useFeatures();
   return <><PageHead title="Analytics" description="Every figure below is calculated from your own bookings, ledger entries and reviews. Nothing is estimated."><div className="ws-range" role="group" aria-label="Period">{[7, 30, 90, 365].map(d => <button key={d} aria-pressed={days === d} onClick={() => setDays(d)}>{d === 365 ? '1 year' : `${d} days`}</button>)}</div></PageHead><LoadState skeleton="stats" label="Loading your analytics…" resource={r}>{() => <>
     <div className="ws-stat-grid">
@@ -22,7 +26,7 @@ export default function AnalyticsPage() {
       <div className="ws-stat"><span>Rating</span><strong>{t.reviewCount ? t.ratingAvg.toFixed(2) : '—'}</strong><small>{t.reviewCount} published review{t.reviewCount === 1 ? '' : 's'} overall</small></div>
       <div className="ws-stat"><span>Response rate</span><strong>{t.responseRate === null ? '—' : `${t.responseRate}%`}</strong><small>{t.medianResponseHours === null ? 'No paid requests in this period' : `Median ${t.medianResponseHours} h to accept or decline`}</small></div>
     </div>
-    {!detailed && <div className="ws-alert"><strong>Basic analytics.</strong> You are seeing headline numbers for your account. <Link to="/dashboard/plan">Upgrade to Servix Pro</Link> to unlock trends, status breakdowns and per-service performance.</div>}
+    {!detailed && <UpgradeNotice title="Basic analytics" body="You are seeing headline numbers for your account. Trends, status breakdowns and per-service performance are included from the Go plan; application and profile performance from Pro." upgradeTo="go" />}
     {detailed && <>
       <div className="ws-chart-grid">
         <section className="ws-panel"><LineChart data={a.series} y="earnings" label="Earnings released per day" money /></section>
@@ -32,6 +36,8 @@ export default function AnalyticsPage() {
       </div>
       <section className="ws-panel"><h2>Service performance</h2>{!a.services.length ? <p className="ws-muted">No bookings for your services in this period.</p> : <div className="ws-record-table"><table><thead><tr><th>SERVICE</th><th>BOOKINGS</th><th>REVENUE (COMPLETED, AFTER FEES)</th></tr></thead><tbody>{a.services.map(s => <tr key={s.id}><td>{s.title}</td><td>{s.bookings}</td><td>{formatPrice(s.revenue)}</td></tr>)}</tbody></table></div>}</section>
     </>}
+    {detailed && !advanced && <UpgradeNotice title="Application & profile performance" body="See your proposal acceptance rate, decision times, weekly trend, profile-view changes and view-to-booking rate on the Pro plan." upgradeTo="pro" compact />}
+    {advanced && a.performance && <PerformancePanel p={a.performance} />}
     <div className="ws-stat-grid">
       <div className="ws-stat"><span>Profile views</span><strong>{a.views?.profile ?? 0}</strong><small>{a.views?.services ?? 0} gig views in this period</small></div>
       <div className="ws-stat"><span>Delivery reliability</span><strong>{a.reliability?.measurable >= 5 && a.reliability.percent != null ? `${a.reliability.percent}%` : <small style={{ fontSize: 14 }}>{NOT_ENOUGH}</small>}</strong><small>{a.reliability?.measurable ? `${a.reliability.onTime} on time, ${a.reliability.late} late of ${a.reliability.measurable} with a deadline` : 'Counts deliveries made by the agreed deadline (needs 5)'}</small></div>
@@ -39,9 +45,29 @@ export default function AnalyticsPage() {
       <div className="ws-stat"><span>Verified projects</span><strong>{a.verifiedProjects ?? 0}</strong><small>Completed bookings shown as Verified Servix Projects</small></div>
     </div>
     {features.achievements && <AchievementsPanel earned={a.achievements ?? []} />}
+    <section className="ws-panel"><h2>Export your records</h2><p className="ws-muted" style={{ marginBottom: 12 }}>Download CSV files of your bookings, proposals and earnings. Exports count towards your plan's monthly allowance.</p><div className="ws-actions"><ExportButton href={`${exportBase}/bookings.csv`} label="Bookings CSV" /><ExportButton href={`${exportBase}/proposals.csv`} label="Proposals CSV" /><ExportButton href={`${exportBase}/earnings.csv`} label="Earnings CSV" /></div></section>
     <VerifiedProjectsPanel />
     <div className="ws-stat-grid"><div className="ws-stat"><span>Unique clients</span><strong>{t.uniqueClients}</strong><small>Distinct customers who booked in this period</small></div><div className="ws-stat"><span>Active services</span><strong>{t.activeServices}<small style={{ fontSize: 16 }}> / {t.totalServices}</small></strong><small>Published out of all listings</small></div><div className="ws-stat"><span>Completed projects</span><strong>{t.completedProjects}</strong><small>Shown on your public profile</small></div><div className="ws-stat"><span>Period</span><strong style={{ fontSize: 22 }}>{days === 365 ? '1 year' : `${days} days`}</strong><small>Since {new Date(a.since).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</small></div></div>
   </>}</LoadState></>;
+}
+
+function PerformancePanel({ p }) {
+  const ap = p.applications; const pf = p.profile;
+  return <section className="ws-panel" data-testid="performance-panel"><h2>Application & profile performance</h2>
+    <div className="ws-stat-grid" style={{ marginTop: 6 }}>
+      <div className="ws-stat"><span>Proposals sent</span><strong>{ap.sent}</strong><small>{ap.pending} awaiting a decision · {ap.withdrawn} withdrawn</small></div>
+      <div className="ws-stat"><span>Acceptance rate</span><strong>{ap.acceptanceRate === null ? '—' : `${ap.acceptanceRate}%`}</strong><small>{ap.accepted} accepted · {ap.rejected} declined</small></div>
+      <div className="ws-stat"><span>Decision time</span><strong>{ap.medianDecisionHours === null ? '—' : `${ap.medianDecisionHours} h`}</strong><small>Median time until customers decided</small></div>
+      <div className="ws-stat"><span>Average proposal</span><strong style={{ fontSize: 22 }}>{ap.averagePrice === null ? '—' : formatPrice(ap.averagePrice)}</strong><small>{ap.bookingsFromProposals} became bookings</small></div>
+    </div>
+    {ap.weekly.length > 0 && <div className="ws-chart-grid"><section className="ws-panel" style={{ marginBottom: 0 }}><BarChart data={ap.weekly} x="week" y="sent" label="Proposals sent per week" /></section><section className="ws-panel" style={{ marginBottom: 0 }}><BarChart data={ap.weekly} x="week" y="accepted" label="Accepted per week" color="#2f6b4f" /></section></div>}
+    <div className="ws-stat-grid">
+      <div className="ws-stat"><span>Profile views</span><strong>{pf.views}</strong><small>{pf.viewsChangePercent === null ? `${pf.previousViews} in the previous period` : `${pf.viewsChangePercent > 0 ? '+' : ''}${pf.viewsChangePercent}% vs the previous period`}</small></div>
+      <div className="ws-stat"><span>View → booking</span><strong>{pf.viewToBookingRate === null ? '—' : `${pf.viewToBookingRate}%`}</strong><small>Bookings per 100 profile views</small></div>
+      <div className="ws-stat"><span>Saved by customers</span><strong>{pf.savedByCustomers}</strong><small>Customers who shortlisted you</small></div>
+      <div className="ws-stat"><span>Repeat customers</span><strong>{pf.repeatCustomerRate?.percent != null ? `${pf.repeatCustomerRate.percent}%` : '—'}</strong><small>{pf.repeatCustomerRate?.customers ? `${pf.repeatCustomerRate.repeat} of ${pf.repeatCustomerRate.customers} booked again` : 'Shown after 5 customers'}</small></div>
+    </div>
+  </section>;
 }
 
 function AchievementsPanel({ earned }) {

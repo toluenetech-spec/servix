@@ -31,7 +31,7 @@ async function main() {
   await prisma.professionalProfile.deleteMany();
   await prisma.category.deleteMany();
   await prisma.testimonial.deleteMany();
-  await prisma.plan.deleteMany();
+  // Plans are upserted (not deleted) so plan subscriptions and admin overrides survive a reseed.
   await prisma.faq.deleteMany();
 
   const categoryIdBySlug = new Map<string, string>();
@@ -147,20 +147,21 @@ async function main() {
     });
   }
   for (const [i, p] of pricingPlans.entries()) {
-    await prisma.plan.create({
-      data: {
-        slug: p.id,
-        name: p.name,
-        tagline: p.tagline,
-        price: BigInt(p.price),
-        period: p.period === 'forever' ? 'per month' : p.period,
-        cta: p.cta,
-        highlighted: p.highlighted,
-        features: p.features,
-        position: i,
-      },
-    });
+    const data = {
+      name: p.name,
+      tagline: p.tagline,
+      price: BigInt(p.price),
+      period: p.period === 'forever' ? 'per month' : p.period,
+      isActive: true,
+      cta: p.cta,
+      highlighted: p.highlighted,
+      features: p.features,
+      position: i,
+    };
+    await prisma.plan.upsert({ where: { slug: p.id }, create: { slug: p.id, ...data }, update: data });
   }
+  // Legacy catalogue rows (professional / business) are retired, never deleted: history may reference them.
+  await prisma.plan.updateMany({ where: { slug: { notIn: pricingPlans.map((p) => p.id) } }, data: { isActive: false } });
   for (const [context, list] of Object.entries(faqs)) {
     for (const [i, f] of (list as { q: string; a: string }[]).entries()) {
       await prisma.faq.create({ data: { context, question: f.q, answer: f.a, position: i } });

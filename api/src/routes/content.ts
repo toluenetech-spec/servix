@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/db.js';
+import { planCatalog } from '../lib/plans.js';
 import { parseBody, parseQuery } from '../lib/query.js';
 import { serializeFaq, serializePlan, serializeTestimonial } from '../lib/serialize.js';
 
@@ -29,9 +30,9 @@ export async function contentRoutes(app: FastifyInstance) {
     },
   );
 
-  app.get('/plans', { schema: { tags: ['content'], summary: 'List active pricing plans' } }, async () => {
-    const rows = await prisma.plan.findMany({ where: { isActive: true }, orderBy: { position: 'asc' } });
-    return rows.map(serializePlan);
+  app.get('/plans', { schema: { tags: ['content'], summary: 'List active pricing plans with effective limits and capabilities' } }, async () => {
+    const [rows, catalog] = await Promise.all([prisma.plan.findMany({ where: { isActive: true }, orderBy: { position: 'asc' } }), planCatalog()]);
+    return rows.map((p) => { const c = catalog.find((x) => x.slug === p.slug); return { ...serializePlan(p), limits: c?.limits ?? null, capabilities: c?.capabilities ?? [], aiDepartments: c?.aiDepartments ?? [], purchasable: c?.purchasable ?? false }; });
   });
 
   app.get(

@@ -93,6 +93,17 @@ model User {
   savedProfessionals SavedProfessional[]
 
   authVersion Int @default(0) @map("auth_version")
+  /** Subscription (all roles). Expired paid plan behaves as free. Team/enterprise members inherit the organization's plan. */
+  planSlug      String    @default("free") @map("plan_slug")
+  planExpiresAt DateTime? @map("plan_expires_at")
+  /** Enterprise: per-account limit overrides set by an administrator. */
+  customLimits  Json      @default("{}") @map("custom_limits")
+  planSubscriptions PlanSubscription[]
+  ownedOrganizations Organization[] @relation("org_owner")
+  organizationMemberships OrganizationMember[] @relation("org_member_user")
+  organizationInvitesSent OrganizationMember[] @relation("org_member_inviter")
+  aiUsageEvents AiUsageEvent[]
+  savedSearches SavedSearch[]
   oauthIdentities OAuthIdentity[]
   security AccountSecurity?
   securityFlows SecurityFlow[]
@@ -505,6 +516,7 @@ model ProfessionalProfile {
   availabilityExceptions AvailabilityException[]
   achievements      ProfessionalAchievement[]
   proposals         Proposal[]
+  profileVersions   ProfileVersion[]
 
   @@index([categoryId, verification, availability])
   @@map("professional_profiles")
@@ -652,6 +664,8 @@ model Plan {
   cta         String  @default("Get Started")
   highlighted Boolean @default(false)
   features    Json    @default("[]")
+  /** Operator overrides merged over the code catalogue: { limits: {...}, features: {...}, aiDepartments: [...] }. */
+  limits      Json    @default("{}")
   isActive    Boolean @default(true) @map("is_active")
   position    Int     @default(0)
 
@@ -864,7 +878,8 @@ model NotificationBroadcast {
 }
 model PlanSubscription {
   id String @id @default(uuid())
-  professionalId String @map("professional_id")
+  professionalId String? @map("professional_id")
+  userId String? @map("user_id")
   planSlug String @map("plan_slug")
   status String @default("initiated")
   reference String @unique
@@ -876,8 +891,10 @@ model PlanSubscription {
   verifiedAt DateTime? @map("verified_at")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
-  professional ProfessionalProfile @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  professional ProfessionalProfile? @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@index([professionalId, status])
+  @@index([userId, status])
   @@map("plan_subscriptions")
 }
 model SavedProfessional {
@@ -988,6 +1005,9 @@ model Proposal {
   proposedStartAt DateTime?           @map("proposed_start_at")
   status          ProposalStatus      @default(submitted)
   rejectedReason  String?             @map("rejected_reason")
+  /** Private organisation tools (Go+): label + note visible to the professional only. */
+  label           String?
+  privateNote     String?             @map("private_note")
   createdAt       DateTime            @default(now()) @map("created_at")
   updatedAt       DateTime            @updatedAt @map("updated_at")
   request         ServiceRequest      @relation(fields: [requestId], references: [id], onDelete: Cascade)
@@ -998,4 +1018,125 @@ model Proposal {
   @@index([requestId, status])
   @@index([professionalId, status])
   @@map("proposals")
+}
+
+/* ---------------- Subscriptions, entitlements & usage (0.9.0) ---------------- */
+
+enum OrganizationRole {
+  owner
+  admin
+  member
+}
+
+enum OrganizationMemberStatus {
+  invited
+  active
+}
+
+/** A team / enterprise workspace. Entitlements come from the owner's plan (or an admin-assigned plan); AI tokens pool here. */
+model Organization {
+  id           String   @id @default(uuid())
+  name         String
+  slug         String   @unique
+  ownerId      String   @map("owner_id")
+  /** Admin-assigned plan (enterprise deals). null = follow the owner's subscription. */
+  planSlug      String?   @map("plan_slug")
+  planExpiresAt DateTime? @map("plan_expires_at")
+  customLimits  Json      @default("{}") @map("custom_limits")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  owner   User                 @relation("org_owner", fields: [ownerId], references: [id])
+  members OrganizationMember[]
+  aiUsageEvents AiUsageEvent[]
+  @@index([ownerId])
+  @@map("organizations")
+}
+
+model OrganizationMember {
+  id              String                   @id @default(uuid())
+  organizationId  String                   @map("organization_id")
+  userId          String?                  @map("user_id")
+  role            OrganizationRole         @default(member)
+  status          OrganizationMemberStatus @default(invited)
+  invitedEmail    String?                  @map("invited_email")
+  inviteTokenHash String?                  @unique @map("invite_token_hash")
+  inviteExpiresAt DateTime?                @map("invite_expires_at")
+  invitedById     String?                  @map("invited_by_id")
+  /** Optional per-member monthly AI cap inside the team pool (null = pool only). */
+  aiTokenCap      Int?                     @map("ai_token_cap")
+  createdAt       DateTime                 @default(now()) @map("created_at")
+  acceptedAt      DateTime?                @map("accepted_at")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?        @relation("org_member_user", fields: [userId], references: [id], onDelete: Cascade)
+  invitedBy    User?        @relation("org_member_inviter", fields: [invitedById], references: [id], onDelete: SetNull)
+  @@unique([organizationId, userId])
+  @@index([userId, status])
+  @@index([organizationId, status])
+  @@map("organization_members")
+}
+
+/** Metered, per-period counters (AI tokens, exports). `reserved` holds in-flight AI reservations so concurrent calls cannot exceed the allowance. */
+model UsagePeriod {
+  id          String   @id @default(uuid())
+  subjectType String   @map("subject_type")
+  subjectId   String   @map("subject_id")
+  metric      String
+  periodStart DateTime @map("period_start") @db.Date
+  used        BigInt   @default(0)
+  reserved    BigInt   @default(0)
+  requests    Int      @default(0)
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  @@unique([subjectType, subjectId, metric, periodStart])
+  @@map("usage_periods")
+}
+
+/** One row per AI task (not per model attempt). No prompts, answers or secrets. */
+model AiUsageEvent {
+  id               String   @id @default(uuid())
+  userId           String?  @map("user_id")
+  organizationId   String?  @map("organization_id")
+  planSlug         String   @map("plan_slug")
+  department       String
+  modelAlias       String?  @map("model_alias")
+  model            String?
+  promptTokens     Int      @default(0) @map("prompt_tokens")
+  completionTokens Int      @default(0) @map("completion_tokens")
+  totalTokens      Int      @default(0) @map("total_tokens")
+  ok               Boolean
+  durationMs       Int      @map("duration_ms")
+  fallbackUsed     Boolean  @default(false) @map("fallback_used")
+  attempts         Int      @default(1)
+  errorCode        String?  @map("error_code")
+  createdAt        DateTime @default(now()) @map("created_at")
+  user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  @@index([createdAt])
+  @@index([userId, createdAt])
+  @@index([organizationId, createdAt])
+  @@index([department, createdAt])
+  @@map("ai_usage_events")
+}
+
+model SavedSearch {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  kind      String
+  name      String
+  params    Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, kind])
+  @@map("saved_searches")
+}
+
+/** Named snapshots of the public professional profile (title, about, skills) that can be restored. */
+model ProfileVersion {
+  id             String   @id @default(uuid())
+  professionalId String   @map("professional_id")
+  name           String
+  data           Json
+  createdAt      DateTime @default(now()) @map("created_at")
+  professional ProfessionalProfile @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  @@index([professionalId, createdAt(sort: Desc)])
+  @@map("profile_versions")
 }

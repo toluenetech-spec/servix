@@ -62,10 +62,7 @@ describe.skipIf(process.env.RUN_LOCAL_KYC_TESTS !== '1')('manual KYC, isolated l
       }
     } finally { await client.end(); }
     prisma = (await import('../src/lib/db.js')).prisma;
-    await prisma.plan.createMany({ data: [
-      { slug: 'free', name: 'Free', price: 0n, position: 0, features: [] },
-      { slug: 'professional', name: 'Servix Pro', price: 15000n, position: 1, features: [] },
-    ] });
+    /* Plans (free/go/pro/team/enterprise) are inserted by the subscriptions migration itself. */
     app = await (await import('../src/app.js')).buildApp(); await app.ready();
   });
   afterAll(async () => {

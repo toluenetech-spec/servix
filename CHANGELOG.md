@@ -2,6 +2,47 @@
 
 All notable changes to the Servix public website.
 
+## 0.9.0 — 2026-10-03 (Subscriptions, entitlements and feature access)
+
+### Added
+- **Five plans for every account**: Free ₦0 · Go ₦5,000 · Pro ₦15,000 · Team ₦35,000 · Enterprise (custom,
+  admin-assigned). Plans now live on the user (`users.plan_slug`), so customers, professionals and teams
+  all have one. Legacy `professional`/`business` slugs become `pro`/`team` with data preserved.
+- **Central entitlement catalogue + engine** (`api/src/lib/entitlements/`): typed features, limits and AI
+  departments per plan; `canAccess / getLimit / canUseAI / assertWithinLimit / requireEntitlement`;
+  per-plan operator overrides and Enterprise custom limits without a deploy. Plan errors carry `meta`
+  (limit, plan, upgrade target, reset date) so the UI explains instead of guessing.
+- **Existing features mapped to plans**: listings, portfolio, proposals (monthly + live), requests,
+  saved professionals, analytics depth; new Go+ productivity: advanced request filters, saved searches,
+  proposal labels/private notes, profile versions, CSV exports; Pro+: proposal pipeline, advanced
+  analytics, profile badge, priority AI routing.
+- **Servix AI usage metering**: monthly token allowances (20k / 100k / 300k / 1M pool / 3M default),
+  atomic reservation so concurrent calls cannot overshoot, failures never billed, warnings at 75 % and
+  90 %, hard stop at 100 % with calm upgrade copy; `GET /ai/usage`, live `ai.quota` on every answer;
+  `ai_usage_events` (never prompts, answers or keys).
+- **Team workspace** (Team/Enterprise): create team, e-mail invitations (`/join-team`), roles
+  owner/admin/member, seats, shared view of requests/proposals, activity, pooled AI tokens with optional
+  per-member caps, Enterprise audit log + CSV.
+- **Admin console**: *Plans & organisations* (catalogue, overrides, organisations, grant any plan) and
+  *AI usage* (totals, by plan/tool/model, errors, trends, top users/teams, recent events, filters).
+- Web: `/dashboard/plan` redesigned (meters, 5-plan grid, comparison table, downgrade confirmation),
+  `/dashboard/team`, `/join-team`, plan tags and upgrade notices across the AI hub, proposals and
+  analytics; public pricing page and FAQs updated to the five plans.
+- Migration `20261004000000_subscriptions_entitlements` + guarded Neon script
+  `api/docs/manual-subscriptions-upgrade.sql`. Docs: `docs/SUBSCRIPTION_ENTITLEMENT_PLAN.md`,
+  `api/docs/ENTITLEMENTS.md`.
+
+### Changed
+- Downgrades never delete data: items above the new limit stay; only new items are blocked, with an
+  explanation and a path back.
+- Seed upserts plans (no `deleteMany`) and marks unknown slugs inactive.
+- Error envelope now forwards `meta` for plan/quota errors.
+
+### Tests
+- New: `api/tests/entitlements-local.test.ts` (13), `api/tests/manual-subscriptions-sql-local.test.ts` (2),
+  `tests/browser/plans.spec.js` (8). Regression: API `tsc` clean, all local suites green, root 23/23,
+  Playwright 100/100.
+
 ## 0.8.2 — 2026-10-03 (Servix AI: faster answers, proper formatting, brand mark, premium hub)
 
 ### Added

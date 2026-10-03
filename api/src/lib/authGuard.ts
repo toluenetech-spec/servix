@@ -81,3 +81,9 @@ export async function requireKycVerified(req: FastifyRequest, reply: FastifyRepl
     throw new ApiError(403, 'KYC_REQUIRED', KYC_REQUIRED_MESSAGE, { kycStatus: user.kycStatus });
   }
 }
+
+/** Attaches `req.auth` when a valid Bearer token is present; anonymous requests pass through. */
+export async function optionalAuth(req: FastifyRequest, reply: FastifyReply): Promise<void> {
+  if (!req.headers.authorization?.startsWith('Bearer ')) return;
+  try { await requireAuth(req, reply); } catch { req.auth = undefined; }
+}

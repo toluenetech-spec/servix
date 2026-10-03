@@ -75,6 +75,9 @@ export function proposalDraftToForm(draft, current = {}) {
 export function aiErrorMessage(err) {
   const code = err?.code; const status = err?.status;
   if (code === 'FEATURE_DISABLED') return 'Servix AI is switched off right now.';
+  if (code === 'AI_QUOTA_EXCEEDED') return err?.meta?.scope === 'member' ? 'Your personal AI allowance for this month is used up. Your team admin can raise it, or it resets next month.' : 'Your Servix AI allowance for this month is used up. It resets on the 1st; plans with more AI tokens are on the Plan page.';
+  if (code === 'PLAN_FEATURE' || code === 'FEATURE_LOCKED') return err?.meta?.upgradeToLabel ? `This AI tool is available on ${err.meta.upgradeToLabel} and above.` : 'This AI tool is not included in your plan.';
+  if (code === 'PLAN_LIMIT') return err?.message || 'You have reached a limit on your plan.';
   if (code === 'AI_UNAVAILABLE' || status === 503) return 'Servix AI is busy at the moment. Please try again in a minute — nothing was changed.';
   if (code === 'AI_TIMEOUT' || status === 504) return 'That took too long and was stopped. Please try again — nothing was changed.';
   if (code === 'AI_INVALID_OUTPUT' || status === 502) return 'Servix AI could not produce a usable answer this time. Please try again or continue manually.';

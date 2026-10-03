@@ -17,6 +17,7 @@ async function toError(res) {
   err.status = payload?.error?.status ?? res.status;
   err.code = payload?.error?.code;
   if (payload?.error?.errors) err.errors = payload.error.errors;
+  if (payload?.error?.meta) err.meta = payload.error.meta;
   return err;
 }
 
@@ -81,6 +82,7 @@ async function streamPost(path, fallbackPath, body, { signal, onDelta } = {}) {
 
 /* ---------- everyone ---------- */
 export const searchIntent = (query, opts) => post('/ai/search/intent', { query }, { auth: false, ...opts });
+export const aiUsage = () => authorizedFetch(`${V1}/ai/usage`).then(async (res) => { if (!res.ok) throw await toError(res); return res.json(); });
 
 /* ---------- signed in ---------- */
 export const askAssistant = (messages, opts) => (opts?.onDelta ? streamPost('/ai/assistant/stream', '/ai/assistant', { messages }, opts) : post('/ai/assistant', { messages }, opts));

@@ -195,7 +195,7 @@ describe('content endpoints', () => {
     for (const x of t) expect(x.isDemo).toBe(true);
 
     const plans = (await get('/api/v1/plans')).json();
-    expect(plans.map((p: { id: string }) => p.id)).toEqual(['free', 'professional', 'business']);
+    expect(plans.map((p: { id: string }) => p.id)).toEqual(['free', 'go', 'pro', 'team', 'enterprise']);
     expect(plans[0].period).toBe('forever');
 
     const grouped = (await get('/api/v1/faqs')).json();

@@ -17,6 +17,7 @@ import { serializeProfessionalDetail, serializeServiceDetail } from '../lib/seri
 import { ALLOWED_IMAGE_TYPES, getStorage, MAX_UPLOAD_BYTES, mediaUrl } from '../lib/storage.js';
 import { audit } from '../lib/audit.js';
 import { assertListingAllowed } from '../lib/plans.js';
+import { entitlementsFor, assertWithinLimit } from '../lib/entitlements/index.js';
 import { assertOwnMediaUrl } from './uploads.js';
 import { profileDetailsSchema } from './applications.js';
 
@@ -245,7 +246,7 @@ export async function proRoutes(app: FastifyInstance) {
       const count = await prisma.portfolioItem.count({
         where: { professionalId: req.professionalProfileId! },
       });
-      if (count >= 20) throw new ApiError(409, 'PORTFOLIO_FULL', 'Portfolio limit reached (20 items).');
+      assertWithinLimit(await entitlementsFor(req), 'portfolio_items', count, 1);
       const item = await prisma.portfolioItem.create({
         data: { ...data, professionalId: req.professionalProfileId!, position: count },
       });
@@ -322,7 +323,7 @@ export async function proRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const data = parseBody(serviceSchema, req.body);
       checkGallery(data.gallery);
-      await assertListingAllowed(req.professionalProfileId!);
+      await assertListingAllowed(req.professionalProfileId!, await entitlementsFor(req));
       const category = await prisma.category.findUnique({ where: { slug: data.categorySlug } });
       if (!category) throw new ApiError(422, 'VALIDATION_ERROR', 'Unknown category.');
 

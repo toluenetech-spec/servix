@@ -23,7 +23,7 @@ import { retryPayout } from '../lib/payoutService.js';
 import { enqueueMail } from '../lib/jobs.js';
 import { disputeResolvedMail } from '../lib/mailer.js';
 import { broadcast, notify } from '../lib/notifications.js';
-import { PLAN_LIMITS, effectivePlan } from '../lib/plans.js';
+import { PLAN_LABEL, effectivePlan } from '../lib/plans.js';
 
 export async function adminRoutes(app: FastifyInstance) {
   const guard = { preHandler: requireAdmin };
@@ -483,7 +483,7 @@ export async function adminRoutes(app: FastifyInstance) {
         prisma.ledgerEntry.aggregate({ where: { account: 'platform_revenue', direction: 'credit', createdAt: { gte: since } }, _sum: { amountKobo: true } }),
         prisma.booking.groupBy({ by: ['serviceId'], where: { createdAt: { gte: since } }, _count: true }),
         prisma.booking.groupBy({ by: ['professionalId'], where: { createdAt: { gte: since }, status: 'completed' }, _count: true, _sum: { amountKobo: true }, orderBy: { _count: { professionalId: 'desc' } }, take: 5 }),
-        prisma.professionalProfile.findMany({ select: { planSlug: true, planExpiresAt: true } }),
+        prisma.user.findMany({ where: { deletedAt: null }, select: { planSlug: true, planExpiresAt: true } }),
         prisma.planSubscription.aggregate({ where: { status: 'active', verifiedAt: { gte: since } }, _sum: { amountKobo: true }, _count: true }),
       ]);
       const series: Record<string, { signups: number; bookings: number; gmv: number; refunds: number }> = {};
@@ -508,7 +508,7 @@ export async function adminRoutes(app: FastifyInstance) {
         series: Object.entries(series).map(([date, v]) => ({ date, ...v })),
         statusCounts, categories: Object.entries(byCategory).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count).slice(0, 8),
         applications: Object.fromEntries(applications.map(a => [a.status, a._count])),
-        plans: Object.entries(plans).map(([slug, count]) => ({ slug, label: PLAN_LIMITS[slug]?.label ?? slug, count })),
+        plans: Object.entries(plans).map(([slug, count]) => ({ slug, label: PLAN_LABEL[slug as keyof typeof PLAN_LABEL] ?? slug, count })),
         topProfessionals: topPros.map(p => ({ ...(proNames.find(n => n.id === p.professionalId) ?? { id: p.professionalId, name: 'Unknown', slug: '' }), completed: p._count, volume: Number(p._sum.amountKobo ?? 0n) / 100 })),
         servicesBooked: categories.length,
       };
@@ -565,9 +565,11 @@ export async function adminRoutes(app: FastifyInstance) {
       const where = q.status ? { status: q.status } : {};
       const [total, rows] = await prisma.$transaction([
         prisma.planSubscription.count({ where }),
-        prisma.planSubscription.findMany({ where, include: { professional: { select: { name: true, slug: true, planSlug: true, planExpiresAt: true, user: { select: { email: true } } } } }, orderBy: { createdAt: 'desc' }, skip: (q.page - 1) * q.pageSize, take: q.pageSize }),
+        prisma.planSubscription.findMany({ where, include: { professional: { select: { name: true, slug: true } }, user: { select: { id: true, fullName: true, email: true, role: true, planSlug: true, planExpiresAt: true } } }, orderBy: { createdAt: 'desc' }, skip: (q.page - 1) * q.pageSize, take: q.pageSize }),
       ]);
-      return { total, page: q.page, pageSize: q.pageSize, items: rows.map(r => ({ id: r.id, reference: r.reference, plan: r.planSlug, status: r.status, amount: Number(r.amountKobo / 100n), currency: r.currency, startsAt: r.startsAt?.toISOString() ?? null, endsAt: r.endsAt?.toISOString() ?? null, createdAt: r.createdAt.toISOString(), professional: { name: r.professional.name, slug: r.professional.slug, email: r.professional.user?.email ?? null, currentPlan: effectivePlan(r.professional) } })) };
+      return { total, page: q.page, pageSize: q.pageSize, items: rows.map(r => ({ id: r.id, reference: r.reference, plan: r.planSlug, status: r.status, amount: Number(r.amountKobo / 100n), currency: r.currency, startsAt: r.startsAt?.toISOString() ?? null, endsAt: r.endsAt?.toISOString() ?? null, createdAt: r.createdAt.toISOString(),
+        user: r.user ? { id: r.user.id, name: r.user.fullName, email: r.user.email, role: r.user.role, currentPlan: effectivePlan(r.user) } : null,
+        professional: { name: r.professional?.name ?? r.user?.fullName ?? 'Account', slug: r.professional?.slug ?? '', email: r.user?.email ?? null, currentPlan: r.user ? effectivePlan(r.user) : 'free' } })) };
     },
   );
 

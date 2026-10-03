@@ -58,11 +58,7 @@ describe.skipIf(process.env.RUN_LOCAL_ONBOARDING_GIGS_TESTS !== '1')('onboarding
       }
     } finally { await client.end(); }
     prisma = (await import('../src/lib/db.js')).prisma;
-    await prisma.plan.createMany({ data: [
-      { slug: 'free', name: 'Free', price: 0n, position: 0, features: [] },
-      { slug: 'professional', name: 'Servix Pro', price: 15000n, position: 1, features: [] },
-      { slug: 'business', name: 'Business', price: 40000n, position: 2, features: [] },
-    ] });
+    /* Plans (free/go/pro/team/enterprise) are inserted by the subscriptions migration itself. */
     await prisma.category.create({ data: { slug: 'web-development', name: 'Web Development' } });
     app = await (await import('../src/app.js')).buildApp(); await app.ready();
   });
