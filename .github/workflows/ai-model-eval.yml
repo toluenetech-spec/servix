@@ -5,11 +5,10 @@ name: AI model evaluation (audit only)
 # system. Results are uploaded as artifacts and written to the job summary.
 # API keys are read ONLY from repository secrets and are never printed.
 #
-#   AI_API_KEY     → Dahl (https://inference.dahl.global/v1)
-#   NVIDIA_API_KEY → NVIDIA Build (https://integrate.api.nvidia.com/v1)
+#   AI_API_KEY → Dahl (https://inference.dahl.global/v1)
 #
-# A provider whose secret is missing is skipped with a notice, not a failure.
-# Run history: see the Actions tab → "AI model evaluation (audit only)".
+# Results are committed to docs/ai-eval/<provider>/ on this branch so they can
+# be read without downloading artifacts. (NVIDIA job removed at owner's request.)
 
 on:
   workflow_dispatch:
@@ -25,7 +24,7 @@ on:
       - '.github/workflows/ai-model-eval.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   evaluate:
@@ -37,10 +36,6 @@ jobs:
             base_url: https://inference.dahl.global/v1
             secret_name: AI_API_KEY
             min_gap_ms: '1200'
-          - provider: nvidia
-            base_url: https://integrate.api.nvidia.com/v1
-            secret_name: NVIDIA_API_KEY
-            min_gap_ms: '1600'
     name: ${{ matrix.provider }}
     runs-on: ubuntu-latest
     timeout-minutes: 110
@@ -76,21 +71,33 @@ jobs:
           fi
           ARGS=""
           if [ -n "$MODELS_INPUT" ]; then ARGS="--models $MODELS_INPUT"; fi
-          npx tsx scripts/aiModelEval.ts --out "$GITHUB_WORKSPACE/ai-eval" $ARGS
+          npx tsx scripts/aiModelEval.ts --out "$GITHUB_WORKSPACE/docs/ai-eval/${{ matrix.provider }}" $ARGS
 
       - name: Publish summary
         if: always()
         run: |
           echo "## ${{ matrix.provider }}" >> "$GITHUB_STEP_SUMMARY"
-          if [ -f "$GITHUB_WORKSPACE/ai-eval/results.md" ]; then
-            cat "$GITHUB_WORKSPACE/ai-eval/results.md" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f "$GITHUB_WORKSPACE/docs/ai-eval/${{ matrix.provider }}/results.md" ]; then
+            cat "$GITHUB_WORKSPACE/docs/ai-eval/${{ matrix.provider }}/results.md" >> "$GITHUB_STEP_SUMMARY"
           else
             echo "No results produced." >> "$GITHUB_STEP_SUMMARY"
           fi
+
+      - name: Commit results to the branch
+        if: always()
+        working-directory: ${{ github.workspace }}
+        run: |
+          if [ ! -d docs/ai-eval/${{ matrix.provider }} ]; then echo "nothing to commit"; exit 0; fi
+          git config user.name "servix-ai-eval[bot]"
+          git config user.email "ai-eval@users.noreply.github.com"
+          git add docs/ai-eval/${{ matrix.provider }}
+          git diff --cached --quiet && { echo "no changes"; exit 0; }
+          git commit -m "ai-eval(${{ matrix.provider }}): results from run ${{ github.run_id }} [skip ci]"
+          for i in 1 2 3; do git pull --rebase origin "${{ github.ref_name }}" && git push origin "HEAD:${{ github.ref_name }}" && break || sleep 5; done
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: ai-eval-${{ matrix.provider }}
-          path: ai-eval
+          path: docs/ai-eval/${{ matrix.provider }}
           if-no-files-found: ignore
