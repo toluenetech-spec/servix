@@ -9,6 +9,7 @@ name: AI model evaluation (audit only)
 #   NVIDIA_API_KEY → NVIDIA Build (https://integrate.api.nvidia.com/v1)
 #
 # A provider whose secret is missing is skipped with a notice, not a failure.
+# Run history: see the Actions tab → "AI model evaluation (audit only)".
 
 on:
   workflow_dispatch:
