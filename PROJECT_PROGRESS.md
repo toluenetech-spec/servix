@@ -408,6 +408,21 @@ stack with a scripted OpenAI-compatible server (drift normalisation, tool use ov
 department routing, bounded failure, no key in logs). Not verified: live Dahl traffic from
 production (needs the key on Railway — owner action).
 
+### 11k. Servix AI — speed, formatting and brand polish (2026-10-03, 0.8.2)
+
+Owner feedback on the live UI: raw `**` in answers, a generic launcher icon, slow replies, a plain hub page.
+Shipped: server-sent-event streaming for the assistant and explanations (first words in well under a
+second on the local stack; the provider's own first-token time still applies in production), hedged
+fallback (`AI_HEDGE_AFTER_MS`, next chain model starts in parallel after 6 s of silence), `ThinkFilter`
+so reasoning never leaks into a stream, `AI_EXTRA_BODY_JSON` for provider knobs, a safe light-Markdown
+renderer (React elements, never HTML; plain text when inserted into forms), the brand “S” mark with
+idle/thinking motion and spring open / ease close panel transitions (all off under reduced motion), and
+a redesigned `/dashboard/ai` (hero, segmented switcher, main column + rail). Verified: API `tsc` clean,
+`ai-router` 31/31, `ai-local` 13/13, root tests 23/23, Playwright 92/92, real local stack SSE smoke
+(TTFB 34 ms through the Vite proxy, 41 deltas, CORS header preserved) and screenshots at 1366 px and
+390 px. Honest limit: streaming and hedging improve perceived and tail latency; Dahl's free-tier queueing
+before the first token is outside our control — a paid tier or another `AI_BASE_URL` remains the fix.
+
 ## 12. Known Issues / Remaining Tasks
 
 - Service-detail availability preview is generated client-side (clearly

@@ -33,6 +33,8 @@ async function mock(page, options = {}) {
     // ---- AI endpoints ----
     if (path.startsWith('ai/') && options.aiDown) return route.fulfill({ status: 503, json: { error: { status: 503, code: 'AI_UNAVAILABLE', message: 'upstream 429 model_concurrency from provider' } } });
     if (path === 'ai/search/intent') return route.fulfill({ json: { filters: { q: 'logo designer', category: 'design', location: 'Lagos', maxPrice: 30000, available: 'week', sort: 'recommended' }, ai: aiMeta } });
+    if (path === 'ai/assistant/stream') { const b = route.request().postDataJSON(); const answer = `You asked: "${b.messages[b.messages.length - 1].content}". **Ada Pro** (ada-pro) is a verified brand designer in Lagos from ₦50,000.\n\n- Verified identity\n- 4.9 rating`; return route.fulfill({ status: 200, headers: { 'content-type': 'text/event-stream' }, body: sse([{ type: 'start' }, ...answer.split(' ').map((w) => ({ type: 'delta', text: `${w} ` })), { type: 'done', answer, ai: { ...aiMeta, toolsUsed: ['search_professionals'] } }]) }); }
+    if (path === 'ai/explain/stream') return route.fulfill({ status: 200, headers: { 'content-type': 'text/event-stream' }, body: sse([{ type: 'start' }, { type: 'delta', text: 'Pending payment means ' }, { type: 'done', answer: 'Pending payment means the booking is reserved but the professional cannot start until Servix confirms your payment.', ai: aiMeta }]) });
     if (path === 'ai/assistant') { const b = route.request().postDataJSON(); return route.fulfill({ json: { answer: `You asked: "${b.messages[b.messages.length - 1].content}". Ada Pro (ada-pro) is a verified brand designer in Lagos from ₦50,000.`, ai: { ...aiMeta, toolsUsed: ['search_professionals'] } } }); }
     if (path === 'ai/drafts') { const b = route.request().postDataJSON(); if (b.kind === 'request_brief') return route.fulfill({ json: { kind: 'request_brief', draft: { title: 'Restaurant website with menu and WhatsApp ordering', description: 'A mobile-first website for a restaurant in Ikeja with the full menu, opening hours and WhatsApp ordering. Five pages, basic SEO.', categorySlug: 'design', budgetType: 'range', budgetMin: 150000, budgetMax: 250000, deadlineAt: '2026-11-30T12:00:00.000Z', preferredDeliveryAt: null, isRemote: true, location: null, requiredSkills: ['web design', 'seo'], attachments: [], extraRequirements: null, missingInformation: ['Do you already have a logo and photos?'] }, ai: { ...aiMeta, model: 'minimax' } } }); return route.fulfill({ json: { kind: b.kind, draft: `Drafted (${b.tone}): ${b.input}`, ai: { ...aiMeta, model: 'minimax' } } }); }
     if (path === `ai/bookings/${BK}/health`) return route.fulfill({ json: { status: 'awaiting_payment', booking: { id: BK, reference: 'SVX-TEST', status: 'pending_payment', overdueDays: 0, expectedDeliveryAt: null }, summary: 'Your booking is reserved but not yet paid. Nothing starts until payment is confirmed.', nextSteps: ['Complete the secure checkout.'], concerns: [], ai: aiMeta } });
@@ -56,6 +58,8 @@ async function mock(page, options = {}) {
   });
   return log;
 }
+
+const sse = (events) => events.map((e) => `data: ${JSON.stringify(e)}\n\n`).join('');
 
 test('everything AI is hidden when the flag is off', async ({ page }) => {
   await mock(page, { features: { ...features, ai: false } });
@@ -105,14 +109,18 @@ test('request editor: brief → structured draft → form filled, nothing posted
 });
 
 test('assistant launcher opens a grounded chat; booking page explains status and health', async ({ page }) => {
-  await mock(page);
+  const log = await mock(page);
   await page.goto('/dashboard');
   await expect(page.getByTestId('ai-dashboard-card')).toBeVisible();
   await page.getByTestId('ai-launcher').click();
   const chat = page.getByTestId('ai-panel');
   await chat.getByLabel('Your question').fill('Who can design a logo in Lagos?');
   await chat.getByRole('button', { name: 'Send' }).click();
-  await expect(chat.getByText(/Ada Pro \(ada-pro\) is a verified brand designer/)).toBeVisible();
+  await expect(chat.getByText(/\(ada-pro\) is a verified brand designer/)).toBeVisible();
+  await expect(chat.locator('strong', { hasText: 'Ada Pro' })).toBeVisible();
+  await expect(chat.locator('li', { hasText: 'Verified identity' })).toBeVisible();
+  await expect(chat.getByText('**')).toHaveCount(0);
+  expect(log.posts.filter((p) => p.path === 'ai/assistant/stream')).toHaveLength(1);
   await chat.getByRole('button', { name: 'Close assistant' }).click();
   await page.goto(`/bookings/${BK}`);
   await expect(page.getByRole('heading', { name: 'Logo design' })).toBeVisible();

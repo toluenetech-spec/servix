@@ -6,7 +6,8 @@ import { Link } from 'react-router-dom';
 import { Icon } from '../ui/Icon.jsx';
 import { matchOpportunities, opportunityRadar, profileAnalysis, profileImprove } from '../../lib/aiApi.js';
 import { formatPrice } from '../../lib/format.js';
-import { AiError, AiMeta, AiNote, AiTag, AiThinking, useAiTask } from './AiBits.jsx';
+import { aiMarkdownToPlain } from '../../lib/aiHelpers.js';
+import { AiError, AiMarkdown, AiMeta, AiNote, AiTag, AiThinking, useAiTask } from './AiBits.jsx';
 
 function RequestLine({ item, right }) {
   const r = item.request;
@@ -29,7 +30,7 @@ export function OpportunityMatches() {
     {task.busy && <AiThinking label="Comparing open requests with your profile…" onCancel={task.cancel} />}
     <AiError error={task.error} onRetry={run} />
     {d && !task.busy && <div style={{ marginTop: 12 }}>
-      <p style={{ fontSize: 13, color: '#233e2b', marginBottom: 12 }}>{d.summary}</p>
+      <AiMarkdown text={d.summary} style={{ marginBottom: 12 }} />
       {d.matches?.length ? d.matches.map((m) => <RequestLine key={m.requestId} item={m} right={<span className="ai-match__fit">{m.fit}% fit</span>} />) : <p className="ws-muted">No strong matches right now. <Link to="/dashboard/proposals">Browse all open requests</Link>.</p>}
       <div className="ws-actions" style={{ marginTop: 12 }}><button type="button" className="ai-link" onClick={run}>Refresh</button></div>
       <AiMeta ai={d.ai} />
@@ -72,7 +73,7 @@ export function ProfileCoach() {
       {analysis.busy && <AiThinking label="Reading your profile…" onCancel={analysis.cancel} />}
       <AiError error={analysis.error} onRetry={runAnalysis} />
       {a && !analysis.busy && <div style={{ marginTop: 12 }}>
-        <div className="ai-score"><strong>{a.completenessScore}<span style={{ fontSize: 16, color: '#7b8778' }}>/100</span></strong><div><small>Completeness</small><span style={{ fontSize: 13, color: '#233e2b' }}>{a.summary}</span></div></div>
+        <div className="ai-score"><strong>{a.completenessScore}<span style={{ fontSize: 16, color: '#7b8778' }}>/100</span></strong><div><small>Completeness</small><AiMarkdown as="span" text={a.summary} /></div></div>
         {a.strengths?.length > 0 && <><p style={{ marginTop: 12 }}><strong>Strengths</strong></p><ul className="ai-list">{a.strengths.map((x) => <li key={x}>{x}</li>)}</ul></>}
         {a.gaps?.length > 0 && <><p style={{ marginTop: 12 }}><strong>Gaps</strong></p><ul className="ai-list ai-flags">{a.gaps.map((x) => <li key={x}>{x}</li>)}</ul></>}
         <div className="ws-actions" style={{ marginTop: 12 }}><Link className="btn btn--secondary" style={{ fontSize: 12 }} to="/dashboard/profile">Edit my profile</Link><button type="button" className="ai-link" onClick={runAnalysis}>Refresh</button></div>
@@ -86,8 +87,8 @@ export function ProfileCoach() {
       {improve.busy && <AiThinking label="Writing suggestions…" onCancel={improve.cancel} />}
       <AiError error={improve.error} onRetry={() => runImprove('all')} />
       {s && !improve.busy && <div style={{ marginTop: 12 }}>
-        {s.suggestions?.map((x, i) => <div className="ai-match" key={i}><div className="ai-match__head"><span className="ai-chip gray" style={{ textTransform: 'capitalize' }}>{x.area}</span></div><p style={{ color: '#233e2b' }}>{x.suggestion}</p>{x.example && <blockquote style={{ margin: '8px 0 0', fontSize: 12, lineHeight: 1.7, whiteSpace: 'pre-wrap', color: '#3a4a3a', borderLeft: '3px solid #cfe0c6', paddingLeft: 10 }}>{x.example}</blockquote>}</div>)}
-        {s.rewrittenAbout && <div className="ai-result"><p><strong>Suggested About section</strong></p><blockquote>{s.rewrittenAbout}</blockquote><div className="ws-actions"><button type="button" className="btn btn--ghost" style={{ fontSize: 12 }} onClick={() => navigator.clipboard?.writeText(s.rewrittenAbout)}>Copy</button><Link className="btn btn--secondary" style={{ fontSize: 12 }} to="/dashboard/profile">Open profile editor</Link></div></div>}
+        {s.suggestions?.map((x, i) => <div className="ai-match" key={i}><div className="ai-match__head"><span className="ai-chip gray" style={{ textTransform: 'capitalize' }}>{x.area}</span></div><AiMarkdown text={x.suggestion} style={{ marginTop: 6 }} />{x.example && <AiMarkdown as="blockquote" text={x.example} style={{ margin: '8px 0 0', fontSize: 12, color: '#3a4a3a', borderLeft: '3px solid #cfe0c6', paddingLeft: 10 }} />}</div>)}
+        {s.rewrittenAbout && <div className="ai-result"><p><strong>Suggested About section</strong></p><AiMarkdown as="blockquote" text={s.rewrittenAbout} /><div className="ws-actions"><button type="button" className="btn btn--ghost" style={{ fontSize: 12 }} onClick={() => navigator.clipboard?.writeText(aiMarkdownToPlain(s.rewrittenAbout))}>Copy</button><Link className="btn btn--secondary" style={{ fontSize: 12 }} to="/dashboard/profile">Open profile editor</Link></div></div>}
         <AiMeta ai={s.ai} />
         <AiNote>Suggestions are based on your current profile and Servix data; nothing changes until you edit and save your profile.</AiNote>
       </div>}

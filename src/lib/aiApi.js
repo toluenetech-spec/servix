@@ -40,12 +40,51 @@ async function post(path, body, { auth = true, signal } = {}) {
   } finally { t.done(); }
 }
 
+/**
+ * Streamed text answers (assistant, explain). The API sends server-sent events; words are forwarded to `onDelta`
+ * as they arrive and the resolved value matches the non-streamed shape `{ answer, ai }`. If the server does not
+ * stream (older API, proxy stripping the event stream) we fall back to the plain endpoint transparently.
+ */
+async function streamPost(path, fallbackPath, body, { signal, onDelta } = {}) {
+  const t = withTimeout(signal);
+  try {
+    const res = await authorizedFetch(`${V1}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' }, body: JSON.stringify(body ?? {}), signal: t.signal });
+    if (res.status === 404) return post(fallbackPath, body, { signal });
+    if (!res.ok) throw await toError(res);
+    if (!res.headers.get('content-type')?.includes('text/event-stream') || !res.body) return res.json();
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = ''; let done = null; let error = null;
+    const handle = (event) => {
+      if (event.type === 'delta') onDelta?.(event.text);
+      else if (event.type === 'done') done = { answer: event.answer, ai: event.ai };
+      else if (event.type === 'error') { error = new Error(event.message ?? 'Servix AI is unavailable.'); error.code = event.code; error.status = event.status; }
+    };
+    for (;;) {
+      const { value, done: eof } = await reader.read();
+      if (eof) break;
+      buffer += decoder.decode(value, { stream: true });
+      let idx;
+      while ((idx = buffer.indexOf('\n\n')) >= 0) {
+        const frame = buffer.slice(0, idx); buffer = buffer.slice(idx + 2);
+        for (const line of frame.split('\n')) if (line.startsWith('data: ')) { try { handle(JSON.parse(line.slice(6))); } catch { /* ignore malformed frame */ } }
+      }
+    }
+    if (error) throw error;
+    if (!done) { const e = new Error('The answer was cut off. Please try again.'); e.code = 'AI_UNAVAILABLE'; e.status = 503; throw e; }
+    return done;
+  } catch (e) {
+    if (e?.name === 'AbortError' || t.signal.aborted) { const err = new Error('Stopped.'); err.code = signal?.aborted ? 'CANCELLED' : 'AI_TIMEOUT'; err.status = 504; throw err; }
+    throw e;
+  } finally { t.done(); }
+}
+
 /* ---------- everyone ---------- */
 export const searchIntent = (query, opts) => post('/ai/search/intent', { query }, { auth: false, ...opts });
 
 /* ---------- signed in ---------- */
-export const askAssistant = (messages, opts) => post('/ai/assistant', { messages }, opts);
-export const explain = (topic, context, opts) => post('/ai/explain', { topic, ...(context ? { context } : {}) }, opts);
+export const askAssistant = (messages, opts) => (opts?.onDelta ? streamPost('/ai/assistant/stream', '/ai/assistant', { messages }, opts) : post('/ai/assistant', { messages }, opts));
+export const explain = (topic, context, opts) => (opts?.onDelta ? streamPost('/ai/explain/stream', '/ai/explain', { topic, ...(context ? { context } : {}) }, opts) : post('/ai/explain', { topic, ...(context ? { context } : {}) }, opts));
 export const pricingGuidance = (body, opts) => post('/ai/pricing/guidance', body, opts);
 export const bookingHealth = (bookingId, opts) => post(`/ai/bookings/${encodeURIComponent(bookingId)}/health`, {}, opts);
 export const draft = (kind, input, tone = 'friendly', opts) => post('/ai/drafts', { kind, input, tone }, opts);

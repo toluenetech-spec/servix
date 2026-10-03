@@ -81,6 +81,10 @@ export interface AiConfig {
   taskTimeoutMs: number;
   maxAttemptsPerModel: number;
   maxToolCalls: number;
+  /** Start the next model in the chain in parallel when the current one has not answered after this long (0 = off). */
+  hedgeAfterMs: number;
+  /** Provider-specific request fields merged into every call (e.g. to switch a model's thinking mode off). */
+  extraBody: Record<string, unknown>;
   /** Problems found while reading the environment (reported, never thrown). */
   warnings: string[];
 }
@@ -119,6 +123,12 @@ export function loadAiConfig(env: NodeJS.ProcessEnv = process.env): AiConfig {
     DEPARTMENTS.map((d) => [d, parseChain(env[`AI_ROUTE_${d.toUpperCase()}`], defaultChain(PRIMARY[d]), d, warnings)]),
   ) as Record<Department, ModelAlias[]>;
 
+  let extraBody: Record<string, unknown> = {};
+  if (env.AI_EXTRA_BODY_JSON?.trim()) {
+    try { const parsed = JSON.parse(env.AI_EXTRA_BODY_JSON) as unknown; if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) extraBody = parsed as Record<string, unknown>; else warnings.push('AI_EXTRA_BODY_JSON ignored: must be a JSON object.'); }
+    catch { warnings.push('AI_EXTRA_BODY_JSON ignored: invalid JSON.'); }
+  }
+
   return {
     enabled,
     provider: { name: env.AI_PROVIDER?.trim() || 'dahl', baseUrl, apiKey },
@@ -128,6 +138,8 @@ export function loadAiConfig(env: NodeJS.ProcessEnv = process.env): AiConfig {
     taskTimeoutMs: intEnv(env, 'AI_TASK_TIMEOUT_MS', 60_000, 5_000, 300_000),
     maxAttemptsPerModel: intEnv(env, 'AI_MAX_ATTEMPTS_PER_MODEL', 2, 1, 3),
     maxToolCalls: intEnv(env, 'AI_MAX_TOOL_CALLS', 6, 1, 12),
+    hedgeAfterMs: intEnv(env, 'AI_HEDGE_AFTER_MS', 6_000, 0, 60_000),
+    extraBody,
     warnings,
   };
 }
@@ -139,7 +151,8 @@ export function describeRouting(cfg: AiConfig) {
     provider: { name: cfg.provider.name, baseUrl: cfg.provider.baseUrl, keyConfigured: Boolean(cfg.provider.apiKey) },
     models: cfg.models,
     departments: DEPARTMENTS.map((d) => ({ department: d, chain: cfg.routes[d], primary: cfg.models[cfg.routes[d][0]] })),
-    timeouts: { callMs: cfg.callTimeoutMs, taskMs: cfg.taskTimeoutMs, maxAttemptsPerModel: cfg.maxAttemptsPerModel, maxToolCalls: cfg.maxToolCalls },
+    timeouts: { callMs: cfg.callTimeoutMs, taskMs: cfg.taskTimeoutMs, maxAttemptsPerModel: cfg.maxAttemptsPerModel, maxToolCalls: cfg.maxToolCalls, hedgeAfterMs: cfg.hedgeAfterMs },
+    extraBodyKeys: Object.keys(cfg.extraBody),
     warnings: cfg.warnings,
   };
 }

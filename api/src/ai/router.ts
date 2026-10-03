@@ -58,74 +58,138 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 class InvalidOutput extends Error { constructor(public issues: string, public raw: string | null) { super('invalid structured output'); } }
 
+export interface RunOptions {
+  /** Streams visible text as it is generated (text departments). Only the winning model's text is forwarded. */
+  onDelta?: (text: string) => void;
+  /** Cancels everything (e.g. the client disconnected). */
+  signal?: AbortSignal;
+}
+
+type ModelOutcome<T> = { ok: true; value: { value: T; text: string | null; toolsUsed: string[] }; usage: ChatUsage; attempts: number } | { ok: false; error: { code: string; message: string }; attempts: number; usage: ChatUsage };
+
 export class AiRouter {
   constructor(private cfg: AiConfig, private provider: AiProvider, private telemetry: AiTelemetry) {}
 
   get config() { return this.cfg; }
 
-  async run<T = string>(task: TaskSpec<T>): Promise<TaskSuccess<T>> {
+  /**
+   * Hedged execution over the department chain. The primary model starts immediately; if it has not
+   * produced anything after `hedgeAfterMs`, the next model starts in parallel (and so on, bounded by the
+   * chain). The first model to stream text or return a valid result wins and the others are cancelled.
+   * A model that fails hands over to the next one at once. Everything stays inside the task deadline.
+   */
+  async run<T = string>(task: TaskSpec<T>, opts: RunOptions = {}): Promise<TaskSuccess<T>> {
     const chain = this.cfg.routes[task.department];
     const startedAt = Date.now();
     const deadline = startedAt + this.cfg.taskTimeoutMs;
-    let attempts = 0;
+    const controllers: AbortController[] = [];
+    const running = new Map<number, Promise<{ i: number; out: ModelOutcome<T> }>>();
+    let claimedBy: number | null = null;
+    let next = 0;
+    let lastStart = 0;
+    let totalAttempts = 0;
+    const usage: ChatUsage = { promptTokens: 0, completionTokens: 0 };
     let lastError: { code: string; message: string } | null = null;
 
-    for (let fallbackIndex = 0; fallbackIndex < chain.length; fallbackIndex++) {
-      const alias = chain[fallbackIndex];
-      const model = this.cfg.models[alias];
-      let repaired = false;
-      let messages = task.messages;
+    const abortOthers = (keep: number) => controllers.forEach((c, i) => { if (i !== keep) c.abort(); });
+    const start = (i: number) => {
+      const ac = new AbortController();
+      if (opts.signal) opts.signal.addEventListener('abort', () => ac.abort(), { once: true });
+      controllers[i] = ac; lastStart = Date.now();
+      const onDelta = opts.onDelta ? (text: string) => {
+        if (claimedBy === null) { claimedBy = i; abortOthers(i); }
+        if (claimedBy === i) opts.onDelta!(text);
+      } : undefined;
+      running.set(i, this.runModel(task, i, deadline, ac.signal, onDelta).then((out) => ({ i, out })));
+    };
+    const fail = (): never => {
+      this.telemetry.recordTask({ department: task.department, ok: false, durationMs: Date.now() - startedAt, modelUsed: null, aliasUsed: null, fallbackUsed: chain.length > 1, attempts: totalAttempts, errorCode: lastError?.code });
+      if (opts.signal?.aborted) throw new ApiError(499, 'AI_CANCELLED', 'Request cancelled.');
+      if (lastError?.code === 'invalid_output') throw new ApiError(502, 'AI_INVALID_OUTPUT', 'Servix AI returned an answer we could not verify. Nothing was saved — please try again.');
+      if (lastError?.code === 'deadline' || lastError?.code === 'timeout') throw new ApiError(504, 'AI_TIMEOUT', 'Servix AI took too long to answer. Please try again.');
+      throw new ApiError(503, 'AI_UNAVAILABLE', 'Servix AI is busy right now. Please try again in a moment.');
+    };
 
-      for (let attempt = 1; attempt <= this.cfg.maxAttemptsPerModel; attempt++) {
-        if (Date.now() >= deadline) { lastError = { code: 'deadline', message: 'task deadline reached' }; break; }
-        attempts++;
-        const t0 = Date.now();
-        const usage: ChatUsage = { promptTokens: 0, completionTokens: 0 };
-        let toolCalls = 0;
-        try {
-          const out = await this.execute(task, model, messages, deadline, usage, (n) => { toolCalls = n; });
-          this.telemetry.recordAttempt({ department: task.department, alias, model, durationMs: Date.now() - t0, ok: true, fallbackIndex, attempt, promptTokens: usage.promptTokens, completionTokens: usage.completionTokens, toolCalls });
-          this.telemetry.recordTask({ department: task.department, ok: true, durationMs: Date.now() - startedAt, modelUsed: model, aliasUsed: alias, fallbackUsed: fallbackIndex > 0, attempts });
-          return { ...out, model, alias, fallbackUsed: fallbackIndex > 0, attempts, durationMs: Date.now() - startedAt, usage };
-        } catch (e) {
-          const durationMs = Date.now() - t0;
-          if (e instanceof InvalidOutput) {
-            this.telemetry.recordAttempt({ department: task.department, alias, model, durationMs, ok: false, fallbackIndex, attempt, promptTokens: usage.promptTokens, completionTokens: usage.completionTokens, errorCode: 'invalid_output', toolCalls });
-            lastError = { code: 'invalid_output', message: e.issues };
-            if (!repaired && Date.now() < deadline) {
-              // One repair round on the same model, with the validator's feedback.
-              repaired = true;
-              messages = [...task.messages,
-                { role: 'assistant', content: e.raw ?? '' },
-                { role: 'user', content: `Your previous answer failed validation: ${e.issues.slice(0, 600)}. Reply again with ONLY the corrected JSON object. Do not add commentary.` }];
-              attempt--; // the repair round does not consume a transient-retry slot
-              continue;
-            }
-            break; // next model
+    start(next++);
+    for (;;) {
+      const canHedge: boolean = this.cfg.hedgeAfterMs > 0 && (claimedBy as number | null) === null && next < chain.length && !opts.signal?.aborted;
+      const hedgeIn = canHedge ? Math.max(0, this.cfg.hedgeAfterMs - (Date.now() - lastStart)) : Infinity;
+      let timer: NodeJS.Timeout | undefined;
+      const hedge: Promise<'hedge'> | null = canHedge ? new Promise<'hedge'>((r) => { timer = setTimeout(() => r('hedge'), hedgeIn); }) : null;
+      const settled: 'hedge' | { i: number; out: ModelOutcome<T> } = await Promise.race([...running.values(), ...(hedge ? [hedge] : [])]);
+      if (timer) clearTimeout(timer);
+      if (settled === 'hedge') { start(next++); continue; }
+
+      running.delete(settled.i);
+      totalAttempts += settled.out.attempts;
+      usage.promptTokens += settled.out.usage.promptTokens; usage.completionTokens += settled.out.usage.completionTokens;
+      if (settled.out.ok) {
+        abortOthers(settled.i);
+        const alias = chain[settled.i]; const model = this.cfg.models[alias];
+        this.telemetry.recordTask({ department: task.department, ok: true, durationMs: Date.now() - startedAt, modelUsed: model, aliasUsed: alias, fallbackUsed: settled.i > 0, attempts: totalAttempts });
+        return { ...settled.out.value, model, alias, fallbackUsed: settled.i > 0, attempts: totalAttempts, durationMs: Date.now() - startedAt, usage };
+      }
+      if (settled.out.error.code !== 'cancelled') lastError = settled.out.error;
+      // A model that already streamed text to the user cannot be silently replaced.
+      if ((claimedBy as number | null) === settled.i) return fail();
+      if (running.size === 0 && next < chain.length && Date.now() < deadline && !opts.signal?.aborted) { start(next++); continue; }
+      if (running.size === 0) return fail();
+    }
+  }
+
+  /** One model: bounded transient retries + one repair round. Never throws; reports the outcome. */
+  private async runModel<T>(task: TaskSpec<T>, fallbackIndex: number, deadline: number, signal: AbortSignal, onDelta?: (text: string) => void): Promise<ModelOutcome<T>> {
+    const alias = this.cfg.routes[task.department][fallbackIndex];
+    const model = this.cfg.models[alias];
+    const usage: ChatUsage = { promptTokens: 0, completionTokens: 0 };
+    let messages = task.messages;
+    let repaired = false;
+    let attempts = 0;
+    let lastError: { code: string; message: string } = { code: 'unavailable', message: 'no attempt made' };
+
+    for (let attempt = 1; attempt <= this.cfg.maxAttemptsPerModel; attempt++) {
+      if (signal.aborted) return { ok: false, error: { code: 'cancelled', message: 'cancelled' }, attempts, usage };
+      if (Date.now() >= deadline) return { ok: false, error: { code: 'deadline', message: 'task deadline reached' }, attempts, usage };
+      attempts++;
+      const t0 = Date.now();
+      let toolCalls = 0;
+      try {
+        const out = await this.execute(task, model, messages, deadline, usage, (n) => { toolCalls = n; }, signal, onDelta);
+        this.telemetry.recordAttempt({ department: task.department, alias, model, durationMs: Date.now() - t0, ok: true, fallbackIndex, attempt, promptTokens: usage.promptTokens, completionTokens: usage.completionTokens, toolCalls });
+        return { ok: true, value: out, usage, attempts };
+      } catch (e) {
+        const durationMs = Date.now() - t0;
+        if (e instanceof InvalidOutput) {
+          this.telemetry.recordAttempt({ department: task.department, alias, model, durationMs, ok: false, fallbackIndex, attempt, promptTokens: usage.promptTokens, completionTokens: usage.completionTokens, errorCode: 'invalid_output', toolCalls });
+          lastError = { code: 'invalid_output', message: e.issues };
+          if (!repaired && Date.now() < deadline && !signal.aborted) {
+            // One repair round on the same model, with the validator's feedback.
+            repaired = true;
+            messages = [...task.messages,
+              { role: 'assistant', content: e.raw ?? '' },
+              { role: 'user', content: `Your previous answer failed validation: ${e.issues.slice(0, 600)}. Reply again with ONLY the corrected JSON object. Do not add commentary.` }];
+            attempt--; // the repair round does not consume a transient-retry slot
+            continue;
           }
-          if (e instanceof AiProviderError) {
-            this.telemetry.recordAttempt({ department: task.department, alias, model, durationMs, ok: false, fallbackIndex, attempt, promptTokens: usage.promptTokens, completionTokens: usage.completionTokens, errorCode: e.code, toolCalls });
-            lastError = { code: e.code, message: e.message };
-            if (e.skipModel) break;
-            if (e.retryable && attempt < this.cfg.maxAttemptsPerModel && Date.now() + 1500 * attempt < deadline) { await sleep(1500 * attempt); continue; }
-            break;
-          }
-          this.telemetry.recordAttempt({ department: task.department, alias, model, durationMs, ok: false, fallbackIndex, attempt, promptTokens: usage.promptTokens, completionTokens: usage.completionTokens, errorCode: 'unavailable', toolCalls });
-          lastError = { code: 'internal', message: (e as Error).message };
           break;
         }
+        if (e instanceof AiProviderError) {
+          if (e.code !== 'cancelled') this.telemetry.recordAttempt({ department: task.department, alias, model, durationMs, ok: false, fallbackIndex, attempt, promptTokens: usage.promptTokens, completionTokens: usage.completionTokens, errorCode: e.code, toolCalls });
+          lastError = { code: e.code, message: e.message };
+          if (e.skipModel) break;
+          if (e.retryable && attempt < this.cfg.maxAttemptsPerModel && Date.now() + 1500 * attempt < deadline) { await sleep(1500 * attempt); continue; }
+          break;
+        }
+        this.telemetry.recordAttempt({ department: task.department, alias, model, durationMs, ok: false, fallbackIndex, attempt, promptTokens: usage.promptTokens, completionTokens: usage.completionTokens, errorCode: 'unavailable', toolCalls });
+        lastError = { code: 'internal', message: (e as Error).message };
+        break;
       }
-      if (lastError?.code === 'deadline') break;
     }
-
-    this.telemetry.recordTask({ department: task.department, ok: false, durationMs: Date.now() - startedAt, modelUsed: null, aliasUsed: null, fallbackUsed: chain.length > 1, attempts, errorCode: lastError?.code });
-    if (lastError?.code === 'invalid_output') throw new ApiError(502, 'AI_INVALID_OUTPUT', 'Servix AI returned an answer we could not verify. Nothing was saved — please try again.');
-    if (lastError?.code === 'deadline' || lastError?.code === 'timeout') throw new ApiError(504, 'AI_TIMEOUT', 'Servix AI took too long to answer. Please try again.');
-    throw new ApiError(503, 'AI_UNAVAILABLE', 'Servix AI is busy right now. Please try again in a moment.');
+    return { ok: false, error: lastError, attempts, usage };
   }
 
   /** One attempt on one model: tool loop (bounded) + structured parse. */
-  private async execute<T>(task: TaskSpec<T>, model: string, baseMessages: ChatMessage[], deadline: number, usage: ChatUsage, onToolCalls: (n: number) => void): Promise<{ value: T; text: string | null; toolsUsed: string[] }> {
+  private async execute<T>(task: TaskSpec<T>, model: string, baseMessages: ChatMessage[], deadline: number, usage: ChatUsage, onToolCalls: (n: number) => void, signal?: AbortSignal, onDelta?: (text: string) => void): Promise<{ value: T; text: string | null; toolsUsed: string[] }> {
     const messages: ChatMessage[] = [...baseMessages];
     const toolsUsed: string[] = [];
     const tools = task.tools?.schemas.length ? task.tools.schemas : undefined;
@@ -137,6 +201,7 @@ export class AiRouter {
         model, messages, tools, json: task.output.kind === 'json' && !tools,
         maxTokens: task.maxTokens, temperature: task.temperature,
         timeoutMs: Math.min(this.cfg.callTimeoutMs, remaining),
+        signal, onDelta: task.output.kind === 'text' ? onDelta : undefined,
       });
       if (res.usage) { usage.promptTokens += res.usage.promptTokens; usage.completionTokens += res.usage.completionTokens; }
 
@@ -161,7 +226,7 @@ export class AiRouter {
         messages.push({ role: 'assistant', content: res.message.content ?? null, tool_calls: calls });
         for (const call of calls) messages.push({ role: 'tool', tool_call_id: call.id, name: call.function.name, content: `${UNTRUSTED_OPEN}\n{"error":"tool budget exhausted — answer with the data you already have"}\n${UNTRUSTED_CLOSE}` });
         onToolCalls(toolsUsed.length);
-        const final = await this.provider.chat({ model, messages, json: task.output.kind === 'json', maxTokens: task.maxTokens, temperature: task.temperature, timeoutMs: Math.min(this.cfg.callTimeoutMs, Math.max(1000, deadline - Date.now())) });
+        const final = await this.provider.chat({ model, messages, json: task.output.kind === 'json', maxTokens: task.maxTokens, temperature: task.temperature, timeoutMs: Math.min(this.cfg.callTimeoutMs, Math.max(1000, deadline - Date.now())), signal, onDelta: task.output.kind === 'text' ? onDelta : undefined });
         if (final.usage) { usage.promptTokens += final.usage.promptTokens; usage.completionTokens += final.usage.completionTokens; }
         return this.finish(task, final.message.content, toolsUsed);
       }

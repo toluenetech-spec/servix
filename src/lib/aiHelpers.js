@@ -92,3 +92,59 @@ export const HEALTH_LABELS = {
   delivered: { label: 'Delivered', tone: 'ok' }, completed: { label: 'Completed', tone: 'ok' }, disputed: { label: 'In dispute', tone: 'bad' },
   cancelled: { label: 'Cancelled', tone: 'gray' }, refunded: { label: 'Refunded', tone: 'gray' }, declined: { label: 'Declined', tone: 'gray' },
 };
+
+/* ------------------------------------------------------------------ light markdown (AI answers) */
+
+/**
+ * Parse the small Markdown subset Servix AI is allowed to use (bold, italics, inline code, bullet and numbered
+ * lists, paragraphs) into a tiny tree. No HTML is ever interpreted — the renderer turns this tree into React
+ * elements, so model output can never inject markup. Headings (`## x`) are demoted to bold paragraphs and
+ * tables/code fences are shown as plain text.
+ */
+export function parseAiMarkdown(text) {
+  const lines = String(text ?? '').replace(/\r\n?/g, '\n').replace(/```[a-z]*\n?/gi, '').split('\n');
+  const blocks = [];
+  let para = [];
+  const flush = () => { if (para.length) { blocks.push({ type: 'p', lines: para.map(parseInline) }); para = []; } };
+  for (const raw of lines) {
+    const line = raw.replace(/\s+$/, '');
+    const bullet = /^\s*(?:[-*•]|\d+[.)])\s+(.*)$/.exec(line);
+    if (bullet) {
+      flush();
+      const ordered = /^\s*\d+[.)]/.test(line);
+      const last = blocks[blocks.length - 1];
+      const list = last && last.type === (ordered ? 'ol' : 'ul') && last.open ? last : { type: ordered ? 'ol' : 'ul', items: [], open: true };
+      if (list !== last) blocks.push(list);
+      list.items.push(parseInline(bullet[1]));
+      continue;
+    }
+    for (const b of blocks) b.open = false;
+    if (!line.trim()) { flush(); continue; }
+    const heading = /^\s*#{1,6}\s+(.*)$/.exec(line);
+    para.push(heading ? `**${heading[1].replace(/\*\*/g, '')}**` : line.trim());
+  }
+  flush();
+  return blocks.map(({ open: _o, ...b }) => b);
+}
+
+/** Inline nodes: { t:'text', v } | { t:'b'|'i', c:[…] } | { t:'code', v }. */
+export function parseInline(text) {
+  const out = [];
+  const re = /(\*\*|__)(.+?)\1|(`)([^`]+)\3|(?<![\w*])(\*|_)([^*_\s](?:[^*_]*?[^*_\s])?)\5(?![\w*])/g;
+  let i = 0; let m;
+  while ((m = re.exec(text))) {
+    if (m.index > i) out.push({ t: 'text', v: text.slice(i, m.index) });
+    if (m[2] != null) out.push({ t: 'b', c: parseInline(m[2]) });
+    else if (m[4] != null) out.push({ t: 'code', v: m[4] });
+    else out.push({ t: 'i', c: parseInline(m[6]) });
+    i = m.index + m[0].length;
+  }
+  if (i < text.length) out.push({ t: 'text', v: text.slice(i) });
+  return out;
+}
+
+/** Strip Markdown markers → plain text (used when a draft is inserted into a form field or copied). */
+export function aiMarkdownToPlain(text) {
+  const inline = (nodes) => nodes.map((n) => (n.t === 'text' || n.t === 'code' ? n.v : inline(n.c))).join('');
+  return parseAiMarkdown(text).map((b) => (b.type === 'p' ? b.lines.map(inline).join('\n') : b.items.map((it, i) => `${b.type === 'ol' ? `${i + 1}.` : '•'} ${inline(it)}`).join('\n'))).join('\n\n').trim();
+}

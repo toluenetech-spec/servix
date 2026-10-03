@@ -18,7 +18,7 @@ let overrides: { provider?: AiProvider; config?: AiConfig } = {};
 export function getAi(): AiRuntime {
   if (runtime) return runtime;
   const config = overrides.config ?? loadAiConfig();
-  const provider = overrides.provider ?? new OpenAICompatibleProvider({ name: config.provider.name, baseUrl: config.provider.baseUrl, apiKey: config.provider.apiKey });
+  const provider = overrides.provider ?? new OpenAICompatibleProvider({ name: config.provider.name, baseUrl: config.provider.baseUrl, apiKey: config.provider.apiKey, extraBody: config.extraBody });
   const telemetry = new AiTelemetry();
   runtime = { config, provider, router: new AiRouter(config, provider, telemetry), telemetry };
   return runtime;

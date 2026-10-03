@@ -2,6 +2,31 @@
 
 All notable changes to the Servix public website.
 
+## 0.8.2 — 2026-10-03 (Servix AI: faster answers, proper formatting, brand mark, premium hub)
+
+### Added
+- **Streaming answers.** `POST /api/v1/ai/assistant/stream` and `POST /api/v1/ai/explain/stream` (server-sent
+  events: `start` / `delta` / `done` / `error`). The assistant and “What does this mean?” now show words as they
+  are written instead of waiting for the full reply; Stop/closing the panel aborts the provider call. Plain
+  endpoints unchanged; the client falls back to them if a stream is unavailable.
+- **Hedged fallback** (`AI_HEDGE_AFTER_MS`, default 6 s): a model that has produced nothing after the window gets
+  the next chain model started in parallel; first usable answer wins, the rest are cancelled. `0` disables.
+- `AI_EXTRA_BODY_JSON` for provider-specific request fields (e.g. switching a model's thinking mode off).
+- `ThinkFilter`: reasoning scratchpads (`<think>…</think>`) never reach the stream, even split across chunks.
+- Safe light-Markdown rendering for every AI text (bold, italics, inline code, bullet/numbered lists) as React
+  elements — never HTML. Drafts inserted into forms or copied are converted to plain text first.
+- Brand-matched **Servix AI mark** (the “S” of the wordmark + coral spark) with a slow idle halo, an orbiting
+  “thinking” state, and a launcher that scales away as the panel springs in / eases out. All motion is disabled
+  under `prefers-reduced-motion`.
+
+### Changed
+- `/dashboard/ai` redesigned: deep-forest hero with the mark, personal greeting, segmented tool switcher, main
+  column + side rail (“What it can do”, “What it never does”, role-aware shortcuts).
+- Assistant prompt asks for short answers first (≤120 words unless detail is requested) and simple formatting;
+  assistant `maxTokens` 1200 → 700.
+- Tests: `api/tests/ai-router.test.ts` 23 → 31, `api/tests/ai-local.test.ts` 12 → 13, root `aiHelpers` 6 → 9;
+  Playwright `ai.spec.js` now exercises the SSE path and Markdown rendering.
+
 ## 0.8.1 — 2026-10-03 (Servix AI user interface — follows the `ai` flag)
 
 ### Added

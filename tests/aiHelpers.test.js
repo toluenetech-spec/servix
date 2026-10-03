@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { searchFiltersToParams, describeSearchFilters, requestDraftToForm, proposalDraftToForm, aiErrorMessage, HEALTH_LABELS } from '../src/lib/aiHelpers.js';
+import { searchFiltersToParams, describeSearchFilters, requestDraftToForm, proposalDraftToForm, aiErrorMessage, HEALTH_LABELS, parseAiMarkdown, parseInline, aiMarkdownToPlain } from '../src/lib/aiHelpers.js';
 
 test('search filters map to the professionals page URL params', () => {
   assert.deepEqual(searchFiltersToParams({ q: 'logo designer', category: 'graphic-design', location: 'Lagos', maxPrice: 30000, sort: 'recommended' }), { q: 'logo designer', category: 'graphic-design', location: 'Lagos', price: '150' });
@@ -53,4 +53,27 @@ test('controlled AI errors become plain-language copy with no provider details',
 
 test('every backend health status has a label', () => {
   for (const s of ['awaiting_payment', 'awaiting_acceptance', 'on_track', 'at_risk', 'late', 'delivered', 'completed', 'disputed', 'cancelled', 'refunded', 'declined']) assert.ok(HEALTH_LABELS[s]?.label, s);
+});
+
+test('parseAiMarkdown: bold/italic/code/lists without ever interpreting HTML', () => {
+  const blocks = parseAiMarkdown('Hi **Ada**, here is `x` and *soft*.\n\n- one **two**\n- three\n\n1. first\n2) second\n\n## Heading\n<b>not html</b>');
+  assert.deepEqual(blocks.map((b) => b.type), ['p', 'ul', 'ol', 'p']);
+  assert.deepEqual(blocks[0].lines[0], [{ t: 'text', v: 'Hi ' }, { t: 'b', c: [{ t: 'text', v: 'Ada' }] }, { t: 'text', v: ', here is ' }, { t: 'code', v: 'x' }, { t: 'text', v: ' and ' }, { t: 'i', c: [{ t: 'text', v: 'soft' }] }, { t: 'text', v: '.' }]);
+  assert.equal(blocks[1].items.length, 2);
+  assert.deepEqual(blocks[1].items[0], [{ t: 'text', v: 'one ' }, { t: 'b', c: [{ t: 'text', v: 'two' }] }]);
+  assert.equal(blocks[2].items.length, 2);
+  assert.deepEqual(blocks[3].lines[0][0], { t: 'b', c: [{ t: 'text', v: 'Heading' }] });
+  assert.deepEqual(blocks[3].lines[1], [{ t: 'text', v: '<b>not html</b>' }]);
+});
+
+test('parseAiMarkdown: leaves prices, underscores in slugs and lone asterisks alone; handles empty input', () => {
+  assert.deepEqual(parseInline('₦150,000 * 2 for ada_okafor-design'), [{ t: 'text', v: '₦150,000 * 2 for ada_okafor-design' }]);
+  assert.deepEqual(parseAiMarkdown(''), []);
+  assert.deepEqual(parseAiMarkdown(null), []);
+  assert.deepEqual(parseAiMarkdown('Line one\nLine two')[0].lines.length, 2);
+});
+
+test('aiMarkdownToPlain strips markers so drafts pasted into forms stay clean', () => {
+  assert.equal(aiMarkdownToPlain('**Logo design** for *bakeries*\n\n- 3 concepts\n- 2 revisions'), 'Logo design for bakeries\n\n• 3 concepts\n• 2 revisions');
+  assert.equal(aiMarkdownToPlain('plain text'), 'plain text');
 });

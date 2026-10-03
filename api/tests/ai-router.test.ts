@@ -7,7 +7,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { z } from 'zod';
 import { DEPARTMENTS, defaultChain, describeRouting, loadAiConfig, type AiConfig } from '../src/ai/config.js';
-import { AiProviderError, OpenAICompatibleProvider, stripThinking, type AiProvider, type ChatRequest, type ChatResponse } from '../src/ai/provider.js';
+import { AiProviderError, OpenAICompatibleProvider, ThinkFilter, stripThinking, type AiProvider, type ChatRequest, type ChatResponse } from '../src/ai/provider.js';
 import { AiRouter, UNTRUSTED_OPEN } from '../src/ai/router.js';
 import { AiTelemetry } from '../src/ai/telemetry.js';
 import { extractJsonObject, normalizeDateTime, normalizeEnum, normalizeNaira, onlyKnown, resolveCategorySlug } from '../src/ai/normalize.js';
@@ -245,5 +245,106 @@ describe('Payment isolation (static guarantees)', () => {
     const { TOOL_NAMES } = await import('../src/ai/tools.js');
     for (const n of TOOL_NAMES) expect(n).not.toMatch(/pay|wallet|payout|refund|bank|escrow|transfer|charge|card|withdraw/i);
     expect(TOOL_NAMES).toContain('search_professionals');
+  });
+});
+
+describe('Hedged fallback and streaming (speed)', () => {
+  /** Provider whose per-model latency is scripted and which honours abort + streaming deltas. */
+  class SlowProvider implements AiProvider {
+    readonly name = 'slow';
+    calls: string[] = []; aborted: string[] = [];
+    constructor(private latency: Record<string, number>, private answer: Record<string, string | Error> = {}) {}
+    chat(req: ChatRequest): Promise<ChatResponse> {
+      this.calls.push(req.model);
+      return new Promise((resolve, reject) => {
+        const ms = this.latency[req.model] ?? 10;
+        const t = setTimeout(() => {
+          const a = this.answer[req.model] ?? `answer from ${req.model}`;
+          if (a instanceof Error) return reject(a);
+          if (req.onDelta) for (const part of a.split(' ')) req.onDelta(`${part} `);
+          resolve(reply(a));
+        }, ms);
+        req.signal?.addEventListener('abort', () => { clearTimeout(t); this.aborted.push(req.model); reject(new AiProviderError('cancelled', 'cancelled')); }, { once: true });
+      });
+    }
+  }
+  const text = { department: 'explanations' as const, messages: [{ role: 'user' as const, content: 'hi' }], output: { kind: 'text' as const } };
+
+  it('starts the next model after the hedge window and takes the first answer; the slow one is cancelled', async () => {
+    const provider = new SlowProvider({ [MODELS.deepseek]: 5000, [MODELS.glm]: 50 });
+    const router = new AiRouter({ ...baseConfig(), hedgeAfterMs: 200, maxAttemptsPerModel: 1 }, provider, new AiTelemetry());
+    const t0 = Date.now();
+    const r = await router.run(text);
+    expect(r.alias).toBe('glm'); expect(r.fallbackUsed).toBe(true);
+    expect(Date.now() - t0).toBeLessThan(1500);
+    expect(provider.calls).toEqual([MODELS.deepseek, MODELS.glm]);
+    expect(provider.aborted).toEqual([MODELS.deepseek]);
+  });
+
+  it('does not hedge when the primary answers inside the window', async () => {
+    const provider = new SlowProvider({ [MODELS.deepseek]: 30, [MODELS.glm]: 5 });
+    const router = new AiRouter({ ...baseConfig(), hedgeAfterMs: 500 }, provider, new AiTelemetry());
+    const r = await router.run(text);
+    expect(r.alias).toBe('deepseek'); expect(provider.calls).toEqual([MODELS.deepseek]);
+  });
+
+  it('hedging can be switched off (AI_HEDGE_AFTER_MS=0) → strictly sequential', async () => {
+    const provider = new SlowProvider({ [MODELS.deepseek]: 300, [MODELS.glm]: 5 });
+    const cfg = { ...loadAiConfig({ ...ENV, AI_HEDGE_AFTER_MS: '0' }), callTimeoutMs: 2000, taskTimeoutMs: 8000 };
+    expect(cfg.hedgeAfterMs).toBe(0);
+    const r = await new AiRouter(cfg, provider, new AiTelemetry()).run(text);
+    expect(r.alias).toBe('deepseek'); expect(provider.calls).toEqual([MODELS.deepseek]);
+  });
+
+  it('streams the winning model’s words only and still returns the full answer', async () => {
+    const provider = new SlowProvider({ [MODELS.deepseek]: 5000, [MODELS.glm]: 50 }, { [MODELS.glm]: 'Escrow protects both sides.' });
+    const router = new AiRouter({ ...baseConfig(), hedgeAfterMs: 100, maxAttemptsPerModel: 1 }, provider, new AiTelemetry());
+    const chunks: string[] = [];
+    const r = await router.run(text, { onDelta: (t) => chunks.push(t) });
+    expect(chunks.join('').trim()).toBe('Escrow protects both sides.');
+    expect(r.value).toBe('Escrow protects both sides.');
+    expect(r.alias).toBe('glm');
+  });
+
+  it('client abort cancels every in-flight model call', async () => {
+    const provider = new SlowProvider({ [MODELS.deepseek]: 5000, [MODELS.glm]: 5000 });
+    const router = new AiRouter({ ...baseConfig(), hedgeAfterMs: 50, maxAttemptsPerModel: 1 }, provider, new AiTelemetry());
+    const ac = new AbortController();
+    setTimeout(() => ac.abort(), 200);
+    await expect(router.run(text, { signal: ac.signal })).rejects.toMatchObject({ code: 'AI_CANCELLED' });
+    expect(provider.aborted.sort()).toEqual([MODELS.deepseek, MODELS.glm].sort());
+  });
+
+  it('extra provider body fields come from configuration and are reported by name only', () => {
+    const cfg = loadAiConfig({ ...ENV, AI_EXTRA_BODY_JSON: '{"chat_template_kwargs":{"enable_thinking":false}}' });
+    expect(cfg.extraBody).toEqual({ chat_template_kwargs: { enable_thinking: false } });
+    expect(describeRouting(cfg).extraBodyKeys).toEqual(['chat_template_kwargs']);
+    expect(loadAiConfig({ ...ENV, AI_EXTRA_BODY_JSON: 'nope' }).warnings.some((w) => w.includes('AI_EXTRA_BODY_JSON'))).toBe(true);
+  });
+
+  it('ThinkFilter never forwards a reasoning scratchpad, even when tags are split across chunks', () => {
+    const run = (parts: string[]) => { const f = new ThinkFilter(); return parts.map((p) => f.feed(p)).join('') + f.flush(); };
+    expect(run(['<thi', 'nk>secret plan</th', 'ink>Hello', ' there'])).toBe('Hello there');
+    expect(run(['Plain ', 'answer.'])).toBe('Plain answer.');
+    expect(run(['  <think>only thinking, cut off'])).toBe('');
+    expect(run(['Start <think>mid</think> end'])).toBe('Start  end');
+  });
+
+  it('streams an SSE body through the OpenAI-compatible provider (deltas, tool calls and usage assembled)', async () => {
+    const events = [
+      { choices: [{ delta: { content: '<think>' } }] }, { choices: [{ delta: { content: 'hmm</think>Hello' } }] }, { choices: [{ delta: { content: ' world' } }] },
+      { choices: [{ delta: { tool_calls: [{ index: 0, id: 'c1', function: { name: 'search_', arguments: '{"q":' } }] } }] },
+      { choices: [{ delta: { tool_calls: [{ index: 0, function: { name: 'professionals', arguments: '"x"}' } }] }, finish_reason: 'tool_calls' }] },
+      { usage: { prompt_tokens: 7, completion_tokens: 3 }, choices: [] },
+    ];
+    const body = events.map((e) => `data: ${JSON.stringify(e)}\n\n`).join('') + 'data: [DONE]\n\n';
+    const fetchImpl = (async () => new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream' } })) as unknown as typeof fetch;
+    const provider = new OpenAICompatibleProvider({ name: 't', baseUrl: 'https://x.test/v1', apiKey: 'k', fetchImpl });
+    const chunks: string[] = [];
+    const r = await provider.chat({ model: 'm', messages: [], timeoutMs: 1000, onDelta: (t) => chunks.push(t) });
+    expect(chunks.join('')).toBe('Hello world');
+    expect(r.message.content).toBe('Hello world');
+    expect(r.message.tool_calls).toEqual([{ id: 'c1', type: 'function', function: { name: 'search_professionals', arguments: '{"q":"x"}' } }]);
+    expect(r.usage).toEqual({ promptTokens: 7, completionTokens: 3 });
   });
 });

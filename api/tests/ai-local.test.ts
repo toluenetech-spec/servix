@@ -244,6 +244,25 @@ describe.skipIf(process.env.RUN_LOCAL_AI_TESTS !== '1')('Servix AI routing layer
     expect(prompt).not.toMatch(/amountKobo|platformFee|paystack|authorization_url/i);
   });
 
+  it('streamed explain: words arrive as SSE deltas, the final event carries the full answer, errors stay in-band', async () => {
+    const me = await account();
+    fake.next = (req) => { for (const w of ['Escrow ', 'holds ', 'funds.']) req.onDelta?.(w); return text('Escrow holds funds.'); };
+    const res = await call(me.token, 'ai/explain/stream', { topic: 'payments' });
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['content-type']).toContain('text/event-stream');
+    expect(res.headers['access-control-allow-origin']).toBe(origin);
+    const events = res.body.split('\n\n').filter((l) => l.startsWith('data: ')).map((l) => JSON.parse(l.slice(6)));
+    expect(events[0]).toEqual({ type: 'start' });
+    expect(events.filter((e) => e.type === 'delta').map((e) => e.text).join('')).toBe('Escrow holds funds.');
+    expect(events.at(-1)).toMatchObject({ type: 'done', answer: 'Escrow holds funds.', ai: { model: 'deepseek', fallbackUsed: false } });
+    fake.down.add(M.deepseek); fake.down.add(M.glm);
+    const down = await call(me.token, 'ai/explain/stream', { topic: 'payments' });
+    const last = down.body.split('\n\n').filter((l) => l.startsWith('data: ')).map((l) => JSON.parse(l.slice(6))).at(-1);
+    expect(last).toMatchObject({ type: 'error', code: 'AI_UNAVAILABLE', status: 503 });
+    fake.down.clear();
+    expect((await call('', 'ai/assistant/stream', { messages: [{ role: 'user', content: 'hi' }] })).statusCode).toBe(401);
+  });
+
   it('existing features still work with the AI layer registered', async () => {
     const pro = await account('professional');
     expect((await app.inject({ method: 'GET', url: `/api/v1/professionals/${pro.profile.slug}` })).statusCode).toBe(200);

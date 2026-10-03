@@ -7,8 +7,8 @@
 import { useState } from 'react';
 import { Icon } from '../ui/Icon.jsx';
 import { draft, draftProposal } from '../../lib/aiApi.js';
-import { proposalDraftToForm, requestDraftToForm } from '../../lib/aiHelpers.js';
-import { AiError, AiMeta, AiNote, AiTag, AiThinking, useAiTask } from './AiBits.jsx';
+import { aiMarkdownToPlain, proposalDraftToForm, requestDraftToForm } from '../../lib/aiHelpers.js';
+import { AiError, AiMarkdown, AiMeta, AiNote, AiTag, AiThinking, useAiTask } from './AiBits.jsx';
 
 const TONES = [['friendly', 'Friendly'], ['professional', 'Professional'], ['brief', 'Short & direct']];
 const COPY = {
@@ -36,8 +36,8 @@ export function AiTextDraft({ kind, seed = '', onUse, compact = false }) {
     {task.busy && <AiThinking label="Writing…" onCancel={task.cancel} />}
     <AiError error={task.error} onRetry={run} />
     {task.data && !task.busy && <div className="ai-result">
-      <blockquote data-testid="ai-draft-text">{task.data.draft}</blockquote>
-      <div className="ws-actions"><button type="button" className="btn btn--primary" style={{ fontSize: 12, padding: '9px 14px' }} onClick={() => { onUse(task.data.draft); task.reset(); setOpen(false); }}>Use this text</button><button type="button" className="btn btn--ghost" style={{ fontSize: 12 }} onClick={() => navigator.clipboard?.writeText(task.data.draft)}>Copy</button></div>
+      <AiMarkdown as="blockquote" data-testid="ai-draft-text" text={task.data.draft} />
+      <div className="ws-actions"><button type="button" className="btn btn--primary" style={{ fontSize: 12, padding: '9px 14px' }} onClick={() => { onUse(aiMarkdownToPlain(task.data.draft)); task.reset(); setOpen(false); }}>Use this text</button><button type="button" className="btn btn--ghost" style={{ fontSize: 12 }} onClick={() => navigator.clipboard?.writeText(aiMarkdownToPlain(task.data.draft))}>Copy</button></div>
       <AiMeta ai={task.data.ai} />
       <AiNote>Edit anything that isn’t accurate before you save — the AI only knows what you typed above.</AiNote>
     </div>}
@@ -82,10 +82,10 @@ export function ProposalDraftAssist({ requestId, form, onFill }) {
     <AiError error={task.error} onRetry={run} />
     {d && !task.busy && <div className="ai-result">
       <p><strong style={{ color: '#17452e' }}>₦{Number(d.price).toLocaleString('en-NG')}</strong> · {d.deliveryDays} day{d.deliveryDays === 1 ? '' : 's'}{d.serviceSlug ? ' · attached to one of your gigs' : ' · custom work'}</p>
-      <blockquote data-testid="ai-proposal-cover">{d.cover}</blockquote>
+      <AiMarkdown as="blockquote" data-testid="ai-proposal-cover" text={d.cover} />
       {d.milestones?.length > 0 && <ul className="ai-list">{d.milestones.map((m, i) => <li key={i}>{m.title}{m.amount ? ` — ₦${Number(m.amount).toLocaleString('en-NG')}` : ''}{m.days ? ` · ${m.days} d` : ''}</li>)}</ul>}
       {d.flags?.length > 0 && <ul className="ai-list ai-flags">{d.flags.map((f) => <li key={f}>{f}</li>)}</ul>}
-      <div className="ws-actions" style={{ marginTop: 12 }}><button type="button" className="btn btn--primary" style={{ fontSize: 12, padding: '9px 14px' }} onClick={() => { onFill(proposalDraftToForm(d, form)); task.reset(); setOpen(false); }} data-testid="ai-proposal-fill">Put it in the form</button></div>
+      <div className="ws-actions" style={{ marginTop: 12 }}><button type="button" className="btn btn--primary" style={{ fontSize: 12, padding: '9px 14px' }} onClick={() => { onFill(proposalDraftToForm({ ...d, cover: aiMarkdownToPlain(d.cover) }, form)); task.reset(); setOpen(false); }} data-testid="ai-proposal-fill">Put it in the form</button></div>
       <AiMeta ai={task.data.ai} />
       <AiNote>Make the price and timeline yours — the customer sees exactly what you send, not what the AI drafted.</AiNote>
     </div>}

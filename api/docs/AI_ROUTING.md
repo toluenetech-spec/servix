@@ -55,6 +55,19 @@ routes/ai.ts  ──►  ai/departments.ts  ──►  ai/router.ts  ──►  
   the model only explains it. Price ranges are clamped into real Servix min/max or forced to
   "Not enough Servix data yet" (< 5 gigs). Completeness scores stay within ±10 of the backend count.
   Empty marketplaces short-circuit without calling a model.
+- **Fast path (0.8.2).** Two latency measures, both configuration:
+  - *Hedged fallback* — `AI_HEDGE_AFTER_MS` (default 6000): if the current model has produced nothing after
+    the window, the next model in the chain starts in parallel. The first model to stream visible text or return
+    a valid result wins; the others are aborted (`AbortSignal`), never recorded as failures. A failing model hands
+    over immediately. Once a model has streamed text to the client it cannot be replaced (a mid-answer failure is
+    a controlled error, never two answers stitched together). `0` disables hedging (strictly sequential chain).
+  - *Streaming* — text departments (assistant, explanations) are available as server-sent events:
+    `POST /ai/assistant/stream`, `POST /ai/explain/stream` emit `data: {"type":"start"|"delta"|"done"|"error"}`.
+    The provider is asked for `stream:true`; `ThinkFilter` suppresses `<think>…</think>` reasoning even when the
+    tags are split across chunks; tool-call fragments and usage are reassembled from the stream. A closed browser
+    tab aborts every in-flight provider call. Non-streaming endpoints are unchanged.
+  - `AI_EXTRA_BODY_JSON` merges provider-specific fields into every request body (e.g. disabling a model's
+    thinking mode) without a code change; only key names are reported in `/admin/ai/status`.
 - **Drafts only.** No department writes to the database. Drafts return to the client, which submits
   them through the normal validated endpoints (`POST /requests`, `POST /requests/:id/proposals`).
 
@@ -92,23 +105,29 @@ be assumed production-grade on Dahl's free tier; `AI_BASE_URL` can point elsewhe
 
 1. On the API host (Railway → Variables): `AI_ENABLED=true`, `AI_API_KEY=<key>`, optionally model ids.
 2. Restart; `GET /api/v1/features` shows `ai: true`; `GET /api/v1/admin/ai/status` shows the routing.
-3. Nothing in the frontend calls these endpoints yet — UI integration is a separate, later step.
+3. The frontend follows the flag automatically (see below). Optional tuning: `AI_HEDGE_AFTER_MS`, `AI_EXTRA_BODY_JSON`.
 
 ## Tests
 
 - `tests/ai-router.test.ts` (unit, no DB): routing table, overrides, fallback flows (DeepSeek→GLM,
   MiniMax→DeepSeek), bounded retries, repair round, deadline, tool loop + UNTRUSTED wrapping, key
-  scrubbing, status classification, think-stripping, telemetry hygiene, normalisers, static payment isolation.
+  scrubbing, status classification, think-stripping, telemetry hygiene, normalisers, static payment isolation,
+  hedged fallback (slow primary → next model wins, cancelled primary, no hedge inside the window, `0` = off),
+  streaming deltas from the winning model only, client abort cancels every call, `ThinkFilter` across split
+  chunks, SSE assembly in the provider (deltas, tool-call fragments, usage), `AI_EXTRA_BODY_JSON` parsing.
 - `tests/ai-local.test.ts` (opt-in, embedded PostgreSQL + real app, scripted provider):
   `RUN_LOCAL_AI_TESTS=1 npx vitest run tests/ai-local.test.ts` — flag gating, every department endpoint,
   audience checks, fallback via HTTP + telemetry, invalid JSON → 502, category/date normalisation accepted
-  by the real `POST /requests`, over-budget/invented-gig handling, project-health derivation, strangers → 404.
+  by the real `POST /requests`, over-budget/invented-gig handling, project-health derivation, strangers → 404,
+  streamed explain over HTTP (SSE deltas, final `done` event, in-band `error` event, CORS header preserved, 401).
 
 ## Frontend (follows the flag)
 
 `src/lib/useFeatures.js` reads `ai` from `GET /api/v1/features`; every AI component returns `null` while it is
 false, so a disabled instance shows no AI UI at all. Client: `src/lib/aiApi.js` (POST only, abortable, 75 s cap);
-pure mappers and error copy in `src/lib/aiHelpers.js`. Surfaces: smart search (`/professionals`), assistant
+pure mappers, error copy and a safe light-Markdown parser (bold/italic/code/lists → React elements, never HTML)
+in `src/lib/aiHelpers.js`. The assistant and “What does this mean?” read the streamed endpoints and render words as
+they arrive (falling back to the plain endpoints if the stream is unavailable). Surfaces: smart search (`/professionals`), assistant
 launcher (workspace shell) and hub (`/dashboard/ai`), request-brief assist (request editor), proposal draft
 (proposal page), text drafts (gig editor, profile About), booking explain + project health (booking page).
 The browser never submits anything on the AI's behalf: drafts are placed in the ordinary forms and go through
