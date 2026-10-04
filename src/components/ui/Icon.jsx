@@ -6,6 +6,9 @@
 const paths = {
   bell: <><path d="M6 17V11a6 6 0 0 1 12 0v6l1.5 2h-15L6 17Z"/><path d="M10 21a2 2 0 0 0 4 0"/></>,
   bookmark: <path d="M6 3h12v18l-6-4-6 4V3Z"/>,
+  copy: <><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a1 1 0 0 1 1-1h10"/></>,
+  'thumbs-up': <path d="M7 11v9H4v-9h3Zm0 0 4-7a2 2 0 0 1 2 2v4h5a2 2 0 0 1 2 2.3l-1 6A2 2 0 0 1 17 20H7"/>,
+  'thumbs-down': <path d="M17 13V4h3v9h-3Zm0 0-4 7a2 2 0 0 1-2-2v-4H6a2 2 0 0 1-2-2.3l1-6A2 2 0 0 1 7 4h10"/>,
   'bar-chart': <path d="M4 20V10m6 10V4m6 16v-7m4 7H2"/>,
   megaphone: <><path d="M3 10v4a1 1 0 0 0 1 1h3l6 4V5L7 9H4a1 1 0 0 0-1 1Z"/><path d="M17 9a4 4 0 0 1 0 6m2.5-9a8 8 0 0 1 0 12"/></>,
   crown: <path d="m3 8 4.5 4L12 5l4.5 7L21 8l-2 11H5L3 8Z"/>,

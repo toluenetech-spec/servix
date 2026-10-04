@@ -10,7 +10,7 @@ import { Badge } from '../../components/ui/Badge.jsx';
 import { Field } from '../../components/ui/Field.jsx';
 import { Skeleton, EmptyState, ErrorState, StatsSkeleton, TableSkeleton } from '../../components/ui/States.jsx';
 import { useToast } from '../../components/ui/Toast.jsx';
-import { LineChart, BarChart, HBars } from '../../components/dashboard/Charts.jsx';
+import { LineChart, BarChart, HBars, Donut } from '../../components/dashboard/Charts.jsx';
 import { formatPrice } from '../../lib/format.js';
 import * as adminApi from '../../lib/adminApi.js';
 import '../../components/plans/plans.css';
@@ -182,6 +182,88 @@ function ModelHealthPanel() {
 
 const RANGES = [[7, '7 days'], [30, '30 days'], [90, '90 days'], [365, '1 year']];
 
+/** Two bars per day: thumbs-up (green) and thumbs-down (coral). Plain SVG so it works on every phone browser. */
+function SatisfactionChart({ daily }) {
+  const w = 600, h = 160, pad = 10;
+  const max = Math.max(1, ...daily.map((d) => Math.max(d.up, d.down)));
+  const gw = daily.length ? (w - pad * 2) / daily.length : 0;
+  const short = (iso) => new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+  return <figure className="chart">
+    <figcaption><strong>Helpful vs not helpful, per day</strong><span><i style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#2f6b4f', marginRight: 4 }} />helpful <i style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#c8553d', margin: '0 4px 0 10px' }} />not helpful</span></figcaption>
+    <svg viewBox={`0 0 ${w} ${h}`} role="img" aria-label="AI answer satisfaction by day" preserveAspectRatio="none">
+      <line x1={pad} x2={w - pad} y1={h - pad - 0.5 * (h - pad * 2)} y2={h - pad - 0.5 * (h - pad * 2)} className="chart-grid" />
+      {daily.map((d, i) => {
+        const bw = Math.max(1, gw * 0.36); const x0 = pad + i * gw + gw * 0.12;
+        const hu = (d.up / max) * (h - pad * 2); const hd = (d.down / max) * (h - pad * 2);
+        return <g key={d.date}><title>{`${short(d.date)}: ${d.up} helpful, ${d.down} not helpful`}</title>
+          <rect x={x0} y={h - pad - hu} width={bw} height={hu} rx="2" fill="#2f6b4f" />
+          <rect x={x0 + bw + gw * 0.04} y={h - pad - hd} width={bw} height={hd} rx="2" fill="#c8553d" />
+        </g>;
+      })}
+    </svg>
+    <div className="chart-axis"><span>{daily.length ? short(daily[0].date) : ''}</span><span>{daily.length ? short(daily[daily.length - 1].date) : ''}</span></div>
+  </figure>;
+}
+
+function SatisfactionPanel() {
+  const [days, setDays] = useState(30); const [rating, setRating] = useState('down'); const [page, setPage] = useState(1);
+  const [data, setData] = useState(null); const [error, setError] = useState(null); const [open, setOpen] = useState(null);
+  const load = useCallback(() => { setError(null); adminApi.getAiFeedback({ days, rating, page }).then(setData).catch(setError); }, [days, rating, page]);
+  useEffect(load, [load]);
+  const when = (iso) => new Date(iso).toLocaleString('en-NG', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  if (error) {
+    return <section className="ws-panel" data-testid="ai-satisfaction"><h2>Satisfaction</h2>
+      {error.status === 503 || error.code === 'SCHEMA_PENDING'
+        ? <p className="ws-muted">The feedback table is not on the database yet — run <code>api/docs/manual-ai-feedback.sql</code> once in the Neon SQL Editor, then refresh.</p>
+        : <ErrorState message="We couldn't load AI feedback." onRetry={load} />}
+    </section>;
+  }
+  if (!data) return <section className="ws-panel" data-testid="ai-satisfaction"><h2>Satisfaction</h2><TableSkeleton rows={3} cols={4} label="Loading feedback…" /></section>;
+  const t = data.totals;
+  return <section className="ws-panel" data-testid="ai-satisfaction">
+    <h2>Satisfaction</h2>
+    <p className="ws-muted" style={{ marginTop: 0 }}>What members said under AI answers (“Helpful?” thumbs). For a thumbs-down the question and the answer are kept so you can see what went wrong.</p>
+    <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', marginBottom: 'var(--space-3)' }}>
+      {RANGES.map(([d, l]) => <Button key={d} size="sm" variant={days === d ? 'primary' : 'ghost'} onClick={() => { setDays(d); setPage(1); }}>{l}</Button>)}
+    </div>
+    <div className="ws-stat-grid" style={{ margin: '0 0 var(--space-3)' }}>
+      <div className="ws-stat"><span>Rated answers</span><strong>{t.rated}</strong></div>
+      <div className="ws-stat"><span>Helpful</span><strong>{t.up}</strong></div>
+      <div className="ws-stat"><span>Not helpful</span><strong>{t.down}</strong></div>
+      <div className="ws-stat"><span>Satisfaction</span><strong>{t.satisfaction === null ? '—' : `${t.satisfaction}%`}</strong></div>
+    </div>
+    {t.rated === 0 ? <p className="ws-muted">No ratings in this period yet.</p> : <div className="ws-chart-grid">
+      <SatisfactionChart daily={data.daily} />
+      <Donut label="Overall" segments={[{ label: 'Helpful', value: t.up }, { label: 'Not helpful', value: t.down }]} />
+    </div>}
+    {data.byDepartment?.length > 1 && <HBars label="Not helpful, by AI department" items={data.byDepartment.map((d) => ({ label: d.department.replaceAll('_', ' '), value: d.down }))} />}
+    <h3 style={{ marginTop: 'var(--space-4)' }}>Feedback</h3>
+    <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', marginBottom: 'var(--space-2)' }}>
+      {[['down', 'Not satisfied'], ['up', 'Satisfied'], ['all', 'All']].map(([r, l]) => <Button key={r} size="sm" variant={rating === r ? 'secondary' : 'ghost'} onClick={() => { setRating(r); setPage(1); }}>{l}</Button>)}
+    </div>
+    {data.items.length === 0 ? <p className="ws-muted">Nothing here for this period.</p> : <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 'var(--space-2)' }} data-testid="ai-feedback-list">
+      {data.items.map((f) => <li key={f.id} style={{ border: '1px solid var(--color-border, #e6ebe0)', borderRadius: 12, padding: 'var(--space-3)' }}>
+        <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', flexWrap: 'wrap', fontSize: 'var(--text-sm)' }}>
+          <Badge variant={f.rating === 'up' ? 'brand' : 'neutral'}>{f.rating === 'up' ? 'Helpful' : 'Not helpful'}</Badge>
+          <span>{f.user ? `${f.user.name || f.user.email}${f.user.role ? ` · ${f.user.role}` : ''}` : 'Deleted account'}</span>
+          <span className="ws-muted">· {when(f.createdAt)} · {f.department.replaceAll('_', ' ')}{f.modelAlias ? ` · ${f.modelAlias}` : ''}</span>
+        </div>
+        {f.comment && <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-sm)' }}><strong>Comment:</strong> {f.comment}</p>}
+        {f.rating === 'down' && (f.prompt || f.answer) && <div style={{ marginTop: 'var(--space-2)', display: 'grid', gap: 'var(--space-2)', fontSize: 'var(--text-sm)' }}>
+          <div style={{ background: '#12372a', color: '#fff', borderRadius: 10, padding: '8px 12px', whiteSpace: 'pre-wrap' }}><span style={{ opacity: 0.7, fontSize: 'var(--text-xs)' }}>They asked</span><br />{f.prompt || '—'}</div>
+          <div style={{ background: '#f1f4ec', borderRadius: 10, padding: '8px 12px', whiteSpace: 'pre-wrap', maxHeight: open === f.id ? 'none' : 120, overflow: 'hidden', position: 'relative' }}><span className="ws-muted" style={{ fontSize: 'var(--text-xs)' }}>Servix AI answered</span><br />{f.answer || '—'}</div>
+          {(f.answer || '').length > 300 && <button type="button" className="ai-link" style={{ justifySelf: 'start' }} onClick={() => setOpen(open === f.id ? null : f.id)}>{open === f.id ? 'Show less' : 'Show full answer'}</button>}
+        </div>}
+      </li>)}
+    </ul>}
+    {data.total > data.pageSize && <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', marginTop: 'var(--space-3)' }}>
+      <Button size="sm" variant="ghost" disabled={page <= 1} onClick={() => setPage(page - 1)}>Previous</Button>
+      <span className="ws-muted" style={{ fontSize: 'var(--text-sm)' }}>Page {page} of {Math.ceil(data.total / data.pageSize)}</span>
+      <Button size="sm" variant="ghost" disabled={page >= Math.ceil(data.total / data.pageSize)} onClick={() => setPage(page + 1)}>Next</Button>
+    </div>}
+  </section>;
+}
+
 export function AiUsageTab() {
   const [filters, setFilters] = useState({ days: 30, plan: '', department: '', status: '', model: '', granularity: 'day' });
   const [data, setData] = useState(null); const [error, setError] = useState(null); const [events, setEvents] = useState(null);
@@ -225,6 +307,7 @@ export function AiUsageTab() {
         <section className="ws-panel" style={{ marginBottom: 0 }}><h2>Top teams</h2>{data.topOrganizations.length === 0 ? <p className="ws-muted">No team usage yet.</p> : <div className="earnings"><table><thead><tr><th>Team</th><th>Requests</th><th>Tokens</th></tr></thead><tbody>{data.topOrganizations.map((o) => <tr key={o.organizationId}><td>{o.name}</td><td>{n(o.requests)}</td><td>{n(o.tokens)}</td></tr>)}</tbody></table></div>}</section>
       </div>
       <ModelHealthPanel />
+      <SatisfactionPanel />
       <section className="ws-panel" style={{ marginBottom: 0 }}><h2>Recent AI requests</h2>{!events ? <TableSkeleton rows={5} cols={7} label="Loading events…" /> : events.items.length === 0 ? <p className="ws-muted">Nothing in this period.</p> : <div className="earnings"><table><thead><tr><th>When</th><th>Account</th><th>Plan</th><th>Tool</th><th>Model</th><th>Tokens</th><th>Result</th></tr></thead><tbody>{events.items.map((e) => <tr key={e.id}><td style={{ fontSize: 'var(--text-xs)' }}>{fmtWhen(e.at)}</td><td>{e.user ? <>{e.user.name}<br /><small>{e.user.email}</small></> : <small>anonymous</small>}{e.organization && <><br /><small>team: {e.organization}</small></>}</td><td>{e.plan ?? '—'}</td><td>{e.department.replaceAll('_', ' ')}</td><td>{e.alias}{e.fallbackUsed && <><br /><small>fallback · {e.attempts} attempts</small></>}</td><td>{n(e.totalTokens)}</td><td><Badge variant={e.ok ? 'brand' : 'neutral'}>{e.ok ? `ok · ${(e.durationMs / 1000).toFixed(1)} s` : e.errorCode ?? 'failed'}</Badge></td></tr>)}</tbody></table></div>}</section>
     </>}
   </div>;

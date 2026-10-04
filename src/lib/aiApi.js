@@ -82,6 +82,13 @@ async function streamPost(path, fallbackPath, body, { signal, onDelta } = {}) {
 
 /* ---------- everyone ---------- */
 export const searchIntent = (query, opts) => post('/ai/search/intent', { query }, { auth: false, ...opts });
+/** Thumbs up/down on an answer. Question + answer are only sent (and stored) for a thumbs-down. */
+export const sendAiFeedback = ({ rating, department = 'assistant', comment, prompt, answer, modelAlias }) => post('/ai/feedback', {
+  rating,
+  department,
+  ...(rating === 'down' ? { ...(comment ? { comment } : {}), ...(prompt ? { prompt: String(prompt).slice(0, 4000) } : {}), ...(answer ? { answer: String(answer).slice(0, 12000) } : {}) } : {}),
+  ...(modelAlias ? { modelAlias } : {}),
+});
 export const aiUsage = () => authorizedFetch(`${V1}/ai/usage`).then(async (res) => { if (!res.ok) throw await toError(res); return res.json(); });
 
 /* ---------- signed in ---------- */

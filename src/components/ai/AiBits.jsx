@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '../ui/Icon.jsx';
 import { aiErrorMessage, parseAiMarkdown } from '../../lib/aiHelpers.js';
+import { sendAiFeedback } from '../../lib/aiApi.js';
 import { UpgradeNotice } from '../plans/PlanBits.jsx';
 import './ai.css';
 
@@ -67,6 +68,66 @@ export function AiNote({ children }) {
 }
 
 /** Shows which model answered and whether the fallback kicked in (no provider details). */
+/** Copy text to the clipboard; falls back to a hidden textarea on browsers without the async clipboard API. */
+export async function copyText(text) {
+  try {
+    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) { await navigator.clipboard.writeText(text); return true; }
+  } catch { /* fall through to the legacy path */ }
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0, text.length);
+    const ok = document.execCommand('copy'); document.body.removeChild(ta); return ok;
+  } catch { return false; }
+}
+
+export function CopyButton({ text, label = 'Copy', className = '' }) {
+  const [state, setState] = useState('idle');
+  useEffect(() => { if (state === 'idle') return undefined; const t = setTimeout(() => setState('idle'), 1600); return () => clearTimeout(t); }, [state]);
+  return <button type="button" className={`ai-action${className ? ` ${className}` : ''}`} onClick={async () => setState((await copyText(text)) ? 'done' : 'failed')} aria-label={state === 'done' ? 'Copied' : label} title={label} data-testid="ai-copy">
+    <Icon name={state === 'done' ? 'check' : 'copy'} size={14} />
+    <span>{state === 'done' ? 'Copied' : state === 'failed' ? 'Couldn’t copy' : label}</span>
+  </button>;
+}
+
+/**
+ * Copy + "Was this helpful?" under an AI answer. 👍 sends just the rating; 👎 opens a one-line box and tells the
+ * user that the question and answer will be shared with the Servix team before anything is sent.
+ */
+export function AiAnswerActions({ answer, prompt, ai, department = 'assistant', onFeedback }) {
+  const [phase, setPhase] = useState('idle'); // idle | asking | sending | thanks | failed
+  const [comment, setComment] = useState('');
+  const [rating, setRating] = useState(null);
+  async function submit(r, note) {
+    setPhase('sending'); setRating(r);
+    try {
+      await sendAiFeedback({ rating: r, department, comment: note, prompt, answer, modelAlias: ai?.model });
+      setPhase('thanks'); onFeedback?.(r);
+    } catch (e) { setPhase(e?.status === 503 ? 'unavailable' : 'failed'); }
+  }
+  return <div className="ai-actions" data-testid="ai-answer-actions">
+    <CopyButton text={answer} label="Copy" />
+    {phase === 'idle' && <span className="ai-actions__ask">
+      <span>Helpful?</span>
+      <button type="button" className="ai-action" onClick={() => submit('up')} aria-label="Yes, this was helpful" title="Yes"><Icon name="thumbs-up" size={14} /></button>
+      <button type="button" className="ai-action" onClick={() => setPhase('asking')} aria-label="No, this was not helpful" title="No"><Icon name="thumbs-down" size={14} /></button>
+    </span>}
+    {phase === 'asking' && <form className="ai-feedback-form" onSubmit={(e) => { e.preventDefault(); submit('down', comment.trim() || undefined); }}>
+      <label className="ws-muted" htmlFor="ai-feedback-comment">Sorry about that. What was wrong? (optional)</label>
+      <textarea id="ai-feedback-comment" rows={2} maxLength={500} value={comment} onChange={(e) => setComment(e.target.value)} placeholder="e.g. the answer was outdated / not what I asked" />
+      <small className="ws-muted">Your question and this answer will be shared with the Servix team so we can fix it.</small>
+      <div className="ai-feedback-form__row">
+        <button type="submit" className="ai-action ai-action--primary">Send</button>
+        <button type="button" className="ai-link" onClick={() => setPhase('idle')}>Cancel</button>
+      </div>
+    </form>}
+    {phase === 'sending' && <small className="ws-muted">Sending…</small>}
+    {phase === 'thanks' && <small className="ai-actions__thanks">{rating === 'up' ? 'Thanks for the feedback!' : 'Thanks — we’ll look into it.'}</small>}
+    {phase === 'unavailable' && <small className="ws-muted">Feedback isn’t available right now.</small>}
+    {phase === 'failed' && <small className="ws-muted">Couldn’t send feedback. <button type="button" className="ai-link" onClick={() => setPhase('idle')}>Try again</button></small>}
+  </div>;
+}
+
 export function AiMeta({ ai }) {
   if (!ai) return null;
   return <small className="ai-meta">Answered in {Math.max(1, Math.round(ai.durationMs / 1000))} s{ai.fallbackUsed ? ' · backup model used' : ''}</small>;

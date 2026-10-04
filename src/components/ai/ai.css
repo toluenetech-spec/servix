@@ -96,6 +96,23 @@
 .ai-msg--user{justify-self:end;background:#12372a;color:#fff;border-bottom-right-radius:5px;white-space:pre-wrap;animation:ai-msg-in .28s cubic-bezier(.2,.8,.2,1)}
 .ai-msg-row{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px;align-items:end;justify-self:start;max-width:94%;animation:ai-msg-in .28s cubic-bezier(.2,.8,.2,1)}
 .ai-msg-row .ai-msg{max-width:none}
+.ai-turn{display:grid;gap:4px;min-width:0}
+.ai-turn--user{justify-self:end;max-width:88%}
+.ai-turn--ai{justify-self:start;max-width:94%}
+.ai-turn--ai .ai-msg-row{max-width:none}
+.ai-actions{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;padding:0 4px 0 36px;font-size:11.5px;color:#5b6b5f}
+.ai-actions--user{justify-content:flex-end;padding:0 4px}
+.ai-actions__ask{display:inline-flex;align-items:center;gap:4px}
+.ai-action{display:inline-flex;align-items:center;gap:4px;background:none;border:0;padding:3px 6px;border-radius:8px;color:#4c5e51;font:inherit;font-size:11.5px;font-weight:600;cursor:pointer;line-height:1}
+.ai-action:hover,.ai-action:focus-visible{background:#e8eee3;color:#12372a;outline:none}
+.ai-action--primary{background:#12372a;color:#fff;padding:6px 12px}
+.ai-action--primary:hover,.ai-action--primary:focus-visible{background:#1d4a39;color:#fff}
+.ai-actions__thanks{color:#2f6b4f;font-weight:600}
+.ai-feedback-form{display:grid;gap:6px;width:100%;max-width:420px;background:#fff;border:1px solid #e6ebe0;border-radius:12px;padding:10px 12px}
+.ai-feedback-form label{font-size:12px;font-weight:600;color:#233e2b}
+.ai-feedback-form textarea{width:100%;box-sizing:border-box;resize:vertical;border:1px solid #d8e0d2;border-radius:8px;padding:7px 9px;font:inherit;font-size:12.5px;line-height:1.5;min-height:44px}
+.ai-feedback-form small{font-size:11px;line-height:1.5}
+.ai-feedback-form__row{display:flex;align-items:center;gap:12px}
 .ai-msg--ai{background:#f1f4ec;color:#233e2b;border-bottom-left-radius:5px;border:1px solid #e6ebe0}
 @keyframes ai-msg-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.ai-msg--user,.ai-msg-row{animation:none}}
@@ -158,6 +175,8 @@
 .ai-card ul{margin:0;padding:0;list-style:none;display:grid;gap:9px}
 .ai-card li{font-size:12.5px;line-height:1.6;color:#4d5b4a;display:flex;gap:9px;align-items:flex-start}
 .ai-card li::before{content:"";flex-shrink:0;width:6px;height:6px;border-radius:50%;background:#1f5c45;margin-top:8px}
+/* Markdown answers inside cards keep normal list rendering (the flex bullets above are for static checklists only). */
+.ai-card .ai-md li,.ai-md li{display:list-item;gap:0;color:inherit;font-size:inherit;line-height:inherit}.ai-card .ai-md li::before,.ai-md li::before{content:none}.ai-md ul{list-style:disc}.ai-md ol{list-style:decimal}
 .ai-card--guard li::before{background:#e56b5d}
 .ai-card--links a{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-radius:10px;border:1px solid #e6ebe0;font-size:12.5px;font-weight:600;color:#17452e;text-decoration:none;transition:background .2s,border-color .2s}
 .ai-card--links a:hover{background:#f3f7ee;border-color:#cfe0c6}

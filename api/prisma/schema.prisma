@@ -102,6 +102,7 @@ model User {
   ownedOrganizations Organization[] @relation("org_owner")
   organizationMemberships OrganizationMember[] @relation("org_member_user")
   organizationInvitesSent OrganizationMember[] @relation("org_member_inviter")
+  aiFeedback    AiFeedback[]
   aiUsageEvents AiUsageEvent[]
   savedSearches SavedSearch[]
   oauthIdentities OAuthIdentity[]
@@ -1139,4 +1140,25 @@ model ProfileVersion {
   professional ProfessionalProfile @relation(fields: [professionalId], references: [id], onDelete: Cascade)
   @@index([professionalId, createdAt(sort: Desc)])
   @@map("profile_versions")
+}
+
+/* ===================== Servix AI feedback (2026-10-04) =====================
+ * One row per thumbs-up/down on an AI answer. The question and answer are
+ * stored ONLY for "down" votes (the user is told so), so admins can see what
+ * went wrong. Never used for billing; no provider secrets. */
+model AiFeedback {
+  id         String   @id @default(uuid())
+  userId     String?  @map("user_id")
+  department String
+  rating     String // 'up' | 'down'
+  comment    String?
+  prompt     String?
+  answer     String?
+  modelAlias String?  @map("model_alias")
+  createdAt  DateTime @default(now()) @map("created_at")
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  @@index([createdAt])
+  @@index([rating, createdAt])
+  @@index([userId, createdAt])
+  @@map("ai_feedback")
 }

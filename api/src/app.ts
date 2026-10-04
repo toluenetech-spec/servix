@@ -38,6 +38,7 @@ import { kycRoutes } from './routes/kyc.js';
 import { marketplaceRoutes } from './routes/marketplace.js';
 import { requestRoutes } from './routes/requests.js';
 import { aiRoutes } from './routes/ai.js';
+import { aiFeedbackRoutes } from './routes/aiFeedback.js';
 import { billingRoutes } from './routes/billing.js';
 import { teamRoutes } from './routes/teams.js';
 import { productivityRoutes } from './routes/productivity.js';
@@ -211,11 +212,18 @@ export async function buildApp() {
     const storageEnv = resolveStorageEnv();
     checks.storage = !storageEnv.enabled || Boolean(storageEnv.bucket && storageEnv.accessKeyId);
     let pendingMigration: string | null = null;
+    let optionalPending: Array<{ table: string; migration: string; script: string }> = [];
     if (checks.database) {
-      try { const schema = await checkSchema(); checks.schema = schema.ok; pendingMigration = schema.pendingMigration; } catch { checks.schema = false; }
+      try { const schema = await checkSchema(); checks.schema = schema.ok; pendingMigration = schema.pendingMigration; optionalPending = schema.optionalPending; } catch { checks.schema = false; }
     } else checks.schema = false;
     const ready = Object.values(checks).every(Boolean);
-    return reply.code(ready ? 200 : 503).send({ ready, checks, ...(pendingMigration ? { pendingMigration, hint: `Apply api/docs/manual-subscriptions-upgrade.sql (migration ${pendingMigration}) on the database; no restart needed.` } : {}) });
+    return reply.code(ready ? 200 : 503).send({
+      ready,
+      checks,
+      ...(pendingMigration ? { pendingMigration, hint: `Apply api/docs/manual-subscriptions-upgrade.sql (migration ${pendingMigration}) on the database; no restart needed.` } : {}),
+      // Optional features whose table is not on the database yet (they answer 503 SCHEMA_PENDING; nothing else is affected).
+      ...(optionalPending.length ? { optionalPending: optionalPending.map((o) => ({ ...o, hint: `Apply ${o.script} (migration ${o.migration}) on the database; no restart needed.` })) } : {}),
+    });;
   });
 
   /* ---------------- Routes ---------------- */
@@ -242,6 +250,7 @@ export async function buildApp() {
       await marketplaceRoutes(v1); // /features, trust, compare, achievements, verified portfolio
       await requestRoutes(v1); // /requests/* + /proposals/* (REQUESTS_ENABLED)
       await aiRoutes(v1); // /ai/* (AI_ENABLED) + /admin/ai/*
+      await aiFeedbackRoutes(v1); // POST /ai/feedback + GET /admin/ai/feedback (thumbs up/down on answers)
       await billingRoutes(v1); // /me/entitlements + /billing/* (plans for every account)
       await teamRoutes(v1); // /team/* (Team / Enterprise workspaces)
       await productivityRoutes(v1); // saved searches, CSV exports, profile versions

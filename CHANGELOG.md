@@ -2,6 +2,23 @@
 
 All notable changes to the Servix public website.
 
+## 0.9.2 — 2026-10-04 (AI answer feedback)
+
+### Added
+- **"Helpful?" under every Servix AI answer**: 👍 / 👎 plus a **Copy** button on each answer and on each of your own
+  questions. A 👍 stores only the rating; a 👎 opens a one-line box (optional comment) and — after telling you so —
+  sends the question and the answer to the Servix team so the mistake can be fixed. `POST /api/v1/ai/feedback`
+  (signed-in, rate limited). Stored in the new `ai_feedback` table (additive migration `20261004120000_ai_feedback`,
+  manual script `api/docs/manual-ai-feedback.sql`). Until the script is applied only the feedback buttons and the admin
+  panel answer `503 SCHEMA_PENDING`; `/readyz` stays `ready:true` and lists the gap under `optionalPending`.
+- **Admin → AI usage → Satisfaction**: helpful vs not-helpful per day (7/30/90/365 days), overall satisfaction %,
+  per-department split, and the list of **not-satisfied** answers showing who asked, what they asked, what Servix AI
+  answered, their comment, the model and the time (`GET /api/v1/admin/ai/feedback?days=&rating=`).
+
+### Fixed
+- **AI answers with bullet points** no longer render as narrow side-by-side columns (a chat-card list style was
+  flexing the markdown `<li>` children); lists inside answers are normal bulleted/numbered lists again.
+
 ## 0.9.1 — 2026-10-04 (Sign-in alerts and iOS fixes)
 
 ### Added

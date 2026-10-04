@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '../ui/Icon.jsx';
 import { askAssistant } from '../../lib/aiApi.js';
-import { AiAvatar, AiError, AiMarkdown, AiMeta, AiNote, AiThinking, useAiTask } from './AiBits.jsx';
+import { AiAnswerActions, AiAvatar, AiError, AiMarkdown, AiMeta, AiNote, AiThinking, CopyButton, useAiTask } from './AiBits.jsx';
 
 const STARTERS = {
   customer: ['Who can design a logo for a small bakery in Lagos?', 'How does payment protection work on Servix?', 'What does “delivered” mean on my booking?'],
@@ -33,9 +33,10 @@ export function AiChat({ role = 'customer', compact = false }) {
     const next = [...messages, { role: 'user', content: q }].slice(-MAX_TURNS);
     setMessages(next); setText(''); setDraft('');
     let partial = '';
-    const r = await task.run((signal) => askAssistant(next, { signal, onDelta: (t) => { partial += t; setDraft(partial); } }));
+    const history = next.map(({ role: rl, content: c }) => ({ role: rl, content: c }));
+    const r = await task.run((signal) => askAssistant(history, { signal, onDelta: (t) => { partial += t; setDraft(partial); } }));
     setDraft('');
-    if (r) { setMessages((m) => [...m, { role: 'assistant', content: r.answer }].slice(-MAX_TURNS)); setLastMeta(r.ai); }
+    if (r) { setMessages((m) => [...m, { role: 'assistant', content: r.answer, ai: r.ai, prompt: q }].slice(-MAX_TURNS)); setLastMeta(r.ai); }
   }
   const stop = () => { task.cancel(); setDraft(''); setMessages((m) => (m[m.length - 1]?.role === 'user' ? m.slice(0, -1) : m)); };
 
@@ -50,8 +51,14 @@ export function AiChat({ role = 'customer', compact = false }) {
         <div className="ai-chat__starters">{(STARTERS[role] ?? STARTERS.customer).map((s) => <button type="button" key={s} onClick={() => send(s)}>{s}</button>)}</div>
       </div>}
       {messages.map((m, i) => (m.role === 'user'
-        ? <div key={i} className="ai-msg ai-msg--user">{m.content}</div>
-        : <div key={i} className="ai-msg-row"><AiAvatar size={26} state="still" /><AiMarkdown className="ai-msg ai-msg--ai" text={m.content} /></div>))}
+        ? <div key={i} className="ai-turn ai-turn--user">
+          <div className="ai-msg ai-msg--user">{m.content}</div>
+          <div className="ai-actions ai-actions--user"><CopyButton text={m.content} /></div>
+        </div>
+        : <div key={i} className="ai-turn ai-turn--ai">
+          <div className="ai-msg-row"><AiAvatar size={26} state="still" /><AiMarkdown className="ai-msg ai-msg--ai" text={m.content} /></div>
+          {!(task.busy && i === messages.length - 1) && <AiAnswerActions answer={m.content} prompt={m.prompt} ai={m.ai} department="assistant" />}
+        </div>))}
       {task.busy && draft && <div className="ai-msg-row"><AiAvatar size={26} state="thinking" /><AiMarkdown className="ai-msg ai-msg--ai" text={draft} streaming data-testid="ai-streaming" /></div>}
       {task.busy && !draft && <AiThinking label="Looking that up…" onCancel={stop} />}
       {task.busy && draft && <button type="button" className="ai-link ai-chat__stop" onClick={stop}>Stop</button>}

@@ -117,6 +117,23 @@ together because they share the same account priority. Mitigations now in place:
    the key is accepted, whether the configured model ids are in the host's catalogue, and on Dahl the key's remaining
    token allocation — the three things that explain almost every "busy" report.
 
+## Answer feedback (2026-10-04)
+
+Every assistant answer carries **Copy** and **Helpful? 👍/👎**. The write lives in `src/routes/aiFeedback.ts`, *outside*
+the AI layer (which still never writes to the database — see the static guard in `tests/ai-router.test.ts`).
+
+- `POST /api/v1/ai/feedback` `{ rating:'up'|'down', department?, comment?≤500, prompt?, answer?, modelAlias? }` — signed-in,
+  30/min. **A 👍 stores only rating/department/model.** A 👎 stores the comment, the question and the answer; the chat shows
+  the user "Your question and this answer will be shared with the Servix team" before they send it.
+- `GET /api/v1/admin/ai/feedback?days=30&rating=down|up|all&page=&pageSize=` — `totals {up,down,rated,satisfaction%}`,
+  `daily [{date,up,down}]` (zeros filled), `byDepartment`, and `items` with `user {id,name,email,role}`, `prompt`, `answer`,
+  `comment`, `modelAlias`, `createdAt`. Rendered in **Admin → AI usage → Satisfaction** (chart + "Not satisfied" list).
+- Table `ai_feedback` — migration `prisma/migrations/20261004120000_ai_feedback`, manual script `docs/manual-ai-feedback.sql`.
+  It is an *optional* migration: while missing, only these two endpoints answer `503 SCHEMA_PENDING`; `/readyz` stays
+  `ready:true` and reports it under `optionalPending` (`src/lib/schemaCheck.ts` → `OPTIONAL_TABLES`).
+- Tests: `tests/ai-feedback-local.test.ts` (`RUN_LOCAL_AI_TESTS=1`): privacy rule (no text on 👍), admin summary, and the
+  503-not-500 behaviour when the table is absent.
+
 ## Telemetry
 
 **Model health (admin console)** — `Admin → AI usage → Model health` reads `/admin/ai/status` (per-model calls, ok,

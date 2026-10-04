@@ -100,6 +100,7 @@ export const getAiUsageEvents = (params) => call('GET', `/admin/ai/usage/events$
 export const getAiStatus = () => call('GET', '/admin/ai/status');
 export const getAiTelemetry = () => call('GET', '/admin/ai/telemetry/recent');
 export const checkAiProvider = () => call('GET', '/admin/ai/provider-check');
+export const getAiFeedback = ({ days = 30, rating = 'down', page = 1, pageSize = 20 } = {}) => call('GET', `/admin/ai/feedback?days=${days}&rating=${rating}&page=${page}&pageSize=${pageSize}`);
 
 /* identity verification (KYC) */
 export const getKycQueue = (params) => call('GET', `/admin/kyc/pending${qs(params)}`);
