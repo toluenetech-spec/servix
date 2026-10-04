@@ -218,3 +218,17 @@ export class OpenAICompatibleProvider implements AiProvider {
     return { message, usage, finishReason, latencyMs };
   }
 }
+
+/**
+ * Routes each call to the provider that serves the requested model id: the primary host for the catalogue models and
+ * an independent backup host (different account) for the `backup` alias. Keys never cross hosts.
+ */
+export class FailoverProvider implements AiProvider {
+  readonly name: string;
+  constructor(private readonly primary: AiProvider, private readonly backup: AiProvider, private readonly backupModels: ReadonlySet<string>) {
+    this.name = `${primary.name}+${backup.name}`;
+  }
+  chat(req: ChatRequest): Promise<ChatResponse> {
+    return this.backupModels.has(req.model) ? this.backup.chat(req) : this.primary.chat(req);
+  }
+}

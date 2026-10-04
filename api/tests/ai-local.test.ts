@@ -63,7 +63,7 @@ describe.skipIf(process.env.RUN_LOCAL_AI_TESTS !== '1')('Servix AI routing layer
     /* Plans (free/go/pro/team/enterprise) are inserted by the subscriptions migration itself. */
     design = (await prisma.category.create({ data: { slug: 'graphic-design', name: 'Graphic Design' } })).id;
     web = (await prisma.category.create({ data: { slug: 'web-development', name: 'Web Development' } })).id;
-    configureAi({ provider: fake, config: { ...loadAiConfig({ AI_ENABLED: 'true', AI_API_KEY: 'fake-key-for-tests' }), callTimeoutMs: 3000, taskTimeoutMs: 10000 } });
+    configureAi({ provider: fake, config: { ...loadAiConfig({ AI_ENABLED: 'true', AI_API_KEY: 'fake-key-for-tests' }), callTimeoutMs: 3000, taskTimeoutMs: 10000, retryBackoffMs: 300 } });
     app = await (await import('../src/app.js')).buildApp(); await app.ready();
   });
   afterAll(async () => { configureAi(null); await app?.close(); await prisma?.$disconnect(); if (cluster) await cluster.stop(); if (directory) await rm(directory, { recursive: true, force: true }); });
@@ -91,7 +91,7 @@ describe.skipIf(process.env.RUN_LOCAL_AI_TESTS !== '1')('Servix AI routing layer
     expect((await app.inject({ method: 'GET', url: '/api/v1/features' })).json()).toMatchObject({ ai: false });
     const res = await call(me.token, 'ai/assistant', { messages: [{ role: 'user', content: 'hi' }] });
     expect(res.statusCode).toBe(503); expect(res.json().error.code).toBe('FEATURE_DISABLED');
-    configureAi({ provider: fake, config: { ...loadAiConfig({ AI_ENABLED: 'true', AI_API_KEY: 'fake-key-for-tests' }), callTimeoutMs: 3000, taskTimeoutMs: 10000 } });
+    configureAi({ provider: fake, config: { ...loadAiConfig({ AI_ENABLED: 'true', AI_API_KEY: 'fake-key-for-tests' }), callTimeoutMs: 3000, taskTimeoutMs: 10000, retryBackoffMs: 300 } });
   });
 
   it('assistant: authenticated only, uses read tools over real rows, respects tool audience', async () => {
@@ -165,7 +165,7 @@ describe.skipIf(process.env.RUN_LOCAL_AI_TESTS !== '1')('Servix AI routing layer
     fake.down = new Set([M.deepseek, M.glm]); fake.calls = [];
     const down = await call(me.token, 'ai/explain', { topic: 'trust' });
     expect(down.statusCode).toBe(503); expect(down.json().error.code).toBe('AI_UNAVAILABLE');
-    expect(fake.calls.length).toBeLessThanOrEqual(4);
+    expect(fake.calls.length).toBeLessThanOrEqual(6);
     fake.down = new Set();
     const status = await call(admin.token, 'admin/ai/status');
     expect(status.statusCode).toBe(200);

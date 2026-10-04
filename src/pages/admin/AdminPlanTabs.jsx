@@ -148,7 +148,9 @@ function GrantPlanPanel() {
 /** Live model health straight from the API process: which provider models are answering, which are failing and why. */
 function ModelHealthPanel() {
   const [status, setStatus] = useState(null); const [recent, setRecent] = useState(null); const [error, setError] = useState(null);
+  const [check, setCheck] = useState(null); const [checking, setChecking] = useState(false);
   const load = useCallback(() => { setError(null); Promise.all([adminApi.getAiStatus(), adminApi.getAiTelemetry()]).then(([s, r]) => { setStatus(s); setRecent(r); }).catch(setError); }, []);
+  const runCheck = async () => { setChecking(true); setCheck(null); try { setCheck(await adminApi.checkAiProvider()); } catch (e) { setCheck({ error: e.message ?? 'Check failed.' }); } finally { setChecking(false); } };
   useEffect(load, [load]);
   if (error) return <section className="ws-panel"><h2>Model health</h2><ErrorState message="We couldn't load model health." onRetry={load} /></section>;
   if (!status || !recent) return <section className="ws-panel"><h2>Model health</h2><TableSkeleton rows={3} cols={5} label="Loading model health…" /></section>;
@@ -157,14 +159,24 @@ function ModelHealthPanel() {
   const when = (iso) => new Date(iso).toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   return <section className="ws-panel" data-testid="ai-model-health">
     <h2>Model health</h2>
-    <p className="ws-muted" style={{ marginTop: 0 }}>{status.enabled === false ? 'Servix AI is switched off.' : `Provider: ${status.provider?.baseUrl ?? status.baseUrl ?? 'configured'} · since this API process started${status.telemetry?.window?.since ? ` (${when(status.telemetry.window.since)})` : ''}.`}</p>
+    <p className="ws-muted" style={{ marginTop: 0 }}>{status.enabled === false ? 'Servix AI is switched off.' : `Provider: ${status.provider?.baseUrl ?? 'configured'}${status.backup ? ` · backup: ${status.backup.baseUrl} (${status.backup.model})` : ' · no backup provider configured'} · since this API process started${status.telemetry?.window?.since ? ` (${when(status.telemetry.window.since)})` : ''}.`}</p>
     {models.length === 0 ? <p className="ws-muted">No model calls since the API last restarted.</p> : <div className="earnings"><table><thead><tr><th>Model</th><th>Calls</th><th>OK</th><th>Failed</th><th>Avg</th><th>Last problem</th></tr></thead><tbody>
       {models.map((m) => <tr key={m.model}><td><code style={{ fontSize: 'var(--text-xs)' }}>{m.model}</code></td><td>{m.calls}</td><td>{m.ok}</td><td>{m.failed ? <Badge variant="neutral">{m.failed}</Badge> : 0}</td><td>{(m.avgMs / 1000).toFixed(1)} s</td><td style={{ fontSize: 'var(--text-xs)', maxWidth: '22rem' }}>{m.lastError ? <>{when(m.lastError.at)} · <strong>{m.lastError.code}</strong>{m.lastError.detail ? <> — {m.lastError.detail}</> : null}</> : <span className="ws-muted">none</span>}</td></tr>)}
     </tbody></table></div>}
     {failures.length > 0 && <details style={{ marginTop: 'var(--space-3)' }}><summary style={{ cursor: 'pointer', fontSize: 'var(--text-sm)' }}>Last {failures.length} failed model calls</summary>
       <ul style={{ fontSize: 'var(--text-xs)', paddingLeft: '1.2rem', margin: 'var(--space-2) 0 0' }}>{failures.map((a, i) => <li key={`${a.at}-${i}`}>{when(a.at)} · {a.alias} ({a.department.replaceAll('_', ' ')}) · {a.errorCode}{a.toolCalls ? ` after ${a.toolCalls} tool call${a.toolCalls === 1 ? '' : 's'}` : ''} · {(a.durationMs / 1000).toFixed(1)} s{a.detail ? ` — ${a.detail}` : ''}</li>)}</ul>
     </details>}
-    <div style={{ marginTop: 'var(--space-3)' }}><Button variant="ghost" size="sm" onClick={load}>Refresh</Button></div>
+    <div style={{ marginTop: 'var(--space-3)', display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}><Button variant="ghost" size="sm" onClick={load}>Refresh</Button><Button variant="secondary" size="sm" disabled={checking} onClick={runCheck} data-testid="ai-provider-check">{checking ? 'Checking…' : 'Check provider connection'}</Button></div>
+    {check && (check.error ? <p className="ws-muted" style={{ marginTop: 'var(--space-2)' }}>{check.error}</p> : <ul style={{ fontSize: 'var(--text-sm)', paddingLeft: '1.2rem', margin: 'var(--space-3) 0 0' }} data-testid="ai-provider-check-result">
+      {check.hosts.map((h) => <li key={h.label} style={{ marginBottom: 'var(--space-2)' }}>
+        <strong>{h.label}</strong> · {h.baseUrl}<br />
+        {!h.reachable ? <Badge variant="neutral">unreachable</Badge> : h.keyAccepted === true ? <Badge variant="brand">key accepted</Badge> : h.keyAccepted === false ? <Badge variant="neutral">key rejected (HTTP {h.modelsStatus})</Badge> : <Badge variant="outline">HTTP {h.modelsStatus}</Badge>}
+        {' '}{h.modelsListed ? `· ${h.modelsListed} models in catalogue` : ''}
+        {h.catalogue?.length > 0 && <ul style={{ paddingLeft: '1.2rem', margin: 'var(--space-1) 0 0', fontSize: 'var(--text-xs)' }}>{h.catalogue.map((c) => <li key={c.id}><code>{c.id}</code> — {c.listed === null ? 'catalogue not readable' : c.listed ? 'listed ✓' : 'NOT in catalogue ✗ (renamed or retired — update the model id)'}</li>)}</ul>}
+        {h.tokens && <div style={{ fontSize: 'var(--text-xs)', marginTop: 'var(--space-1)' }}>Key allocation (HTTP {h.tokens.status}): <code>{h.tokens.snippet}</code></div>}
+        {h.note && <div className="ws-muted" style={{ fontSize: 'var(--text-xs)', marginTop: 'var(--space-1)' }}>{h.note}</div>}
+      </li>)}
+    </ul>)}
   </section>;
 }
 

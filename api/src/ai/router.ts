@@ -199,7 +199,7 @@ export class AiRouter {
           if (e.code !== 'cancelled') this.telemetry.recordAttempt({ department: task.department, alias, model, durationMs, ok: false, fallbackIndex, attempt, promptTokens: usage.promptTokens, completionTokens: usage.completionTokens, errorCode: e.code, detail: e.message, toolCalls });
           lastError = { code: e.code, message: e.message };
           if (e.skipModel) break;
-          if (e.retryable && attempt < this.cfg.maxAttemptsPerModel && Date.now() + 1500 * attempt < deadline) { await sleep(1500 * attempt + Math.floor(Math.random() * 750)); continue; } // jitter: hedged siblings must not retry in lock-step against a per-account concurrency cap
+          if (e.retryable && attempt < this.cfg.maxAttemptsPerModel && Date.now() + this.cfg.retryBackoffMs * attempt < deadline) { await sleep(this.cfg.retryBackoffMs * attempt + Math.floor(Math.random() * 750)); continue; } // jitter: hedged siblings must not retry in lock-step against a per-account concurrency cap
           break;
         }
         this.telemetry.recordAttempt({ department: task.department, alias, model, durationMs, ok: false, fallbackIndex, attempt, promptTokens: usage.promptTokens, completionTokens: usage.completionTokens, errorCode: 'unavailable', detail: (e as Error).message, toolCalls });

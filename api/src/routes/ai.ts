@@ -196,5 +196,42 @@ export async function aiRoutes(app: FastifyInstance) {
     departments: Object.values(DEPARTMENT_DEFS).map((d) => ({ department: d.key, label: d.label, audience: d.audience, tools: d.tools, chain: getAi().config.routes[d.key] })),
   }));
 
+  /**
+   * Live connection check per provider host (admin only): can we reach it, is the key accepted, are the configured
+   * model ids present in its catalogue, and (hosts that expose it) how many tokens remain on the key. Secrets never
+   * leave the server; only HTTP statuses and short scrubbed snippets are returned.
+   */
+  app.get('/admin/ai/provider-check', { preHandler: requireAdmin, config: { rateLimit: { max: 6, timeWindow: '1 minute' } }, schema: { tags: ['admin'], summary: 'Check AI provider connectivity, key and catalogue (no secrets)' } }, async () => {
+    const cfg = getAi().config;
+    const hosts: Array<{ label: string; baseUrl: string; apiKey: string; expect: string[] }> = [
+      { label: 'primary', baseUrl: cfg.provider.baseUrl, apiKey: cfg.provider.apiKey, expect: [cfg.models.deepseek, cfg.models.minimax, cfg.models.glm] },
+      ...(cfg.backup ? [{ label: 'backup', baseUrl: cfg.backup.baseUrl, apiKey: cfg.backup.apiKey, expect: [cfg.models.backup] }] : []),
+    ];
+    const probe = async (url: string, key: string) => {
+      try {
+        const res = await fetch(url, { headers: key ? { Authorization: `Bearer ${key}` } : {}, signal: AbortSignal.timeout(10_000) });
+        const text = (await res.text().catch(() => '')).split(key).join('[REDACTED]');
+        return { status: res.status, body: text.slice(0, 20_000) };
+      } catch (e) { return { status: 0, body: ((e as Error).message ?? 'network error').split(key).join('[REDACTED]').slice(0, 200) }; }
+    };
+    return { checkedAt: new Date().toISOString(), hosts: await Promise.all(hosts.map(async (h) => {
+      const models = await probe(`${h.baseUrl}/models`, h.apiKey);
+      let ids: string[] = [];
+      try { const j = JSON.parse(models.body) as { data?: Array<{ id?: string }> }; ids = (j.data ?? []).map((m) => String(m.id ?? '')); } catch { /* not JSON */ }
+      const catalogue = h.expect.map((id) => ({ id, listed: ids.length ? ids.includes(id) : null }));
+      // Dahl exposes the remaining allocation of a key; other hosts simply report "n/a".
+      const origin = h.baseUrl.replace(/\/v1$/, '');
+      const tokens = /dahl\.global/.test(h.baseUrl) ? await probe(`${origin}/tokens/current`, h.apiKey) : null;
+      return {
+        label: h.label, baseUrl: h.baseUrl,
+        reachable: models.status > 0,
+        keyAccepted: models.status === 200 ? true : models.status === 401 || models.status === 403 ? false : null,
+        modelsStatus: models.status, modelsListed: ids.length, catalogue,
+        tokens: tokens ? { status: tokens.status, snippet: tokens.body.replace(/\s+/g, ' ').slice(0, 240) } : null,
+        note: models.status === 0 ? `Could not reach the host: ${models.body}` : models.status === 200 ? null : models.body.replace(/\s+/g, ' ').slice(0, 240),
+      };
+    })) };
+  });
+
   app.get('/admin/ai/telemetry/recent', { preHandler: requireAdmin, schema: { tags: ['admin'], summary: 'Most recent AI attempts and tasks' } }, async () => getAi().telemetry.recent(100));
 }

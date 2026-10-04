@@ -102,6 +102,21 @@ console screen — and never touch payments, payouts, ledger, refunds or wallets
 admin tools; a forged `admin_*` call from them returns `tool "…" is not available here`. Covered by
 `tests/ai-local.test.ts` ("admin assistant …").
 
+## Capacity errors and the backup provider (2026-10-04)
+
+Dahl's free (gift-token) tier answers `429 {"code":"model_concurrency"}` — *"Signed-in and paid accounts are admitted
+first"* — whenever the shared free capacity is busy; every call fails in ~0.1 s, and both Dahl models usually fail
+together because they share the same account priority. Mitigations now in place:
+
+1. **Retries**: `AI_MAX_ATTEMPTS_PER_MODEL` default 3 with `AI_RETRY_BACKOFF_MS` 2000 (2 s, 4 s … + jitter) per model.
+2. **Independent backup provider**: set `AI_BACKUP_API_KEY` (and optionally `AI_BACKUP_BASE_URL`, default NVIDIA
+   `https://integrate.api.nvidia.com/v1`, and `AI_BACKUP_MODEL`, default `meta/llama-3.3-70b-instruct`). The alias
+   `backup` is appended to every chain, served by `FailoverProvider` on its own host and key — keys never cross hosts.
+   It is only reached after every Dahl model failed, so Dahl stays primary and the agreed routing is unchanged.
+3. **Provider check**: `GET /admin/ai/provider-check` (button in Model health) verifies, per host, reachability, whether
+   the key is accepted, whether the configured model ids are in the host's catalogue, and on Dahl the key's remaining
+   token allocation — the three things that explain almost every "busy" report.
+
 ## Telemetry
 
 **Model health (admin console)** — `Admin → AI usage → Model health` reads `/admin/ai/status` (per-model calls, ok,

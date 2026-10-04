@@ -6,7 +6,7 @@
  * exported to the frontend; the browser only ever sees `/api/v1/ai/*` results.
  */
 import { describeRouting, loadAiConfig, type AiConfig } from './config.js';
-import { OpenAICompatibleProvider, type AiProvider } from './provider.js';
+import { FailoverProvider, OpenAICompatibleProvider, type AiProvider } from './provider.js';
 import { AiRouter } from './router.js';
 import { AiTelemetry, type TelemetryLogger } from './telemetry.js';
 
@@ -18,7 +18,10 @@ let overrides: { provider?: AiProvider; config?: AiConfig } = {};
 export function getAi(): AiRuntime {
   if (runtime) return runtime;
   const config = overrides.config ?? loadAiConfig();
-  const provider = overrides.provider ?? new OpenAICompatibleProvider({ name: config.provider.name, baseUrl: config.provider.baseUrl, apiKey: config.provider.apiKey, extraBody: config.extraBody });
+  const primary = new OpenAICompatibleProvider({ name: config.provider.name, baseUrl: config.provider.baseUrl, apiKey: config.provider.apiKey, extraBody: config.extraBody });
+  const provider = overrides.provider ?? (config.backup
+    ? new FailoverProvider(primary, new OpenAICompatibleProvider({ name: config.backup.name, baseUrl: config.backup.baseUrl, apiKey: config.backup.apiKey }), new Set([config.models.backup]))
+    : primary);
   const telemetry = new AiTelemetry();
   runtime = { config, provider, router: new AiRouter(config, provider, telemetry), telemetry };
   return runtime;

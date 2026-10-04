@@ -43,9 +43,37 @@ describe('AI config / routing table', () => {
     }
     expect(cfg.routes.proposal_generation).toEqual(['minimax', 'deepseek', 'glm']);
     expect(cfg.routes.background_drafting).toEqual(['minimax', 'deepseek', 'glm']);
-    expect(cfg.models).toEqual(MODELS);
+    expect(cfg.models).toEqual({ ...MODELS, backup: 'meta/llama-3.3-70b-instruct' });
     expect(defaultChain('glm')).toEqual(['glm', 'deepseek']);
   });
+  it('an independent backup provider appends the `backup` alias to every chain; without it the alias is unknown', () => {
+    const plain = loadAiConfig(ENV);
+    expect(plain.backup).toBeNull();
+    for (const d of DEPARTMENTS) expect(plain.routes[d]).not.toContain('backup');
+    expect(loadAiConfig({ ...ENV, AI_ROUTE_ASSISTANT: 'deepseek,backup' }).warnings.join(' ')).toContain('AI_ROUTE_ASSISTANT ignored');
+    const withBackup = loadAiConfig({ ...ENV, AI_BACKUP_API_KEY: 'nv-test', AI_BACKUP_MODEL: 'meta/llama-3.3-70b-instruct' });
+    expect(withBackup.backup).toMatchObject({ baseUrl: 'https://integrate.api.nvidia.com/v1' });
+    for (const d of DEPARTMENTS) expect(withBackup.routes[d].at(-1)).toBe('backup');
+    expect(withBackup.routes.assistant).toEqual(['deepseek', 'glm', 'backup']);
+    expect(withBackup.routes.proposal_generation).toEqual(['minimax', 'deepseek', 'glm', 'backup']);
+    // Same host + same key is not a backup.
+    expect(loadAiConfig({ ...ENV, AI_BACKUP_API_KEY: ENV.AI_API_KEY, AI_BACKUP_BASE_URL: ENV.AI_BASE_URL }).backup).toBeNull();
+    const view = JSON.stringify(describeRouting(withBackup));
+    expect(view).not.toContain('nv-test');
+  });
+
+  it('when every primary-provider model is at capacity, the backup host answers (keys never cross hosts)', async () => {
+    const { FailoverProvider } = await import('../src/ai/provider.js');
+    const seen: string[] = [];
+    const primary: AiProvider = { name: 'dahl', async chat(req) { seen.push(`dahl:${req.model}`); throw new AiProviderError('rate_limited', 'rate limited / at capacity: {"error":{"code":"model_concurrency"}}', 429); } };
+    const backup: AiProvider = { name: 'nvidia', async chat(req) { seen.push(`nvidia:${req.model}`); return reply('answer from backup'); } };
+    const cfg = { ...loadAiConfig({ ...ENV, AI_BACKUP_API_KEY: 'nv-test' }), callTimeoutMs: 2000, taskTimeoutMs: 20000, maxAttemptsPerModel: 1, retryBackoffMs: 250 };
+    const provider = new FailoverProvider(primary, backup, new Set([cfg.models.backup]));
+    const r = await new AiRouter(cfg, provider, new AiTelemetry()).run({ department: 'assistant', messages: [{ role: 'user', content: 'hi' }], output: { kind: 'text' } });
+    expect(r.alias).toBe('backup'); expect(r.fallbackUsed).toBe(true); expect(r.value).toBe('answer from backup');
+    expect(seen).toEqual([`dahl:${MODELS.deepseek}`, `dahl:${MODELS.glm}`, `nvidia:${cfg.models.backup}`]);
+  });
+
   it('is OFF without a key, and reports why', () => {
     const cfg = loadAiConfig({ AI_ENABLED: 'true' });
     expect(cfg.enabled).toBe(false);

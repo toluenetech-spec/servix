@@ -30,6 +30,10 @@ All notable changes to the Servix public website.
   a secret-scrubbed provider reason, shown in **Admin → AI usage → Model health** (per-model calls/failures and the
   last 12 failed calls) so the real cause is visible without server access. Admin identity queue tool reads account
   status only (no verification records).
+- **Servix AI capacity (rate_limited / model_concurrency)**: three retries per model with 2 s/4 s back-off, plus an
+  optional **independent backup provider** (`AI_BACKUP_API_KEY`, default NVIDIA free tier, `meta/llama-3.3-70b-instruct`)
+  that answers only when every Dahl model is at capacity. Admin → AI usage → Model health gets **Check provider
+  connection** (key accepted? model ids still in the catalogue? remaining Dahl allocation?).
 - **Older iPhone/iPad Safari crash** ("Something went wrong on this page … Invalid regular expression: invalid
   group specifier name"): removed a regex lookbehind from AI markdown rendering and `Object.hasOwn` from page
   metadata so Safari < 16.4 can load every page again.
