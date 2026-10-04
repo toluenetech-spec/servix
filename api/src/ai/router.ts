@@ -69,6 +69,15 @@ export interface RunOptions {
 
 /** Attached to the ApiError thrown by `run()` so metering can record failed tasks (tokens spent, attempts). */
 export interface AiRunFailure { usage: ChatUsage; attempts: number; fallbackUsed: boolean; durationMs: number; errorCode: string }
+/** Echo a tool-calling assistant turn back to the model. Thinking models (DeepSeek, GLM) reject the follow-up turn
+ *  when their `reasoning_content` is dropped, so it is passed through untouched when present. */
+function assistantTurn(message: ChatMessage, calls: NonNullable<ChatMessage['tool_calls']>): ChatMessage {
+  const reasoning = (message as ChatMessage & { reasoning_content?: unknown }).reasoning_content;
+  const turn: ChatMessage & { reasoning_content?: string } = { role: 'assistant', content: message.content ?? null, tool_calls: calls };
+  if (typeof reasoning === 'string' && reasoning) turn.reasoning_content = reasoning;
+  return turn;
+}
+
 export const aiFailureOf = (e: unknown): AiRunFailure | null => (e && typeof e === 'object' && 'aiFailure' in e ? (e as { aiFailure: AiRunFailure }).aiFailure : null);
 
 type ModelOutcome<T> = { ok: true; value: { value: T; text: string | null; toolsUsed: string[] }; usage: ChatUsage; attempts: number } | { ok: false; error: { code: string; message: string }; attempts: number; usage: ChatUsage };
@@ -91,6 +100,7 @@ export class AiRouter {
     const controllers: AbortController[] = [];
     const running = new Map<number, Promise<{ i: number; out: ModelOutcome<T> }>>();
     let claimedBy: number | null = null;
+    const progressing = new Set<number>();
     let next = 0;
     let lastStart = 0;
     let totalAttempts = 0;
@@ -106,7 +116,9 @@ export class AiRouter {
         if (claimedBy === null) { claimedBy = i; abortOthers(i); }
         if (claimedBy === i) opts.onDelta!(text);
       } : undefined;
-      running.set(i, this.runModel(task, i, deadline, ac.signal, onDelta).then((out) => ({ i, out })));
+      // A model that is already mid tool-loop is making progress: do not start a parallel sibling (the provider's
+      // per-account concurrency cap would turn one slow answer into two failures).
+      running.set(i, this.runModel(task, i, deadline, ac.signal, onDelta, () => progressing.add(i)).then((out) => ({ i, out })));
     };
     const fail = (): never => {
       this.telemetry.recordTask({ department: task.department, ok: false, durationMs: Date.now() - startedAt, modelUsed: null, aliasUsed: null, fallbackUsed: chain.length > 1, attempts: totalAttempts, errorCode: lastError?.code });
@@ -122,13 +134,13 @@ export class AiRouter {
     start(next++);
     for (;;) {
       const hedgeAfterMs: number = opts.hedgeAfterMs ?? this.cfg.hedgeAfterMs;
-      const canHedge: boolean = hedgeAfterMs > 0 && (claimedBy as number | null) === null && next < chain.length && !opts.signal?.aborted;
+      const canHedge: boolean = hedgeAfterMs > 0 && (claimedBy as number | null) === null && next < chain.length && !opts.signal?.aborted && ![...running.keys()].some((i) => progressing.has(i));
       const hedgeIn = canHedge ? Math.max(0, hedgeAfterMs - (Date.now() - lastStart)) : Infinity;
       let timer: NodeJS.Timeout | undefined;
       const hedge: Promise<'hedge'> | null = canHedge ? new Promise<'hedge'>((r) => { timer = setTimeout(() => r('hedge'), hedgeIn); }) : null;
       const settled: 'hedge' | { i: number; out: ModelOutcome<T> } = await Promise.race([...running.values(), ...(hedge ? [hedge] : [])]);
       if (timer) clearTimeout(timer);
-      if (settled === 'hedge') { start(next++); continue; }
+      if (settled === 'hedge') { if (![...running.keys()].some((i) => progressing.has(i))) start(next++); continue; }
 
       running.delete(settled.i);
       totalAttempts += settled.out.attempts;
@@ -148,7 +160,7 @@ export class AiRouter {
   }
 
   /** One model: bounded transient retries + one repair round. Never throws; reports the outcome. */
-  private async runModel<T>(task: TaskSpec<T>, fallbackIndex: number, deadline: number, signal: AbortSignal, onDelta?: (text: string) => void): Promise<ModelOutcome<T>> {
+  private async runModel<T>(task: TaskSpec<T>, fallbackIndex: number, deadline: number, signal: AbortSignal, onDelta?: (text: string) => void, onProgress?: () => void): Promise<ModelOutcome<T>> {
     const alias = this.cfg.routes[task.department][fallbackIndex];
     const model = this.cfg.models[alias];
     const usage: ChatUsage = { promptTokens: 0, completionTokens: 0 };
@@ -164,13 +176,13 @@ export class AiRouter {
       const t0 = Date.now();
       let toolCalls = 0;
       try {
-        const out = await this.execute(task, model, messages, deadline, usage, (n) => { toolCalls = n; }, signal, onDelta);
+        const out = await this.execute(task, model, messages, deadline, usage, (n) => { toolCalls = n; if (n > 0) onProgress?.(); }, signal, onDelta);
         this.telemetry.recordAttempt({ department: task.department, alias, model, durationMs: Date.now() - t0, ok: true, fallbackIndex, attempt, promptTokens: usage.promptTokens, completionTokens: usage.completionTokens, toolCalls });
         return { ok: true, value: out, usage, attempts };
       } catch (e) {
         const durationMs = Date.now() - t0;
         if (e instanceof InvalidOutput) {
-          this.telemetry.recordAttempt({ department: task.department, alias, model, durationMs, ok: false, fallbackIndex, attempt, promptTokens: usage.promptTokens, completionTokens: usage.completionTokens, errorCode: 'invalid_output', toolCalls });
+          this.telemetry.recordAttempt({ department: task.department, alias, model, durationMs, ok: false, fallbackIndex, attempt, promptTokens: usage.promptTokens, completionTokens: usage.completionTokens, errorCode: 'invalid_output', detail: e.issues, toolCalls });
           lastError = { code: 'invalid_output', message: e.issues };
           if (!repaired && Date.now() < deadline && !signal.aborted) {
             // One repair round on the same model, with the validator's feedback.
@@ -184,13 +196,13 @@ export class AiRouter {
           break;
         }
         if (e instanceof AiProviderError) {
-          if (e.code !== 'cancelled') this.telemetry.recordAttempt({ department: task.department, alias, model, durationMs, ok: false, fallbackIndex, attempt, promptTokens: usage.promptTokens, completionTokens: usage.completionTokens, errorCode: e.code, toolCalls });
+          if (e.code !== 'cancelled') this.telemetry.recordAttempt({ department: task.department, alias, model, durationMs, ok: false, fallbackIndex, attempt, promptTokens: usage.promptTokens, completionTokens: usage.completionTokens, errorCode: e.code, detail: e.message, toolCalls });
           lastError = { code: e.code, message: e.message };
           if (e.skipModel) break;
-          if (e.retryable && attempt < this.cfg.maxAttemptsPerModel && Date.now() + 1500 * attempt < deadline) { await sleep(1500 * attempt); continue; }
+          if (e.retryable && attempt < this.cfg.maxAttemptsPerModel && Date.now() + 1500 * attempt < deadline) { await sleep(1500 * attempt + Math.floor(Math.random() * 750)); continue; } // jitter: hedged siblings must not retry in lock-step against a per-account concurrency cap
           break;
         }
-        this.telemetry.recordAttempt({ department: task.department, alias, model, durationMs, ok: false, fallbackIndex, attempt, promptTokens: usage.promptTokens, completionTokens: usage.completionTokens, errorCode: 'unavailable', toolCalls });
+        this.telemetry.recordAttempt({ department: task.department, alias, model, durationMs, ok: false, fallbackIndex, attempt, promptTokens: usage.promptTokens, completionTokens: usage.completionTokens, errorCode: 'unavailable', detail: (e as Error).message, toolCalls });
         lastError = { code: 'internal', message: (e as Error).message };
         break;
       }
@@ -217,7 +229,7 @@ export class AiRouter {
 
       const calls = res.message.tool_calls ?? [];
       if (calls.length && task.tools && round < this.cfg.maxToolCalls) {
-        messages.push({ role: 'assistant', content: res.message.content ?? null, tool_calls: calls });
+        messages.push(assistantTurn(res.message, calls));
         for (const call of calls) {
           toolsUsed.push(call.function.name);
           let args: unknown = {};
@@ -233,7 +245,7 @@ export class AiRouter {
       }
       if (calls.length && task.tools) {
         // Tool budget exhausted: ask for a final answer without tools.
-        messages.push({ role: 'assistant', content: res.message.content ?? null, tool_calls: calls });
+        messages.push(assistantTurn(res.message, calls));
         for (const call of calls) messages.push({ role: 'tool', tool_call_id: call.id, name: call.function.name, content: `${UNTRUSTED_OPEN}\n{"error":"tool budget exhausted — answer with the data you already have"}\n${UNTRUSTED_CLOSE}` });
         onToolCalls(toolsUsed.length);
         const final = await this.provider.chat({ model, messages, json: task.output.kind === 'json', maxTokens: task.maxTokens, temperature: task.temperature, timeoutMs: Math.min(this.cfg.callTimeoutMs, Math.max(1000, deadline - Date.now())), signal, onDelta: task.output.kind === 'text' ? onDelta : undefined });

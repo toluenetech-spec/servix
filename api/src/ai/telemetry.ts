@@ -22,6 +22,8 @@ export interface AttemptRecord {
   promptTokens: number;
   completionTokens: number;
   errorCode?: AiErrorCode | 'invalid_output' | 'deadline';
+  /** Short, secret-scrubbed provider reason (e.g. "model_concurrency", "model not found") for the admin console. */
+  detail?: string;
   toolCalls?: number;
 }
 
@@ -50,7 +52,7 @@ export class AiTelemetry {
   setLogger(logger: TelemetryLogger | null) { this.logger = logger; }
 
   recordAttempt(r: Omit<AttemptRecord, 'at'>) {
-    const rec = { at: new Date().toISOString(), ...r };
+    const rec = { at: new Date().toISOString(), ...r, ...(r.detail ? { detail: r.detail.replace(/\s+/g, ' ').slice(0, 200) } : {}) };
     this.attempts.push(rec); if (this.attempts.length > RING) this.attempts.shift();
     const line = { ai: { kind: 'attempt', ...rec } };
     if (rec.ok) this.logger?.info(line, 'ai model attempt'); else this.logger?.warn(line, 'ai model attempt failed');
@@ -67,10 +69,10 @@ export class AiTelemetry {
 
   /** Aggregates for the admin console. */
   summary() {
-    const byModel = new Map<string, { model: string; calls: number; ok: number; failed: number; totalMs: number; promptTokens: number; completionTokens: number; errors: Record<string, number> }>();
+    const byModel = new Map<string, { model: string; calls: number; ok: number; failed: number; totalMs: number; promptTokens: number; completionTokens: number; errors: Record<string, number>; lastError: { at: string; code: string; detail: string | null } | null; lastOkAt: string | null }>();
     for (const a of this.attempts) {
-      const m = byModel.get(a.model) ?? { model: a.model, calls: 0, ok: 0, failed: 0, totalMs: 0, promptTokens: 0, completionTokens: 0, errors: {} };
-      m.calls++; if (a.ok) m.ok++; else { m.failed++; if (a.errorCode) m.errors[a.errorCode] = (m.errors[a.errorCode] ?? 0) + 1; }
+      const m = byModel.get(a.model) ?? { model: a.model, calls: 0, ok: 0, failed: 0, totalMs: 0, promptTokens: 0, completionTokens: 0, errors: {}, lastError: null, lastOkAt: null };
+      m.calls++; if (a.ok) { m.ok++; m.lastOkAt = a.at; } else { m.failed++; if (a.errorCode) m.errors[a.errorCode] = (m.errors[a.errorCode] ?? 0) + 1; m.lastError = { at: a.at, code: a.errorCode ?? 'unknown', detail: a.detail ?? null }; }
       m.totalMs += a.durationMs; m.promptTokens += a.promptTokens; m.completionTokens += a.completionTokens;
       byModel.set(a.model, m);
     }

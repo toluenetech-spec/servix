@@ -24,6 +24,12 @@ All notable changes to the Servix public website.
   cannot act and never sees payments/payouts/ledger.
 
 ### Fixed
+- **Servix AI "busy" answers**: the router no longer starts a parallel backup model while the primary is already
+  mid tool-lookup (the provider's per-account concurrency cap turned one slow answer into two failures), retries are
+  jittered, and thinking models get their `reasoning_content` echoed back on tool turns. Failed model calls now keep
+  a secret-scrubbed provider reason, shown in **Admin → AI usage → Model health** (per-model calls/failures and the
+  last 12 failed calls) so the real cause is visible without server access. Admin identity queue tool reads account
+  status only (no verification records).
 - **Older iPhone/iPad Safari crash** ("Something went wrong on this page … Invalid regular expression: invalid
   group specifier name"): removed a regex lookbehind from AI markdown rendering and `Object.hasOwn` from page
   metadata so Safari < 16.4 can load every page again.

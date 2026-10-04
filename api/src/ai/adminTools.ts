@@ -34,7 +34,7 @@ export const adminOverview = async () => {
     prisma.service.groupBy({ by: ['status'], _count: { _all: true } }),
     prisma.service.count({ where: { createdAt: { gte: today } } }),
     prisma.professionalApplication.groupBy({ by: ['status'], _count: { _all: true } }),
-    prisma.kycVerification.groupBy({ by: ['status'], _count: { _all: true } }),
+    prisma.user.groupBy({ by: ['kycStatus'], where: { deletedAt: null }, _count: { _all: true } }),
     prisma.booking.groupBy({ by: ['status'], _count: { _all: true } }),
     prisma.booking.count({ where: { status: 'disputed' } }),
     prisma.serviceRequest.groupBy({ by: ['status'], _count: { _all: true } }),
@@ -46,7 +46,7 @@ export const adminOverview = async () => {
     users: { total: users, newToday: usersToday, newLast7Days: usersWeek, professionals: pros },
     gigs: { byStatus: byStatus(services), createdToday: servicesToday },
     professionalApplications: byStatus(applications),
-    identityVerifications: byStatus(kyc),
+    identityVerifications: Object.fromEntries(kyc.map((r) => [r.kycStatus, r._count._all])),
     bookings: { byStatus: byStatus(bookings), openDisputes: disputes, note: 'Amounts, payments and payouts are not available to Servix AI — use Admin → Bookings / Payouts.' },
     requests: { byStatus: byStatus(requests), proposalsAwaitingDecision: proposalsPending },
   };
@@ -129,13 +129,13 @@ export const ADMIN_TOOL_DEFS = [
   },
   {
     name: 'admin_list_identity_checks',
-    description: 'Identity (KYC) verification queue: who submitted, document type and review status. Never returns ID numbers or document files.',
-    parameters: { type: 'object', properties: { status: { type: 'string', enum: ['pending', 'approved', 'rejected'] }, since: { type: 'string' }, limit: { type: 'integer', minimum: 1, maximum: 50 } }, additionalProperties: false },
+    description: 'Identity (KYC) verification queue by account: who is pending, verified or rejected. Never returns ID numbers, document types or files — Servix AI has no access to verification records themselves.',
+    parameters: { type: 'object', properties: { status: { type: 'string', enum: ['pending', 'verified', 'rejected', 'unverified'] }, since: { type: 'string', description: 'account sign-up time filter' }, limit: { type: 'integer', minimum: 1, maximum: 50 } }, additionalProperties: false },
     run: async (args: Record<string, unknown>) => {
-      const status = normalizeEnum(args.status, ['not_submitted', 'pending', 'approved', 'rejected'] as const); const since = sinceFrom(args.since);
-      const where = { ...(status ? { status } : {}), ...(since ? { createdAt: { gte: since } } : {}) };
-      const rows = await prisma.kycVerification.findMany({ where, orderBy: { createdAt: 'desc' }, take: take(args.limit), include: { user: { select: { fullName: true, email: true } } } });
-      return { showing: rows.length, reviewHint: 'Decisions are made in Admin → Identity (KYC); Servix AI cannot approve or reject.', items: rows.map((k) => ({ id: k.id, name: k.user.fullName, email: k.user.email, documentType: k.documentType, status: k.status, submittedAt: iso(k.createdAt), reviewedAt: iso(k.reviewedAt), rejectionReason: k.rejectionReason })) };
+      const status = normalizeEnum(args.status, ['pending', 'verified', 'rejected', 'unverified'] as const) ?? 'pending'; const since = sinceFrom(args.since);
+      const where = { deletedAt: null, kycStatus: status, ...(since ? { createdAt: { gte: since } } : {}) };
+      const rows = await prisma.user.findMany({ where, orderBy: { updatedAt: 'desc' }, take: take(args.limit), select: { fullName: true, email: true, role: true, kycStatus: true, updatedAt: true } });
+      return { total: await prisma.user.count({ where }), showing: rows.length, reviewHint: 'Decisions are made in Admin → Identity (KYC); Servix AI cannot approve or reject and never sees documents.', items: rows.map((u) => ({ name: u.fullName, email: u.email, role: u.role, identityStatus: u.kycStatus, lastUpdatedAt: iso(u.updatedAt) })) };
     },
   },
   {

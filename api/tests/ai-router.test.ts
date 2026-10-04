@@ -146,7 +146,7 @@ describe('AiRouter fallback behaviour', () => {
   });
 
   it('task deadline stops the chain → 504 AI_TIMEOUT', async () => {
-    const p = new FakeProvider({ [MODELS.deepseek]: () => new AiProviderError('timeout', 'slow'), [MODELS.glm]: () => reply('late') });
+    const p = new FakeProvider({ [MODELS.deepseek]: () => new AiProviderError('timeout', 'slow'), [MODELS.glm]: () => new AiProviderError('timeout', 'slow too') });
     const cfg = baseConfig(); cfg.taskTimeoutMs = 5000; cfg.maxAttemptsPerModel = 3;
     const router = new AiRouter(cfg, p, telemetry);
     const started = Date.now();
@@ -286,6 +286,46 @@ describe('Hedged fallback and streaming (speed)', () => {
     const router = new AiRouter({ ...baseConfig(), hedgeAfterMs: 500 }, provider, new AiTelemetry());
     const r = await router.run(text);
     expect(r.alias).toBe('deepseek'); expect(provider.calls).toEqual([MODELS.deepseek]);
+  });
+
+  it('does not hedge while the primary is mid tool-loop (provider concurrency caps), and echoes reasoning_content back', async () => {
+    const calls: string[] = [];
+    const provider: AiProvider = { name: 'fake', async chat(req: ChatRequest): Promise<ChatResponse> {
+      calls.push(req.model);
+      const toolMsgs = req.messages.filter((m) => m.role === 'tool');
+      if (req.model === MODELS.deepseek && toolMsgs.length === 0) {
+        return { message: { role: 'assistant', content: null, tool_calls: [{ id: 'c1', type: 'function', function: { name: 'lookup', arguments: '{}' } }], ...({ reasoning_content: 'I should look this up first.' } as object) }, usage: null, finishReason: 'tool_calls', latencyMs: 1 };
+      }
+      await new Promise((r) => setTimeout(r, 450)); // slower than the hedge window, but progress was already made
+      return reply(`answer from ${req.model}`);
+    } };
+    const router = new AiRouter({ ...baseConfig(), hedgeAfterMs: 150, maxAttemptsPerModel: 1 }, provider, new AiTelemetry());
+    const r = await router.run({ department: 'assistant', messages: [{ role: 'user', content: 'go' }], output: { kind: 'text' },
+      tools: { schemas: [{ type: 'function', function: { name: 'lookup', description: 'x', parameters: {} } }], run: async () => ({ found: true }) } });
+    expect(r.alias).toBe('deepseek');
+    expect(calls).toEqual([MODELS.deepseek, MODELS.deepseek]); // GLM never started
+    expect(r.toolsUsed).toEqual(['lookup']);
+  });
+
+  it('a tool-calling turn echoed to a thinking model keeps its reasoning_content', async () => {
+    const seen: ChatRequest['messages'][] = [];
+    const p = new FakeProvider({ [MODELS.deepseek]: (req, n) => {
+      seen.push(req.messages);
+      if (n === 1) return { message: { role: 'assistant', content: null, tool_calls: [{ id: 'c1', type: 'function', function: { name: 'echo', arguments: '{}' } }], ...({ reasoning_content: 'thinking…' } as object) }, usage: null, finishReason: 'tool_calls', latencyMs: 1 };
+      return reply('done');
+    } });
+    await new AiRouter(baseConfig(), p, new AiTelemetry()).run({ department: 'assistant', messages: [{ role: 'user', content: 'go' }], output: { kind: 'text' }, tools: { schemas: [{ type: 'function', function: { name: 'echo', description: 'x', parameters: {} } }], run: async () => ({}) } });
+    const echoed = seen[1].find((m) => m.role === 'assistant' && m.tool_calls) as (ChatRequest['messages'][number] & { reasoning_content?: string });
+    expect(echoed.reasoning_content).toBe('thinking…');
+  });
+
+  it('failed attempts carry a scrubbed provider reason into telemetry (visible in the admin console)', async () => {
+    const t = new AiTelemetry();
+    const p = new FakeProvider({ [MODELS.deepseek]: () => new AiProviderError('rate_limited', 'rate limited / at capacity: {"error":"model_concurrency"}', 429), [MODELS.glm]: () => reply('ok') });
+    await new AiRouter({ ...baseConfig(), maxAttemptsPerModel: 1 }, p, t).run(text);
+    const failed = t.recent().attempts.find((a) => !a.ok)!;
+    expect(failed.detail).toContain('model_concurrency');
+    expect(t.summary().models.find((m) => m.model === MODELS.deepseek)!.lastError).toMatchObject({ code: 'rate_limited' });
   });
 
   it('hedging can be switched off (AI_HEDGE_AFTER_MS=0) → strictly sequential', async () => {

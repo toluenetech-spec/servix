@@ -145,6 +145,29 @@ function GrantPlanPanel() {
 
 /* ------------------------------------------------------------------ AI usage analytics */
 
+/** Live model health straight from the API process: which provider models are answering, which are failing and why. */
+function ModelHealthPanel() {
+  const [status, setStatus] = useState(null); const [recent, setRecent] = useState(null); const [error, setError] = useState(null);
+  const load = useCallback(() => { setError(null); Promise.all([adminApi.getAiStatus(), adminApi.getAiTelemetry()]).then(([s, r]) => { setStatus(s); setRecent(r); }).catch(setError); }, []);
+  useEffect(load, [load]);
+  if (error) return <section className="ws-panel"><h2>Model health</h2><ErrorState message="We couldn't load model health." onRetry={load} /></section>;
+  if (!status || !recent) return <section className="ws-panel"><h2>Model health</h2><TableSkeleton rows={3} cols={5} label="Loading model health…" /></section>;
+  const models = status.telemetry?.models ?? [];
+  const failures = (recent.attempts ?? []).filter((a) => !a.ok).slice(-12).reverse();
+  const when = (iso) => new Date(iso).toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  return <section className="ws-panel" data-testid="ai-model-health">
+    <h2>Model health</h2>
+    <p className="ws-muted" style={{ marginTop: 0 }}>{status.enabled === false ? 'Servix AI is switched off.' : `Provider: ${status.provider?.baseUrl ?? status.baseUrl ?? 'configured'} · since this API process started${status.telemetry?.window?.since ? ` (${when(status.telemetry.window.since)})` : ''}.`}</p>
+    {models.length === 0 ? <p className="ws-muted">No model calls since the API last restarted.</p> : <div className="earnings"><table><thead><tr><th>Model</th><th>Calls</th><th>OK</th><th>Failed</th><th>Avg</th><th>Last problem</th></tr></thead><tbody>
+      {models.map((m) => <tr key={m.model}><td><code style={{ fontSize: 'var(--text-xs)' }}>{m.model}</code></td><td>{m.calls}</td><td>{m.ok}</td><td>{m.failed ? <Badge variant="neutral">{m.failed}</Badge> : 0}</td><td>{(m.avgMs / 1000).toFixed(1)} s</td><td style={{ fontSize: 'var(--text-xs)', maxWidth: '22rem' }}>{m.lastError ? <>{when(m.lastError.at)} · <strong>{m.lastError.code}</strong>{m.lastError.detail ? <> — {m.lastError.detail}</> : null}</> : <span className="ws-muted">none</span>}</td></tr>)}
+    </tbody></table></div>}
+    {failures.length > 0 && <details style={{ marginTop: 'var(--space-3)' }}><summary style={{ cursor: 'pointer', fontSize: 'var(--text-sm)' }}>Last {failures.length} failed model calls</summary>
+      <ul style={{ fontSize: 'var(--text-xs)', paddingLeft: '1.2rem', margin: 'var(--space-2) 0 0' }}>{failures.map((a, i) => <li key={`${a.at}-${i}`}>{when(a.at)} · {a.alias} ({a.department.replaceAll('_', ' ')}) · {a.errorCode}{a.toolCalls ? ` after ${a.toolCalls} tool call${a.toolCalls === 1 ? '' : 's'}` : ''} · {(a.durationMs / 1000).toFixed(1)} s{a.detail ? ` — ${a.detail}` : ''}</li>)}</ul>
+    </details>}
+    <div style={{ marginTop: 'var(--space-3)' }}><Button variant="ghost" size="sm" onClick={load}>Refresh</Button></div>
+  </section>;
+}
+
 const RANGES = [[7, '7 days'], [30, '30 days'], [90, '90 days'], [365, '1 year']];
 
 export function AiUsageTab() {
@@ -189,6 +212,7 @@ export function AiUsageTab() {
         <section className="ws-panel" style={{ marginBottom: 0 }}><h2>Top users</h2>{data.topUsers.length === 0 ? <p className="ws-muted">No usage yet.</p> : <div className="earnings"><table><thead><tr><th>Account</th><th>Plan</th><th>Requests</th><th>Tokens</th></tr></thead><tbody>{data.topUsers.map((u) => <tr key={u.userId}><td>{u.name}<br /><small>{u.email}</small></td><td><Badge variant={PLAN_VARIANT[u.plan] ?? 'neutral'}>{u.plan ?? '—'}</Badge></td><td>{n(u.requests)}</td><td>{n(u.tokens)}</td></tr>)}</tbody></table></div>}</section>
         <section className="ws-panel" style={{ marginBottom: 0 }}><h2>Top teams</h2>{data.topOrganizations.length === 0 ? <p className="ws-muted">No team usage yet.</p> : <div className="earnings"><table><thead><tr><th>Team</th><th>Requests</th><th>Tokens</th></tr></thead><tbody>{data.topOrganizations.map((o) => <tr key={o.organizationId}><td>{o.name}</td><td>{n(o.requests)}</td><td>{n(o.tokens)}</td></tr>)}</tbody></table></div>}</section>
       </div>
+      <ModelHealthPanel />
       <section className="ws-panel" style={{ marginBottom: 0 }}><h2>Recent AI requests</h2>{!events ? <TableSkeleton rows={5} cols={7} label="Loading events…" /> : events.items.length === 0 ? <p className="ws-muted">Nothing in this period.</p> : <div className="earnings"><table><thead><tr><th>When</th><th>Account</th><th>Plan</th><th>Tool</th><th>Model</th><th>Tokens</th><th>Result</th></tr></thead><tbody>{events.items.map((e) => <tr key={e.id}><td style={{ fontSize: 'var(--text-xs)' }}>{fmtWhen(e.at)}</td><td>{e.user ? <>{e.user.name}<br /><small>{e.user.email}</small></> : <small>anonymous</small>}{e.organization && <><br /><small>team: {e.organization}</small></>}</td><td>{e.plan ?? '—'}</td><td>{e.department.replaceAll('_', ' ')}</td><td>{e.alias}{e.fallbackUsed && <><br /><small>fallback · {e.attempts} attempts</small></>}</td><td>{n(e.totalTokens)}</td><td><Badge variant={e.ok ? 'brand' : 'neutral'}>{e.ok ? `ok · ${(e.durationMs / 1000).toFixed(1)} s` : e.errorCode ?? 'failed'}</Badge></td></tr>)}</tbody></table></div>}</section>
     </>}
   </div>;

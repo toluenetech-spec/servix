@@ -97,6 +97,8 @@ export const grantUserPlan = (id, body) => call('POST', `/admin/users/${encodeUR
 export const getUserAiUsage = (id) => call('GET', `/admin/users/${encodeURIComponent(id)}/ai-usage`);
 export const getAiUsage = (params) => call('GET', `/admin/ai/usage${qs(params)}`);
 export const getAiUsageEvents = (params) => call('GET', `/admin/ai/usage/events${qs(params)}`);
+export const getAiStatus = () => call('GET', '/admin/ai/status');
+export const getAiTelemetry = () => call('GET', '/admin/ai/telemetry/recent');
 
 /* identity verification (KYC) */
 export const getKycQueue = (params) => call('GET', `/admin/kyc/pending${qs(params)}`);

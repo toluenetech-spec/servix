@@ -104,6 +104,14 @@ admin tools; a forged `admin_*` call from them returns `tool "…" is not availa
 
 ## Telemetry
 
+**Model health (admin console)** — `Admin → AI usage → Model health` reads `/admin/ai/status` (per-model calls, ok,
+failed, average latency, last error code + scrubbed provider reason, since process start) and
+`/admin/ai/telemetry/recent` (last failed attempts with department, tool-call count and reason). Use it first when users
+report "Servix AI is busy": `rate_limited … model_concurrency` = provider per-account concurrency cap;
+`bad_request … model` = catalogue id retired/renamed (fix with `AI_MODEL_*` env); `auth` = key; `unavailable` = provider
+5xx; `timeout` = raise `AI_CALL_TIMEOUT_MS`. Hedging never starts a sibling while the primary is mid tool-loop.
+
+
 `AiTelemetry` records every attempt (department, alias, model id, duration, ok, fallback index,
 attempt number, tokens, error code, tool calls) and every task (model used, fallback used, attempts).
 Bounded ring buffer (1000). Read with `GET /api/v1/admin/ai/status` (aggregates) and
