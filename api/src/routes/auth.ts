@@ -33,6 +33,7 @@ import {
 } from '../lib/tokens.js';
 import { verifyEmailMail, resetPasswordMail } from '../lib/mailer.js';
 import { enqueueMail } from '../lib/jobs.js';
+import { alertIfNewDevice, clientAddress } from '../lib/loginAlerts.js';
 import { serializeUser } from '../lib/serialize.js';
 import { requireAuth } from '../lib/authGuard.js';
 
@@ -94,7 +95,7 @@ async function issueSession(
 ) {
   const family = familyId ?? newFamilyId();
   const { raw, hash } = newOpaqueToken();
-  await db.refreshToken.create({
+  const session = await db.refreshToken.create({
     data: {
       userId: user.id,
       mfaVerified,
@@ -104,7 +105,13 @@ async function issueSession(
       expiresAt: refreshExpiry(),
       userAgent: userAgent?.slice(0, 300),
     },
+    select: { id: true },
   });
+  // A brand-new session family = a completed sign-in (password, Google or the security-check flow); token
+  // rotation passes `familyId` and is never a "new device". Alerting never blocks the sign-in.
+  if (!familyId) {
+    await alertIfNewDevice(db, { userId: user.id, sessionId: session.id, userAgent, ip: clientAddress(reply.request.headers as Record<string, unknown>, reply.request.ip), log: reply.log });
+  }
   reply.setCookie(REFRESH_COOKIE, raw, { ...COOKIE_OPTS, expires: refreshExpiry() });
   const accessToken = await signAccessToken({ sub: user.id, role: user.role, status: user.status, sid: family, mfaVerified, authVersion: user.authVersion ?? 0 });
   return accessToken;

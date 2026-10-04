@@ -17,6 +17,7 @@ export function emailSamples() {
     { id: 'dispute-released', label: 'Dispute resolved · release', group: 'Services & payments', mail: mail.disputeResolvedMail(to, ref, 'released') },
     { id: 'dispute-refunded', label: 'Dispute resolved · refund', group: 'Services & payments', mail: mail.disputeResolvedMail(to, ref, 'refunded') },
     { id: 'payout', label: 'Professional payout', group: 'Services & payments', mail: mail.payoutSentMail(to, 'PAY-2026-0062', '₦28,000') },
+    { id: 'new-device', label: 'New device sign-in', group: 'Security alerts', mail: mail.newDeviceSignInMail(to, { name: 'Bola Adeyemi', device: 'Safari on iPhone', when: '4 Oct 2026, 14:05 (Lagos time)', ip: '41.58.1.2' }) },
     { id: 'enrolled', label: 'Security method added', group: 'Security alerts', mail: mail.securityNoticeMail(to, 'security.enrolled', 'A Google Authenticator-compatible authenticator was enrolled on your Servix account.') },
     { id: 'recovery-used', label: 'Recovery code used', group: 'Security alerts', mail: mail.securityNoticeMail(to, 'security.recovery_used', 'A single-use recovery code was used on your account. Existing sessions have been signed out.') },
     { id: 'password-changed', label: 'Password changed', group: 'Security alerts', mail: mail.securityNoticeMail(to, 'security.password_reset', 'Your Servix password was reset. Existing sessions have been signed out.') },

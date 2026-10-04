@@ -31,6 +31,29 @@
   setup key, passkey cancellation/errors, resend countdown, recovery download and
   acknowledgement, success/error/busy states and confirmed-password reset.
 
+## New-device sign-in alerts (2026-10-04)
+
+`src/lib/loginAlerts.ts` (+ pure helpers in `src/lib/deviceInfo.ts`), wired into `issueSession` in `src/routes/auth.ts`.
+
+- **Trigger**: every completed sign-in that starts a *new* refresh-token family — password login, Google sign-in, and the
+  security-check flow (`/auth/security/finish`). `/auth/refresh` passes the existing `familyId` and therefore never alerts.
+- **"New device"** = the account already has at least one earlier `refresh_tokens` row and none of them came from the
+  same browser family + operating system (`describeDevice`: e.g. "Chrome on Android", "Safari on iPhone",
+  "Microsoft Edge on Windows"). Two different Android phones on Chrome are the *same kind* of device (no alert);
+  Android → iPhone alerts. The first session of a brand-new account (registration) never alerts.
+- **What happens**: in-app notification `security.new_device` (link `/dashboard/settings`), audit row
+  `security.new_device`, and the email `newDeviceSignInMail` — subject *"New sign-in to your Servix account from
+  <device>"* with device, Lagos time, forwarded client address (display only; first `X-Forwarded-For` hop, validated),
+  and a **Secure my account** button to `/forgot-password`. A password reset bumps `authVersion`, which signs every
+  device out, so that single action is the containment step. The email contains no sign-in links, tokens or codes.
+- **Never blocks sign-in**: the whole check is try/caught and logged; the email is enqueued through the existing
+  PgQueue (`email.send`, idempotency key `new-device-<sessionId>`), so a Brevo outage cannot fail a login.
+- **Switch**: `LOGIN_ALERTS=false` disables the email only (notification + audit still written). No new tables, no
+  migration, no new required env vars.
+- **Tests**: `tests/login-alerts-local.test.ts` — UA/IP helpers run always; the end-to-end flow (register → same-kind
+  device → new device → refresh → repeat device → second new device, plus the `LOGIN_ALERTS=false` variant) runs with
+  `RUN_LOCAL_SECURITY_TESTS=1` on an embedded PostgreSQL.
+
 ## Security boundaries
 
 Restricted random cookie: HttpOnly, SameSite=Lax, Secure in production, auth-only

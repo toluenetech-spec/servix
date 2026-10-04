@@ -9,7 +9,7 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 describe('professional transactional email templates', () => {
   it('covers every current mail type and important variant with HTML and plain text', () => {
-    const samples = emailSamples(); expect(samples).toHaveLength(17);
+    const samples = emailSamples(); expect(samples).toHaveLength(18);
     for (const { mail } of samples) {
       expect(mail.html).toContain('<html lang="en">'); expect(mail.html).toContain('role="presentation"');
       expect(mail.html).toContain('alt="SERVIX"'); expect(mail.html).toContain('Contact Servix support');

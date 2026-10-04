@@ -215,6 +215,24 @@ export function securityNoticeMail(to: string, action: string, message: string):
   });
 }
 
+export function newDeviceSignInMail(to: string, info: { name?: string | null; device: string; when: string; ip?: string | null }): Mail {
+  const first = info.name?.trim().split(/\s+/)[0];
+  const details: Array<[string, string]> = [['Device', info.device], ['When', info.when]];
+  if (info.ip) details.push(['Network address', info.ip]);
+  return brandedMail(to, `New sign-in to your Servix account from ${info.device}`, {
+    category: 'Account security', status: 'New device sign-in', preheader: `Your Servix account was just signed in from ${info.device}. If this was you, no action is needed.`,
+    title: `${first ? `${first}, your` : 'Your'} account was signed in on a new device.`,
+    paragraphs: [
+      `We noticed a sign-in to your Servix account from a device or browser you have not used before. Here is what we know:`,
+      `If this was you — for example a new phone, tablet or browser — you can ignore this email.`,
+      `If you do not recognise it, change your password straight away. Changing your password signs every device out of your account, including this one, and your saved security method (passkey or authenticator) is still required to get back in.`,
+    ],
+    details,
+    action: { label: 'Secure my account', url: emailAppLink('/forgot-password') },
+    note: { title: 'Servix will never ask for your password or codes', text: 'This email contains no links that sign you in and nothing that can be used to access your account. Only the "Secure my account" button above leads to Servix; it starts a normal password reset.' },
+  });
+}
+
 export function kycOutcomeMail(to: string, outcome: 'approved' | 'rejected', reason?: string | null): Mail {
   const base = (process.env.APP_BASE_URL ?? '').replace(/\/$/, '');
   const link = `${base}/dashboard/identity`;

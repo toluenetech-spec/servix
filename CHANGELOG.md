@@ -2,6 +2,21 @@
 
 All notable changes to the Servix public website.
 
+## 0.9.1 — 2026-10-04 (Sign-in alerts and iOS fixes)
+
+### Added
+- **New-device sign-in alerts**: when an account is signed in from a browser/operating system it has not used
+  before (password, Google or security-check sign-in — never token refresh, never the very first session of a new
+  account), the owner gets an in-app notification and an email "New sign-in to your Servix account from
+  <device>" with device, Lagos time, network address and a *Secure my account* button (password reset, which signs
+  every device out). Non-blocking, queued through the existing email jobs; `LOGIN_ALERTS=false` turns the email off.
+  No migration.
+
+### Fixed
+- **Older iPhone/iPad Safari crash** ("Something went wrong on this page … Invalid regular expression: invalid
+  group specifier name"): removed a regex lookbehind from AI markdown rendering and `Object.hasOwn` from page
+  metadata so Safari < 16.4 can load every page again.
+
 ## 0.9.0 — 2026-10-03 (Subscriptions, entitlements and feature access)
 
 ### Added
