@@ -18,6 +18,7 @@ import { normalizeProfileDetails } from '../lib/serialize.js';
 import type { ToolSchema } from './provider.js';
 import type { ToolRunner } from './router.js';
 import { resolveCategorySlug, normalizeEnum, normalizeNaira, clampText } from './normalize.js';
+import { ADMIN_TOOL_DEFS } from './adminTools.js';
 
 export interface ToolContext {
   userId: string | null;
@@ -29,7 +30,7 @@ interface ToolDef {
   name: string;
   description: string;
   parameters: Record<string, unknown>;
-  audience?: 'professional' | 'authenticated';
+  audience?: 'professional' | 'authenticated' | 'admin';
   run(args: Record<string, unknown>, ctx: ToolContext): Promise<unknown>;
 }
 
@@ -214,8 +215,10 @@ export async function bookingTimeline(bookingId: string, ctx: ToolContext) {
 
 /** Build the tool runner a department is allowed to use for this caller. */
 export function buildToolRunner(allow: readonly string[], ctx: ToolContext): ToolRunner {
-  const defs = TOOLS.filter((t) => allow.includes(t.name)).filter((t) =>
+  const adminDefs: ToolDef[] = ADMIN_TOOL_DEFS.map((t) => ({ name: t.name, description: t.description, parameters: t.parameters as Record<string, unknown>, audience: 'admin', run: (args) => t.run(args) }));
+  const defs = [...TOOLS, ...adminDefs].filter((t) => allow.includes(t.name)).filter((t) =>
     t.audience === 'professional' ? ctx.role === 'professional' && Boolean(ctx.professionalProfileId)
+    : t.audience === 'admin' ? ctx.role === 'admin' && Boolean(ctx.userId)
     : t.audience === 'authenticated' ? Boolean(ctx.userId)
     : true);
   const schemas: ToolSchema[] = defs.map((t) => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.parameters } }));

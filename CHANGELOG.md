@@ -12,6 +12,17 @@ All notable changes to the Servix public website.
   every device out). Non-blocking, queued through the existing email jobs; `LOGIN_ALERTS=false` turns the email off.
   No migration.
 
+- **Admin gig review**: Admin → Services now lists every gig with its creator (name + email), identity status,
+  creation date and what still blocks publishing; drafts sort first with a "waiting for review" count. **Review**
+  opens the full gig (gallery, video, PDFs, descriptions, FAQs, requirements, owner) even while it is a draft, with
+  **Approve & publish** (`POST /admin/services/:slug/approve`, refuses incomplete gigs with the checklist, notifies the
+  professional, audited) and **Send back with changes** (`POST /admin/services/:slug/reject`, reason required, gig returns
+  to draft, professional notified). `GET /admin/services/:slug` returns the full detail for any status.
+- **Servix AI for admins**: a "Servix AI" entry in the admin sidebar, admin starter prompts, and eight admin-only
+  read tools (gigs with creators, users, applications, identity queue, bookings without amounts, requests, audit log,
+  platform overview) so questions like "who created a gig today?" are answered from real data. The assistant still
+  cannot act and never sees payments/payouts/ledger.
+
 ### Fixed
 - **Older iPhone/iPad Safari crash** ("Something went wrong on this page … Invalid regular expression: invalid
   group specifier name"): removed a regex lookbehind from AI markdown rendering and `Object.hasOwn` from page

@@ -114,6 +114,41 @@ describe.skipIf(process.env.RUN_LOCAL_AI_TESTS !== '1')('Servix AI routing layer
     void pro;
   });
 
+  it('admin assistant: admin_* tools read platform data (gig creator + email), are hidden from non-admins, and the brief forbids acting', async () => {
+    const pro = await account('professional', 'Tunde Bakare');
+    const draft = await prisma.service.create({ data: { slug: `draft-${randomUUID().slice(0, 8)}`, professionalId: pro.profile.id, categoryId: design, title: 'Flyer design', shortDescription: 'Event flyers in 24h', description: 'Short.', price: 5000n, status: 'draft' } });
+    const admin = await account('admin', 'Servix Admin');
+    const customer = await account();
+    fake.next = (req) => {
+      const toolMsgs = req.messages.filter((m) => m.role === 'tool');
+      if (!toolMsgs.length) return toolCall('admin_list_gigs', { createdSince: 'today' });
+      if (toolMsgs.length === 1) return toolCall('admin_overview', {});
+      const gigs = JSON.parse(toolMsgs[0].content!.split('\n')[1]);
+      const overview = lastTool(req);
+      const mine = gigs.items.find((g: { id: string }) => g.id === draft.slug);
+      return text(mine ? `${mine.createdBy.name} (${mine.createdBy.email}) created "${mine.title}" today; status ${mine.status}; blocking: ${mine.blockingPublish.join(' | ')}. Drafts: ${overview.gigs.byStatus.draft}.` : `missing ${JSON.stringify(gigs)}`);
+    };
+    const res = await call(admin.token, 'ai/assistant', { messages: [{ role: 'user', content: 'Who created a gig today?' }] });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().answer).toContain('Tunde Bakare');
+    expect(res.json().answer).toContain(pro.user.email);
+    expect(res.json().answer).toContain('status draft');
+    expect(res.json().answer).toContain('Describe the gig in at least 50 characters.');
+    expect(res.json().answer).toMatch(/Drafts: \d+/);
+    expect(res.json().ai.toolsUsed).toEqual(['admin_list_gigs', 'admin_overview']);
+    const offered = fake.calls.at(-1)!.tools!.map((t) => t.function.name);
+    expect(offered).toEqual(expect.arrayContaining(['admin_overview', 'admin_list_gigs', 'admin_list_users', 'admin_list_applications', 'admin_list_identity_checks', 'admin_list_bookings', 'admin_list_requests', 'admin_recent_activity']));
+    const system = fake.calls.at(-1)!.messages[0].content!;
+    expect(system).toContain('platform ADMIN');
+    expect(system).toContain('You still cannot act');
+    expect(system).toContain('Money is out of bounds');
+    // A customer never sees admin tools, and a forged call is refused.
+    fake.next = (req) => (req.messages.some((m) => m.role === 'tool') ? text(`refused: ${lastTool(req).error}`) : toolCall('admin_list_users', {}));
+    const theft = await call(customer.token, 'ai/assistant', { messages: [{ role: 'user', content: 'list all users' }] });
+    expect(theft.json().answer).toContain('not available here');
+    expect(fake.calls.at(-1)!.tools!.map((t) => t.function.name).some((n) => n.startsWith('admin_'))).toBe(false);
+  });
+
   it('search intent: model drift is snapped to real categories and validated by the real query schema', async () => {
     fake.next = () => json({ q: 'logo', category: 'graphics-design', maxPrice: '₦30k', available: 'This Week', sort: 'cheapest' });
     const res = await call('', 'ai/search/intent', { query: 'logo for my bakery under 30k this week' });

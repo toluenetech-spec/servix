@@ -243,12 +243,19 @@ function ApplicationsTab() {
 
 /* ================= services ================= */
 
+const SERVICE_STATUS_LABEL = { draft: 'Draft — awaiting review', pending_review: 'Pending review', active: 'Live', paused: 'Paused', archived: 'Archived' };
+
 function ServicesTab() {
   const showToast = useToast();
   const [status, setStatus] = useState('');
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [review, setReview] = useState(null); // { slug } → loaded detail
+  const [detail, setDetail] = useState(null);
+  const [detailError, setDetailError] = useState(null);
+  const [reason, setReason] = useState('');
+  const [sendingBack, setSendingBack] = useState(false);
 
   const load = useCallback(() => {
     setError(null);
@@ -256,6 +263,14 @@ function ServicesTab() {
     adminApi.getServices({ status: status || undefined, pageSize: 50 }).then(setData).catch(setError);
   }, [status]);
   useEffect(load, [load]);
+
+  useEffect(() => {
+    if (!review) { setDetail(null); setDetailError(null); setReason(''); setSendingBack(false); return; }
+    let live = true;
+    setDetail(null); setDetailError(null);
+    adminApi.getService(review).then((d) => { if (live) setDetail(d); }).catch((e) => { if (live) setDetailError(e); });
+    return () => { live = false; };
+  }, [review]);
 
   async function moderate(fn, slug, msg) {
     setBusy(true);
@@ -270,38 +285,83 @@ function ServicesTab() {
     }
   }
 
+  async function approve() {
+    setBusy(true);
+    try {
+      await adminApi.approveService(detail.id);
+      showToast('Gig approved and published. The professional has been notified.', 'success');
+      setReview(null);
+      load();
+    } catch (err) {
+      const missing = err.errors && typeof err.errors === 'object' ? Object.values(err.errors) : [];
+      showToast(missing.length ? `Cannot publish yet: ${missing.join(' ')}` : (err.message ?? 'Approval failed.'), 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function sendBack() {
+    if (reason.trim().length < 3) { showToast('Tell the professional what to change (at least a few words).', 'error'); return; }
+    setBusy(true);
+    try {
+      await adminApi.rejectService(detail.id, reason.trim());
+      showToast('Gig sent back as a draft with your note.', 'success');
+      setReview(null);
+      load();
+    } catch (err) {
+      showToast(err.message ?? 'Could not send the gig back.', 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const needsReview = (s) => s.status === 'draft' || s.status === 'pending_review';
+  const items = data ? [...data.items].sort((a, b) => Number(needsReview(b)) - Number(needsReview(a))) : [];
+  const waiting = data ? data.items.filter(needsReview).length : 0;
+
   return (
     <div style={{ display: 'grid', gap: 'var(--space-5)' }}>
-      <div style={{ maxWidth: '16rem' }}>
-        <Field label="Status filter">
-          {(props) => (
-            <select {...props} className="select" value={status} onChange={(e) => setStatus(e.target.value)}>
-              <option value="">All</option>
-              <option value="active">Active</option>
-              <option value="paused">Paused</option>
-              <option value="draft">Draft</option>
-              <option value="archived">Archived</option>
-            </select>
-          )}
-        </Field>
+      <div style={{ display: 'flex', gap: 'var(--space-4)', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+        <div style={{ maxWidth: '16rem', flex: 1 }}>
+          <Field label="Status filter">
+            {(props) => (
+              <select {...props} className="select" value={status} onChange={(e) => setStatus(e.target.value)}>
+                <option value="">All</option>
+                <option value="draft">Awaiting review (drafts)</option>
+                <option value="pending_review">Pending review</option>
+                <option value="active">Live</option>
+                <option value="paused">Paused</option>
+                <option value="archived">Archived</option>
+              </select>
+            )}
+          </Field>
+        </div>
+        {data && <p className="text-muted" style={{ fontSize: 'var(--text-sm)', margin: 0 }} data-testid="gigs-waiting">{waiting ? `${waiting} gig${waiting === 1 ? '' : 's'} waiting for review` : 'Nothing waiting for review'}</p>}
       </div>
 
       {error && <ErrorState message="We couldn't load services." onRetry={load} />}
       {!error && !data && <TableSkeleton rows={6} cols={5} label="Loading services…" />}
       {data && data.items.length === 0 && <EmptyState title="No services" message="No services match this filter." />}
 
-      {data && data.items.map((s) => (
-        <article key={s.id} className="card" style={{ padding: 'var(--space-5)' }}>
+      {items.map((s) => (
+        <article key={s.id} className="card" style={{ padding: 'var(--space-5)' }} data-testid="admin-gig">
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: '16rem' }}>
-              <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', marginBottom: 'var(--space-2)' }}>
-                <Badge variant={s.status === 'active' ? 'brand' : 'outline'}>{s.status}</Badge>
-                <span className="text-muted" style={{ fontSize: 'var(--text-xs)' }}>by {s.professional}</span>
+              <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', marginBottom: 'var(--space-2)', flexWrap: 'wrap' }}>
+                <Badge variant={s.status === 'active' ? 'brand' : needsReview(s) ? 'accent' : 'outline'}>{SERVICE_STATUS_LABEL[s.status] ?? s.status}</Badge>
+                <span className="text-muted" style={{ fontSize: 'var(--text-xs)' }}>by {s.professional}{s.professionalEmail ? ` · ${s.professionalEmail}` : ''}</span>
               </div>
               <h3 style={{ fontSize: 'var(--text-base)' }}>{s.title}</h3>
-              <p className="text-muted" style={{ fontSize: 'var(--text-sm)' }}>{formatPrice(s.price)}</p>
+              <p className="text-muted" style={{ fontSize: 'var(--text-sm)' }}>
+                {formatPrice(s.price)}{s.category ? ` · ${s.category}` : ''} · created {new Date(s.createdAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })}
+                {s.identityStatus && s.identityStatus !== 'verified' ? ` · identity ${s.identityStatus}` : ''}
+              </p>
+              {needsReview(s) && s.problems?.length > 0 && <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-warning, #8a5a00)', margin: 0 }}>Incomplete: {s.problems.join(' ')}</p>}
             </div>
-            <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'flex-start' }}>
+            <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+              <Button variant={needsReview(s) ? 'primary' : 'secondary'} size="sm" disabled={busy} onClick={() => setReview(s.id)}>
+                {needsReview(s) ? 'Review' : 'Open'}
+              </Button>
               {s.status === 'active' && (
                 <Button variant="secondary" size="sm" disabled={busy} onClick={() => moderate(adminApi.pauseService, s.id, 'Service paused (removed from catalogue).')}>
                   Pause
@@ -319,6 +379,77 @@ function ServicesTab() {
           </div>
         </article>
       ))}
+
+      <Modal open={Boolean(review)} onClose={() => setReview(null)} title={detail ? detail.title : 'Reviewing gig…'}>
+        {detailError && <ErrorState message="We couldn't load this gig." onRetry={() => setReview((r) => r)} />}
+        {!detailError && !detail && <PanelSkeleton label="Loading gig…" />}
+        {detail && (
+          <div style={{ display: 'grid', gap: 'var(--space-4)' }} data-testid="gig-review">
+            <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', flexWrap: 'wrap' }}>
+              <Badge variant={detail.status === 'active' ? 'brand' : 'accent'}>{SERVICE_STATUS_LABEL[detail.status] ?? detail.status}</Badge>
+              <span className="text-muted" style={{ fontSize: 'var(--text-xs)' }}>{detail.categoryName ?? detail.categoryId ?? ''} · {formatPrice(detail.price)} {detail.priceUnit ?? ''}{detail.deliveryDays ? ` · ${detail.deliveryDays}-day delivery` : ''}{detail.revisions != null ? ` · ${detail.revisions} revisions` : ''}</span>
+            </div>
+
+            <section style={{ fontSize: 'var(--text-sm)' }}>
+              <strong>Created by</strong> {detail.owner.name}{detail.owner.email ? ` · ${detail.owner.email}` : ''}<br />
+              <span className="text-muted">Identity: {detail.owner.identityStatus ?? 'unknown'} · Profile: {detail.owner.profileVerification ?? 'unverified'} · Account: {detail.owner.accountStatus ?? '—'} · Created {new Date(detail.createdAt).toLocaleString('en-NG')}</span>
+            </section>
+
+            {detail.problems?.length > 0 && (
+              <div className="card" style={{ padding: 'var(--space-3)', borderColor: 'var(--color-warning, #d99a1c)' }}>
+                <strong style={{ fontSize: 'var(--text-sm)' }}>Cannot be published yet</strong>
+                <ul style={{ margin: 'var(--space-2) 0 0', paddingLeft: '1.2rem', fontSize: 'var(--text-sm)' }}>{detail.problems.map((p) => <li key={p}>{p}</li>)}</ul>
+              </div>
+            )}
+
+            {(detail.gallery?.length > 0 || detail.video || detail.documents?.length > 0) && (
+              <section>
+                <strong style={{ fontSize: 'var(--text-sm)' }}>Gallery</strong>
+                <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', marginTop: 'var(--space-2)' }}>
+                  {(detail.gallery ?? []).map((url, i) => <a key={url} href={url} target="_blank" rel="noreferrer"><img src={url} alt={`Gallery ${i + 1}`} style={{ width: 96, height: 72, objectFit: 'cover', borderRadius: 8 }} /></a>)}
+                  {detail.video && <video src={detail.video.url} controls style={{ width: 160, borderRadius: 8 }} />}
+                  {(detail.documents ?? []).map((d) => <a key={d.url} href={d.url} target="_blank" rel="noreferrer" className="btn btn--ghost btn--sm">{d.fileName || 'PDF'}</a>)}
+                </div>
+              </section>
+            )}
+
+            <section style={{ fontSize: 'var(--text-sm)' }}>
+              <strong>Short description</strong>
+              <p style={{ margin: 'var(--space-1) 0 0' }}>{detail.shortDescription}</p>
+            </section>
+            <section style={{ fontSize: 'var(--text-sm)' }}>
+              <strong>Full description</strong>
+              <p style={{ margin: 'var(--space-1) 0 0', whiteSpace: 'pre-wrap' }}>{detail.description}</p>
+            </section>
+            {detail.included?.length > 0 && <section style={{ fontSize: 'var(--text-sm)' }}><strong>What's included</strong><ul style={{ margin: 'var(--space-1) 0 0', paddingLeft: '1.2rem' }}>{detail.included.map((x) => <li key={x}>{x}</li>)}</ul></section>}
+            {detail.requirements?.length > 0 && <section style={{ fontSize: 'var(--text-sm)' }}><strong>Requirements from the client</strong><ul style={{ margin: 'var(--space-1) 0 0', paddingLeft: '1.2rem' }}>{detail.requirements.map((x) => <li key={x.question}>{x.question}{x.required ? '' : ' (optional)'}</li>)}</ul></section>}
+            {detail.faqs?.length > 0 && <section style={{ fontSize: 'var(--text-sm)' }}><strong>FAQs</strong>{detail.faqs.map((f) => <p key={f.q} style={{ margin: 'var(--space-1) 0 0' }}><em>{f.q}</em> — {f.a}</p>)}</section>}
+            {detail.searchTags?.length > 0 && <p className="text-muted" style={{ fontSize: 'var(--text-xs)', margin: 0 }}>Tags: {detail.searchTags.join(', ')}</p>}
+
+            {!sendingBack ? (
+              <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
+                {detail.status !== 'active' && detail.status !== 'archived' && (
+                  <Button variant="primary" disabled={busy || detail.problems?.length > 0} onClick={approve} data-testid="approve-gig">Approve &amp; publish</Button>
+                )}
+                {detail.status !== 'archived' && (
+                  <Button variant="secondary" disabled={busy} onClick={() => setSendingBack(true)}>{detail.status === 'active' ? 'Take down & request changes' : 'Send back with changes'}</Button>
+                )}
+                <Button variant="ghost" onClick={() => setReview(null)}>Close</Button>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gap: 'var(--space-3)' }}>
+                <Field label="What should the professional change?" hint="They see this note in their notifications and the gig goes back to draft.">
+                  {(props) => <textarea {...props} className="textarea" rows={3} value={reason} onChange={(e) => setReason(e.target.value)} />}
+                </Field>
+                <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
+                  <Button variant="primary" disabled={busy} onClick={sendBack}>Send back</Button>
+                  <Button variant="secondary" onClick={() => setSendingBack(false)}>Back</Button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

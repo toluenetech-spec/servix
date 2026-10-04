@@ -87,6 +87,21 @@ routes/ai.ts  ──►  ai/departments.ts  ──►  ai/router.ts  ──►  
   validated in the Dahl evaluation).
 - Rate limit: 20 requests/minute per IP per AI route; body limit 512 KB (global).
 
+## Admin read access (2026-10-04)
+
+Platform admins asked Servix AI to "see everything except payments". `src/ai/adminTools.ts` adds eight **read-only**
+tools that `buildToolRunner` exposes only when the caller's role (re-read from the database) is `admin`:
+`admin_overview`, `admin_list_gigs` (who created which gig, when, owner email, identity status, what still blocks
+publishing), `admin_list_users`, `admin_list_applications`, `admin_list_identity_checks` (status only — never ID numbers or
+documents), `admin_list_bookings` (status only — no amounts), `admin_list_requests`, `admin_recent_activity` (audit log).
+Time filters accept `today` / `yesterday` / `7d` / ISO dates on the Lagos calendar (`src/ai/since.ts`).
+
+The assistant's system prompt gains `ADMIN_BRIEF` for admins: always call a tool before answering operational questions,
+never claim to lack access, **never act** (approve/reject/publish/suspend/pay/message) — instead point to the exact admin
+console screen — and never touch payments, payouts, ledger, refunds or wallets. Customers and professionals never see
+admin tools; a forged `admin_*` call from them returns `tool "…" is not available here`. Covered by
+`tests/ai-local.test.ts` ("admin assistant …").
+
 ## Telemetry
 
 `AiTelemetry` records every attempt (department, alias, model id, duration, ok, fallback index,

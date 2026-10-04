@@ -20,6 +20,7 @@ import type { Department } from './config.js';
 import type { ChatMessage } from './provider.js';
 import type { ParseResult, TaskSpec } from './router.js';
 import { bookingTimeline, buildToolRunner, listCategories, openRequestsFor, ownProfile, priceStats, type ToolContext } from './tools.js';
+import { ADMIN_TOOL_NAMES } from './adminTools.js';
 import { clampText, normalizeDateTime, normalizeEnum, normalizeInt, normalizeNaira, normalizeStringList, onlyKnown, resolveCategorySlug } from './normalize.js';
 
 export const SYSTEM_BASE = [
@@ -33,6 +34,15 @@ export const SYSTEM_BASE = [
   '6. Formatting: plain sentences and short paragraphs. You may use **bold** for a name or figure and "- " bullet lists for steps; never use headings, tables or code blocks.',
 ].join('\n');
 
+/** Extra briefing for platform administrators: full read access through admin_* tools, still no actions. */
+export const ADMIN_BRIEF = [
+  'The user is a verified Servix platform ADMIN. You have read access to the whole platform through the admin_* tools: accounts, gigs (with who created them and when), professional applications, identity-check queue, bookings (status only), customer requests and the audit log.',
+  'ALWAYS call the matching admin_* tool before answering an operational question (e.g. "who created a gig today" → admin_list_gigs with createdSince "today"; "what is waiting for me" → admin_overview). Never say you lack access to platform data — you have it; if a tool returns nothing, say nothing matched.',
+  'You still cannot act: you do not approve, reject, publish, suspend, pay, refund or message anyone, even when asked. When the admin wants to act, tell them exactly where in the admin console (Admin → Services → Review for gigs; Admin → Applications; Admin → Identity (KYC); Admin → Users; Admin → Bookings & disputes).',
+  'Money is out of bounds: payments, payouts, ledger balances, refunds and wallets are never available to you — point to Admin → Payouts or Admin → Bookings & disputes instead. Listing prices and request budgets are fine to quote.',
+  'Admins may receive names and emails of accounts; never reveal ID numbers, documents, passwords, tokens or codes (you do not have them).',
+].join('\n');
+
 export type Audience = 'any' | 'professional' | 'authenticated';
 
 export interface DepartmentDef {
@@ -43,7 +53,7 @@ export interface DepartmentDef {
 }
 
 export const DEPARTMENT_DEFS: Record<Department, DepartmentDef> = {
-  assistant: { key: 'assistant', label: 'AI Concierge / assistant', audience: 'authenticated', tools: ['get_categories', 'search_professionals', 'get_professional_profile', 'get_trust_metrics', 'check_availability', 'compare_professionals', 'get_price_stats', 'get_open_requests', 'get_my_profile', 'get_booking_timeline'] },
+  assistant: { key: 'assistant', label: 'AI Concierge / assistant', audience: 'authenticated', tools: ['get_categories', 'search_professionals', 'get_professional_profile', 'get_trust_metrics', 'check_availability', 'compare_professionals', 'get_price_stats', 'get_open_requests', 'get_my_profile', 'get_booking_timeline', ...ADMIN_TOOL_NAMES] },
   search_intent: { key: 'search_intent', label: 'Natural-language search', audience: 'any', tools: [] },
   job_matching: { key: 'job_matching', label: 'Job & opportunity matching', audience: 'professional', tools: [] },
   opportunity_radar: { key: 'opportunity_radar', label: 'Opportunity Radar', audience: 'professional', tools: [] },
@@ -73,7 +83,7 @@ export const assistantInput = z.object({
 
 export function assistantTask(input: z.infer<typeof assistantInput>, ctx: ToolContext): TaskSpec<string> {
   const history: ChatMessage[] = input.messages.map((m) => ({ role: m.role, content: m.role === 'user' ? untrusted('customer message', m.content) : m.content }));
-  const who = ctx.role === 'professional' ? 'The user is a Servix professional.' : ctx.role === 'admin' ? 'The user is a Servix admin.' : 'The user is a Servix customer.';
+  const who = ctx.role === 'professional' ? 'The user is a Servix professional.' : ctx.role === 'admin' ? ADMIN_BRIEF : 'The user is a Servix customer.';
   return {
     department: 'assistant',
     messages: [{ role: 'system', content: `${SYSTEM_BASE}\n${who}\nUse tools to look things up before answering questions about professionals, prices, availability, trust or requests. Quote the real slug/name of any professional you mention.` }, ...history],

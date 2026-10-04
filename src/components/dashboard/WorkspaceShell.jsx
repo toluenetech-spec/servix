@@ -36,6 +36,7 @@ function buildNavigation({ user, overview, features = {}, plan = {} }) {
       ['/admin?tab=payouts', 'Payouts', 'wallet', 'payouts'],
       ['/admin?tab=subscriptions', 'Plan subscriptions', 'crown', 'subscriptions'],
       ['/admin?tab=plans', 'Plans & organisations', 'layers', 'plans'],
+      ...(features.ai ? [['/dashboard/ai', 'Servix AI', 'sparkle']] : []),
       ['/admin?tab=ai', 'AI usage', 'sparkle', 'ai'],
       ['/admin?tab=notifications', 'Send notification', 'megaphone', 'notifications'],
       ['/admin?tab=audit', 'Audit log', 'shield', 'audit'],

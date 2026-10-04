@@ -14,7 +14,8 @@ import { requireAdmin } from '../lib/authGuard.js';
 import { ApiError, notFound } from '../lib/errors.js';
 import { parseBody, parseQuery, paginationSchema } from '../lib/query.js';
 import { audit } from '../lib/audit.js';
-import { serializeUser } from '../lib/serialize.js';
+import { serializeUser, serializeServiceDetail } from '../lib/serialize.js';
+import { publishProblems } from './pro.js';
 import { serializeApplication, slugify, normalizeDetails } from './applications.js';
 import { transition } from '../lib/bookingService.js';
 import { postTransaction, refundLegs, releaseLegs } from '../lib/ledger.js';
@@ -186,7 +187,7 @@ export async function adminRoutes(app: FastifyInstance) {
         prisma.service.count({ where }),
         prisma.service.findMany({
           where,
-          include: { professional: { select: { name: true, slug: true } } },
+          include: { professional: { select: { name: true, slug: true, user: { select: { email: true, kycStatus: true } } } }, category: { select: { name: true } }, media: { select: { kind: true } } },
           orderBy: { updatedAt: 'desc' },
           skip: (q.page - 1) * q.pageSize,
           take: q.pageSize,
@@ -198,8 +199,13 @@ export async function adminRoutes(app: FastifyInstance) {
           title: s.title,
           status: s.status,
           price: Number(s.price),
+          category: s.category?.name ?? null,
           professional: s.professional.name,
           professionalId: s.professional.slug,
+          professionalEmail: s.professional.user?.email ?? null,
+          identityStatus: s.professional.user?.kycStatus ?? null,
+          problems: Object.values(publishProblems({ ...s, media: s.media })),
+          createdAt: s.createdAt.toISOString(),
           updatedAt: s.updatedAt.toISOString(),
         })),
         total,
@@ -233,6 +239,91 @@ export async function adminRoutes(app: FastifyInstance) {
   };
   moderateService('pause', 'active', 'paused');
   moderateService('unpause', 'paused', 'active');
+
+  /* ---- gig review: admins can open any gig (including drafts) and publish it or send it back ---- */
+
+  const adminServiceInclude = { media: true, faqs: true, category: true, professional: { include: { user: { select: { id: true, email: true, fullName: true, kycStatus: true, status: true } } } } } as const;
+  const serializeAdminService = (s: NonNullable<Awaited<ReturnType<typeof prisma.service.findFirst<{ include: typeof adminServiceInclude }>>>>) => ({
+    ...serializeServiceDetail(s),
+    status: s.status,
+    categoryName: s.category?.name ?? null,
+    createdAt: s.createdAt.toISOString(),
+    updatedAt: s.updatedAt.toISOString(),
+    problems: Object.values(publishProblems(s)),
+    owner: {
+      userId: s.professional.user?.id ?? null,
+      name: s.professional.user?.fullName ?? s.professional.name,
+      email: s.professional.user?.email ?? null,
+      accountStatus: s.professional.user?.status ?? null,
+      identityStatus: s.professional.user?.kycStatus ?? null,
+      professionalSlug: s.professional.slug,
+      profileVerification: s.professional.verification,
+    },
+  });
+
+  app.get(
+    '/admin/services/:slug',
+    { ...guard, schema: { tags: ['admin'], summary: 'Full gig detail for review (any status)', security: [{ bearerAuth: [] }] } },
+    async (req) => {
+      const { slug } = req.params as { slug: string };
+      const service = await prisma.service.findFirst({ where: { OR: [{ slug }, { id: slug }] }, include: adminServiceInclude });
+      if (!service) throw notFound('SERVICE_NOT_FOUND', 'Service not found');
+      return serializeAdminService(service);
+    },
+  );
+
+  const refreshStartingPrice = async (tx: Parameters<typeof audit>[0], professionalId: string) => {
+    const min = await tx.service.aggregate({ where: { professionalId, status: 'active' }, _min: { price: true } });
+    await tx.professionalProfile.update({ where: { id: professionalId }, data: { startingPrice: min._min.price } });
+  };
+
+  app.post(
+    '/admin/services/:slug/approve',
+    { ...guard, config: adminLimit, schema: { tags: ['admin'], summary: 'Review: approve and publish a gig (draft/pending/paused → active)', security: [{ bearerAuth: [] }] } },
+    async (req) => {
+      const { slug } = req.params as { slug: string };
+      const body = parseBody(z.object({ note: z.string().trim().max(500).optional() }), req.body ?? {});
+      const result = await prisma.$transaction(async (tx) => {
+        const service = await tx.service.findFirst({ where: { OR: [{ slug }, { id: slug }] }, include: adminServiceInclude });
+        if (!service) throw notFound('SERVICE_NOT_FOUND', 'Service not found');
+        if (service.status === 'active') return { service, changed: false };
+        if (service.status === 'archived') throw new ApiError(409, 'INVALID_TRANSITION', 'Archived gigs cannot be published.');
+        const problems = publishProblems(service);
+        if (Object.keys(problems).length > 0) throw new ApiError(422, 'GIG_INCOMPLETE', 'This gig is missing required details; send it back to the professional.', problems);
+        const cas = await tx.service.updateMany({ where: { id: service.id, status: service.status }, data: { status: 'active' } });
+        if (cas.count === 0) throw new ApiError(409, 'INVALID_TRANSITION', 'Gig changed while reviewing; reload.');
+        await refreshStartingPrice(tx, service.professionalId);
+        await audit(tx, { actorId: req.auth!.sub, action: 'service.approve', entity: 'service', entityId: service.slug, ip: req.ip, data: { from: service.status, note: body.note ?? null } });
+        if (service.professional.user) {
+          await notify(tx, { userId: service.professional.user.id, type: 'gig.approved', title: `“${service.title}” is now live`, body: body.note ? `Servix reviewed and published your gig. Note from the team: ${body.note}` : 'Servix reviewed and published your gig. Customers can now find and book it.', link: '/dashboard/gigs' });
+        }
+        return { service: { ...service, status: 'active' as const }, changed: true };
+      });
+      return { id: result.service.slug, status: 'active', changed: result.changed };
+    },
+  );
+
+  app.post(
+    '/admin/services/:slug/reject',
+    { ...guard, config: adminLimit, schema: { tags: ['admin'], summary: 'Review: send a gig back to the professional as a draft with a reason', security: [{ bearerAuth: [] }] } },
+    async (req) => {
+      const { slug } = req.params as { slug: string };
+      const body = parseBody(z.object({ reason: z.string().trim().min(3).max(500) }), req.body);
+      const updated = await prisma.$transaction(async (tx) => {
+        const service = await tx.service.findFirst({ where: { OR: [{ slug }, { id: slug }] }, include: adminServiceInclude });
+        if (!service) throw notFound('SERVICE_NOT_FOUND', 'Service not found');
+        if (service.status === 'archived') throw new ApiError(409, 'INVALID_TRANSITION', 'Archived gigs cannot be reviewed.');
+        await tx.service.update({ where: { id: service.id }, data: { status: 'draft' } });
+        if (service.status === 'active') await refreshStartingPrice(tx, service.professionalId);
+        await audit(tx, { actorId: req.auth!.sub, action: 'service.reject', entity: 'service', entityId: service.slug, ip: req.ip, data: { from: service.status, reason: body.reason } });
+        if (service.professional.user) {
+          await notify(tx, { userId: service.professional.user.id, type: 'gig.changes_requested', title: `“${service.title}” needs changes`, body: `Servix reviewed your gig and sent it back as a draft. Reason: ${body.reason}. Update it and publish again.`, link: '/dashboard/gigs' });
+        }
+        return service;
+      });
+      return { id: updated.slug, status: 'draft' };
+    },
+  );
 
   /* ================= user management ================= */
 

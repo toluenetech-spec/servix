@@ -14,7 +14,7 @@ import { AiAvatar, AiError, AiMarkdown, AiMeta, AiNote, AiThinking, useAiTask } 
 const STARTERS = {
   customer: ['Who can design a logo for a small bakery in Lagos?', 'How does payment protection work on Servix?', 'What does “delivered” mean on my booking?'],
   professional: ['Which open requests fit my skills?', 'How do payouts work?', 'How can I get more bookings?'],
-  admin: ['Explain the Servix trust score.', 'How does the request → proposal flow work?'],
+  admin: ['Who created gigs today?', 'What is waiting for review right now?', 'Which accounts signed up this week?', 'Show open disputes.'],
 };
 const MAX_TURNS = 20;
 

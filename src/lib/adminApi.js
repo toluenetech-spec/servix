@@ -60,6 +60,9 @@ export const rejectApplication = (id, reason) =>
 export const getServices = (params) => call('GET', `/admin/services${qs(params)}`);
 export const pauseService = (slug) => call('POST', `/admin/services/${slug}/pause`);
 export const unpauseService = (slug) => call('POST', `/admin/services/${slug}/unpause`);
+export const getService = (slug) => call('GET', `/admin/services/${slug}`);
+export const approveService = (slug, note) => call('POST', `/admin/services/${slug}/approve`, note ? { note } : {});
+export const rejectService = (slug, reason) => call('POST', `/admin/services/${slug}/reject`, { reason });
 
 /* users */
 export const getUsers = (params) => call('GET', `/admin/users${qs(params)}`);
