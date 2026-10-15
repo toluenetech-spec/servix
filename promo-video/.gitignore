@@ -1,0 +1,5 @@
+# Hyperframes caches / check artifacts
+composition/.hyperframes/
+composition-landscape/.hyperframes/
+# scratch frames extracted for review
+work/frames/

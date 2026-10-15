@@ -1,0 +1,259 @@
+// Generates index.html for the vertical (this directory) and landscape (../composition-landscape) Servix
+// launch video. One template, two layouts. Run: node build.mjs
+import { writeFileSync, mkdirSync, cpSync, existsSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const here = dirname(fileURLToPath(import.meta.url));
+const DURATION = 25.6;
+
+const layouts = {
+  vertical: { w: 1080, h: 1920, dir: here, res: 'portrait' },
+  landscape: { w: 1920, h: 1080, dir: join(here, '..', 'composition-landscape'), res: 'landscape' },
+};
+
+function html(L) {
+  const V = L.w < L.h;
+  // Phone geometry: CSS-px screen is 390x844; images are 3x.
+  const screenW = V ? 660 : 420;
+  const k = screenW / 390;
+  const screenH = Math.round(844 * k);
+  const bezel = V ? 18 : 12;
+  const phoneW = screenW + bezel * 2, phoneH = screenH + bezel * 2;
+  const phoneX = V ? Math.round((L.w - phoneW) / 2) : 1060;
+  const phoneY = V ? 660 : 150;
+  const phoneRadius = V ? 92 : 60;
+  const px = (n) => Math.round(n * k);
+
+  return `<!doctype html>
+<html lang="en" data-resolution="${L.res}">
+<head>
+<meta charset="UTF-8">
+<title>Servix launch (${V ? 'vertical' : 'landscape'})</title>
+<script src="assets/gsap.min.js"></script>
+<style>
+@font-face{font-family:'Inter';font-style:normal;font-weight:100 900;font-display:block;src:url(assets/fonts/inter-latin-wght-normal.woff2) format('woff2')}
+:root{--forest:#12372A;--green:#1F5C45;--ivory:#F7F4EC;--sand:#EDE8DC;--coral:#E56B5D;--charcoal:#202622;--gray:#68716B}
+html,body{margin:0;width:${L.w}px;height:${L.h}px;overflow:hidden;background:var(--forest);font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+#main{position:relative;width:${L.w}px;height:${L.h}px;overflow:hidden;background:var(--forest);color:var(--ivory)}
+.abs{position:absolute}
+.grain{inset:0;background-image:radial-gradient(rgba(247,244,236,.045) 1px,transparent 1.2px);background-size:7px 7px;opacity:.6;pointer-events:none}
+.glow{left:50%;top:${V ? 40 : 46}%;width:${V ? 1400 : 1500}px;height:${V ? 1400 : 1500}px;margin:-${V ? 700 : 750}px 0 0 -${V ? 700 : 750}px;border-radius:50%;background:radial-gradient(closest-side,rgba(31,92,69,.75),rgba(31,92,69,0) 70%);opacity:0}
+.h1{font-weight:800;letter-spacing:-.025em;line-height:1.04;color:var(--ivory)}
+.eyebrow{font-weight:700;font-size:${V ? 28 : 24}px;letter-spacing:.22em;text-transform:uppercase;color:var(--coral)}
+.sub{font-weight:500;color:var(--sand);line-height:1.3;opacity:.92}
+.u{position:relative;display:inline-block;white-space:nowrap}
+.u i{position:absolute;left:0;right:0;bottom:${V ? 4 : 2}px;height:${V ? 10 : 7}px;background:var(--coral);border-radius:4px;transform:scaleX(0);transform-origin:left}
+.row{display:flex;flex-direction:column}
+.line{overflow:hidden;padding-bottom:.12em;margin-bottom:-.12em}
+.line>span{display:block}
+/* hook */
+#hook{left:0;right:0;top:${V ? 700 : 360}px;padding:0 ${V ? 90 : 220}px;text-align:left}
+#hook .h1{font-size:${V ? 96 : 104}px}
+#hook .h1.l2{color:var(--ivory)}
+/* reveal + outro lockups */
+.lockup{left:0;right:0;display:flex;flex-direction:column;align-items:center;gap:${V ? 36 : 28}px}
+#lock1{top:${V ? 700 : 330}px}
+#lock2{top:${V ? 640 : 270}px}
+.tile{width:${V ? 220 : 180}px;height:${V ? 220 : 180}px;border-radius:${V ? 52 : 44}px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.35)}
+.tile img{width:100%;height:100%;display:block}
+.word{height:${V ? 86 : 72}px}
+.word img{height:100%;display:block}
+.tag{font-size:${V ? 44 : 40}px;font-weight:500;color:var(--sand);letter-spacing:-.01em}
+.cta{font-size:${V ? 60 : 56}px;font-weight:800;letter-spacing:-.02em}
+.url{font-size:${V ? 46 : 42}px;font-weight:600;color:var(--ivory);letter-spacing:.01em}
+.url i{bottom:-6px;height:6px}
+/* captions */
+.cap{${V ? `left:90px;right:90px;top:210px;` : `left:200px;width:780px;top:330px;`}display:flex;flex-direction:column;gap:${V ? 22 : 20}px}
+.cap .h1{font-size:${V ? 84 : 92}px}
+.cap .sub{font-size:${V ? 38 : 36}px;${V ? '' : 'max-width:820px;'}}
+/* phone */
+#phone{left:${phoneX}px;top:${phoneY}px;width:${phoneW}px;height:${phoneH}px;border-radius:${phoneRadius}px;background:#0E1F19;box-shadow:0 60px 140px rgba(0,0,0,.5),inset 0 0 0 2px rgba(247,244,236,.18)}
+#screen{left:${bezel}px;top:${bezel}px;width:${screenW}px;height:${screenH}px;border-radius:${phoneRadius - bezel}px;overflow:hidden;background:var(--ivory)}
+.scr{inset:0;background:var(--ivory)}
+.scr>img.full{width:${screenW}px;height:${screenH}px;display:block}
+#notch{left:50%;top:${bezel + px(8)}px;width:${px(110)}px;height:${px(30)}px;margin-left:-${px(55)}px;border-radius:999px;background:#0E1F19}
+/* professionals screen pieces */
+#prosHeader{left:0;top:0;width:${screenW}px;height:${px(66.7)}px;z-index:3}
+#prosHeader img{width:100%;display:block}
+#list{left:0;top:${px(66.7)}px;width:${screenW}px}
+#results{width:${screenW}px;display:block}
+.card{position:absolute;left:${px(18)}px;width:${px(354)}px;display:block;border-radius:${px(10)}px;box-shadow:0 ${px(6)}px ${px(18)}px rgba(18,55,42,.10)}
+#card1{top:${px(104)}px}#card2{top:${px(104 + 282)}px}#card3{top:${px(104 + 564)}px}
+#ring{left:${px(18 + 220)}px;top:${px(66.7 + 104 + 34)}px;width:${px(44)}px;height:${px(44)}px;margin:-${px(22)}px 0 0 -${px(22)}px;border:${px(3)}px solid var(--coral);border-radius:50%;opacity:0}
+/* tap */
+#tap{left:${px(140)}px;top:${px(606)}px;width:${px(54)}px;height:${px(54)}px;margin:-${px(27)}px 0 0 -${px(27)}px;border-radius:50%;background:rgba(229,107,93,.55);box-shadow:0 0 0 ${px(3)}px rgba(247,244,236,.9);opacity:0}
+/* ai cover */
+#cover{left:${px(19)}px;top:${px(505)}px;width:${px(352)}px;height:${px(339)}px;background:#fff}
+</style>
+</head>
+<body>
+<div id="main" data-composition-id="main" data-width="${L.w}" data-height="${L.h}" data-start="0" data-duration="${DURATION}">
+  <div class="abs glow" id="glow" data-layout-allow-overflow></div>
+  <div class="abs grain"></div>
+
+  <!-- Scene 1: hook -->
+  <div class="abs row" id="hook">
+    <div class="line"><span class="h1 l1a">Hiring a professional</span></div>
+    <div class="line"><span class="h1 l1b">in Nigeria</span></div>
+    <div class="line" style="margin-top:${V ? 26 : 22}px"><span class="h1 l2">shouldn't be a <span class="u">gamble.<i id="ul1"></i></span></span></div>
+  </div>
+
+  <!-- Scene 2: reveal -->
+  <div class="abs lockup" id="lock1">
+    <div class="tile"><img id="tile1" src="assets/brand/servix-app-logo.png" alt=""></div>
+    <div class="word"><img id="word1" src="assets/brand/wordmark-ivory.svg" alt="Servix"></div>
+    <div class="tag">Services, delivered professionally.</div>
+  </div>
+
+  <!-- Captions for scenes 3–5 -->
+  <div class="abs cap" id="cap3">
+    <div class="line"><span class="eyebrow">Find</span></div>
+    <div class="line"><span class="h1">Verified professionals.</span></div>
+    <div class="line"><span class="sub">Identity-checked. Rated. Priced upfront.</span></div>
+  </div>
+  <div class="abs cap" id="cap4">
+    <div class="line"><span class="eyebrow">Book</span></div>
+    <div class="line"><span class="h1">Pay once. Held until you confirm.</span></div>
+    <div class="line"><span class="sub">“Payment is held securely and only released after you confirm completion.”</span></div>
+  </div>
+  <div class="abs cap" id="cap5">
+    <div class="line"><span class="eyebrow">Ask</span></div>
+    <div class="line"><span class="h1">Servix AI.</span></div>
+    <div class="line"><span class="sub">Answers from real Servix data. Never moves your money.</span></div>
+  </div>
+
+  <!-- Phone -->
+  <div class="abs" id="phone" data-layout-allow-overflow>
+    <div class="abs" id="screen">
+      <div class="abs scr" id="sHome"><img class="full" src="assets/screens/home.png" alt=""></div>
+      <div class="abs scr" id="sPros" data-layout-allow-overflow>
+        <div class="abs" id="prosHeader"><img src="assets/screens/pros-header.png" alt=""></div>
+        <div class="abs" id="list">
+          <img id="results" src="assets/screens/pros-results.png" alt="">
+          <img class="card" id="card1" data-layout-allow-overflow src="assets/screens/card-1.png" alt="">
+          <img class="card" id="card2" data-layout-allow-overflow src="assets/screens/card-2.png" alt="">
+          <img class="card" id="card3" data-layout-allow-overflow src="assets/screens/card-3.png" alt="">
+        </div>
+        <div class="abs" id="ring"></div>
+      </div>
+      <div class="abs scr" id="sSheet" data-layout-allow-overflow><img class="full" src="assets/screens/booking-sheet.png" alt=""><div class="abs" id="tap"></div></div>
+      <div class="abs scr" id="sBooking" data-layout-allow-overflow><img class="full" src="assets/screens/booking-page.png" alt=""></div>
+      <div class="abs scr" id="sAi" data-layout-allow-overflow><img class="full" src="assets/screens/ai.png" alt=""><div class="abs" id="cover"></div></div>
+    </div>
+  </div>
+
+  <!-- Scene 6: outro -->
+  <div class="abs lockup" id="lock2">
+    <div class="tile"><img id="tile2" src="assets/brand/servix-app-logo.png" alt=""></div>
+    <div class="word"><img id="word2" src="assets/brand/wordmark-ivory.svg" alt="Servix"></div>
+    <div class="cta" id="cta">Find your professional today.</div>
+    <div class="url"><span class="u">www.servix.name.ng<i id="ul2"></i></span></div>
+  </div>
+
+  <!-- Audio -->
+  <audio id="music" data-start="0" data-duration="${DURATION}" data-track-index="2" data-volume="0.55" data-fade-in="0.3" data-fade-out="1.4" src="assets/music/happy-beats-business-moves-vol-11-by-ende-dot-app.mp3"></audio>
+  <audio id="sfx-hook-1" data-start="0.35" data-duration="0.6" data-track-index="3" data-volume="0.45" src="assets/sfx/impact-soft-1.ogg"></audio>
+  <audio id="sfx-hook-2" data-start="1.60" data-duration="0.6" data-track-index="3" data-volume="0.55" src="assets/sfx/impact-soft-2.ogg"></audio>
+  <audio id="sfx-logo" data-start="3.70" data-duration="0.8" data-track-index="3" data-volume="0.5" src="assets/sfx/impact-heavy.ogg"></audio>
+  <audio id="sfx-card-1" data-start="7.38" data-duration="0.6" data-track-index="4" data-volume="0.4" src="assets/sfx/card-slide.ogg"></audio>
+  <audio id="sfx-card-2" data-start="8.44" data-duration="0.6" data-track-index="4" data-volume="0.4" src="assets/sfx/card-slide.ogg"></audio>
+  <audio id="sfx-card-3" data-start="9.50" data-duration="0.6" data-track-index="4" data-volume="0.4" src="assets/sfx/card-slide.ogg"></audio>
+  <audio id="sfx-tap" data-start="14.20" data-duration="0.3" data-track-index="3" data-volume="0.6" src="assets/sfx/click.ogg"></audio>
+  <audio id="sfx-booked" data-start="15.28" data-duration="0.6" data-track-index="3" data-volume="0.4" src="assets/sfx/impact-soft-1.ogg"></audio>
+  <audio id="sfx-bell" data-start="22.65" data-duration="2.0" data-track-index="3" data-volume="0.35" src="assets/sfx/bell.ogg"></audio>
+
+  <script>
+  (function () {
+    const V = ${V};
+    const SW = ${screenW};
+    const tl = gsap.timeline({ paused: true, defaults: { ease: 'power3.out' } });
+    const up = (sel, at, d = 0.7) => tl.fromTo(sel, { yPercent: 110, opacity: 0 }, { yPercent: 0, opacity: 1, duration: d }, at);
+    const down = (sel, at, d = 0.4) => tl.to(sel, { yPercent: -110, opacity: 0, duration: d, ease: 'power2.in' }, at);
+
+    // initial states
+    gsap.set(['#lock1', '#lock2', '#cap3', '#cap4', '#cap5'], { opacity: 0 });
+    gsap.set('#lock1 > *', { opacity: 0 });
+    gsap.set('#lock2 > *', { opacity: 0 });
+    gsap.set('#phone', { y: V ? 1500 : 1100 });
+    gsap.set(['#sPros', '#sSheet', '#sBooking', '#sAi'], { x: SW });
+    gsap.set(['#card1', '#card2', '#card3'], { x: SW, opacity: 0 });
+
+    // ---------- Scene 1: hook (0 – 3.70)
+    tl.to('#glow', { opacity: 1, duration: 1.2, ease: 'sine.out' }, 0);
+    up('#hook .l1a', 0.35, 0.8);
+    up('#hook .l1b', 0.47, 0.8);
+    tl.fromTo('#hook .l2', { yPercent: 120, opacity: 0 }, { yPercent: 0, opacity: 1, duration: 0.55, ease: 'power4.out' }, 1.60);
+    tl.to('#ul1', { scaleX: 1, duration: 0.45, ease: 'power3.inOut' }, 1.95);
+    tl.to('#hook', { opacity: 0, y: -40, duration: 0.35, ease: 'power2.in' }, 3.35);
+
+    // ---------- Scene 2: reveal (3.70 – 6.34)
+    tl.set('#lock1', { opacity: 1 }, 3.70);
+    tl.fromTo('#lock1 .tile', { scale: 0.6, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.6, ease: 'back.out(1.6)' }, 3.70);
+    tl.fromTo('#lock1 .word', { x: -40, opacity: 0 }, { x: 0, opacity: 1, duration: 0.55 }, 3.95);
+    tl.fromTo('#lock1 .tag', { y: 24, opacity: 0 }, { y: 0, opacity: 1, duration: 0.6 }, 4.30);
+    tl.to('#lock1', { y: -140, opacity: 0, duration: 0.55, ease: 'power2.in' }, 5.80);
+    tl.to('#phone', { y: 0, duration: 1.0, ease: 'power4.out' }, 5.80);
+
+    // ---------- Scene 3: find (6.34 – 12.65)
+    tl.set('#cap3', { opacity: 1 }, 6.34);
+    up('#cap3 .eyebrow', 6.34, 0.5);
+    up('#cap3 .h1', 6.44, 0.7);
+    tl.to('#sPros', { x: 0, duration: 0.55, ease: 'power3.inOut' }, 6.60);
+    [7.38, 8.44, 9.50].forEach((t, i) => tl.to('#card' + (i + 1), { x: 0, opacity: 1, duration: 0.6, ease: 'power3.out' }, t));
+    tl.fromTo('#ring', { opacity: 0, scale: 1.8 }, { opacity: 1, scale: 1, duration: 0.4 }, 10.50);
+    tl.to('#ring', { opacity: 0, duration: 0.4 }, 11.9);
+    up('#cap3 .sub', 10.60, 0.6);
+    down('#cap3 .line > *', 12.25, 0.35);
+
+    // ---------- Scene 4: book (12.65 – 17.91)
+    tl.to('#sSheet', { x: 0, duration: 0.55, ease: 'power3.inOut' }, 12.65);
+    tl.set('#cap4', { opacity: 1 }, 12.65);
+    up('#cap4 .eyebrow', 12.65, 0.5);
+    up('#cap4 .h1', 12.75, 0.7);
+    tl.fromTo('#tap', { opacity: 0, scale: 1.6 }, { opacity: 1, scale: 1, duration: 0.18, ease: 'power2.out' }, 14.05);
+    tl.to('#tap', { scale: 0.85, duration: 0.12, ease: 'power2.in', overwrite: 'auto' }, 14.24);
+    tl.to('#tap', { opacity: 0, scale: 1.4, duration: 0.3 }, 14.35);
+    tl.to('#sBooking', { x: 0, duration: 0.55, ease: 'power3.inOut' }, 15.28);
+    up('#cap4 .sub', 15.60, 0.6);
+    down('#cap4 .line > *', 17.50, 0.35);
+
+    // ---------- Scene 5: AI (17.91 – 22.65)
+    tl.to('#sAi', { x: 0, duration: 0.55, ease: 'power3.inOut' }, 17.91);
+    tl.set('#cap5', { opacity: 1 }, 17.91);
+    up('#cap5 .eyebrow', 17.91, 0.5);
+    up('#cap5 .h1', 18.01, 0.7);
+    tl.fromTo('#cover', { y: 0 }, { y: ${px(339)}, duration: 2.7, ease: 'steps(18)' }, 18.60);
+    up('#cap5 .sub', 20.40, 0.6);
+    down('#cap5 .line > *', 22.30, 0.35);
+
+    // ---------- Scene 6: outro (22.65 – 25.6)
+    tl.to('#phone', { y: V ? 1500 : 1100, duration: 0.7, ease: 'power3.in' }, 22.25);
+    tl.set('#lock2', { opacity: 1 }, 22.65);
+    tl.fromTo('#lock2 .tile', { scale: 0.6, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.6, ease: 'back.out(1.6)' }, 22.65);
+    tl.fromTo('#lock2 .word', { x: -40, opacity: 0 }, { x: 0, opacity: 1, duration: 0.55 }, 22.85);
+    tl.fromTo('#lock2 .cta', { y: 24, opacity: 0 }, { y: 0, opacity: 1, duration: 0.6 }, 23.20);
+    tl.fromTo('#lock2 .url', { y: 24, opacity: 0 }, { y: 0, opacity: 1, duration: 0.6 }, 23.80);
+    tl.to('#ul2', { scaleX: 1, duration: 0.45, ease: 'power3.inOut' }, 24.1);
+    tl.to('#glow', { opacity: 0.6, duration: 1.0 }, 24.4);
+    tl.set({}, {}, ${DURATION});
+
+    window.__timelines = window.__timelines || {};
+    window.__timelines['main'] = tl;
+  })();
+  </script>
+</div>
+</body>
+</html>
+`;
+}
+
+for (const [name, L] of Object.entries(layouts)) {
+  mkdirSync(L.dir, { recursive: true });
+  if (name === 'landscape') {
+    // landscape shares the vertical assets via a copy (Hyperframes serves relative paths)
+    if (!existsSync(join(L.dir, 'assets'))) cpSync(join(here, 'assets'), join(L.dir, 'assets'), { recursive: true });
+  }
+  writeFileSync(join(L.dir, 'index.html'), html(L));
+  console.log('wrote', join(L.dir, 'index.html'));
+}
