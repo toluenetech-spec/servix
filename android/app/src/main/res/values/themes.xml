@@ -1,0 +1,6 @@
+<resources>
+    <style name="Theme.Servix" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">#12372A</item>
+        <item name="android:windowBackground">#F7F4EC</item>
+    </style>
+</resources>

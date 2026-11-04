@@ -1,0 +1,59 @@
+/* Identity verification (KYC) — user page, workspace banner and admin review. */
+
+/* workspace banner + topbar badge */
+.ws-kyc-banner{display:flex;align-items:center;gap:10px;padding:12px 36px;font-size:13px;line-height:1.6;border-bottom:1px solid transparent}
+.ws-kyc-banner.is-pending{background:#fff7e8;color:#7a5a1e;border-color:#f1dfb8}
+.ws-kyc-banner.is-rejected{background:#fdf1ee;color:#8a2c1a;border-color:#f1c9bf}
+.ws-kyc-banner a{color:inherit;font-weight:600;text-decoration:underline}
+.ws-top-security.is-verified{color:#1f7a3f;font-weight:600}
+.kyc-verified-chip{background:#e3f4e8;color:#1f7a3f;font-weight:600;text-transform:none;align-items:center;gap:6px}
+@media(max-width:760px){.ws-kyc-banner{padding:10px 16px;font-size:12px}}
+
+/* user page */
+.kyc-state h2{margin:16px 0 8px}
+.kyc-meta{display:grid;gap:10px;margin-top:18px;font-size:13px}
+.kyc-meta div{display:grid;grid-template-columns:130px 1fr;gap:10px;align-items:baseline}
+.kyc-meta dt{color:#7b8778;font-size:11px;letter-spacing:.4px;text-transform:uppercase}
+.kyc-meta dd{margin:0;color:#233e2b;word-break:break-word}
+.kyc-meta code{font-size:13px;background:#f3f6ef;padding:2px 6px;border-radius:4px}
+.kyc-list{padding-left:18px;font-size:13px;color:#7b8778;line-height:1.8;display:grid;gap:6px}
+.kyc-list a{color:#315632}
+.kyc-form small{font-weight:400;font-size:12px;line-height:1.5}
+.kyc-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.kyc-uploads{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.kyc-picker{border:1px dashed #cfd8c8;border-radius:10px;padding:18px;background:#fafbf7;display:grid;gap:10px}
+.kyc-picker.has-file{border-style:solid;border-color:#b9cfae;background:#fff}
+.kyc-picker strong{font-size:13px}
+.kyc-picker p{font-size:12px;line-height:1.6}
+.kyc-preview{min-height:150px;display:grid;place-items:center;border-radius:8px;background:#eef2e8;overflow:hidden}
+.kyc-preview img{max-width:100%;max-height:260px;object-fit:contain;display:block}
+.kyc-pdf{display:flex;align-items:center;gap:8px;font-size:13px;color:#315632;padding:12px}
+.kyc-consent{display:flex!important;gap:12px;align-items:flex-start;font-weight:500!important;line-height:1.6;font-size:13px!important}
+.kyc-consent input{width:18px!important;height:18px;margin-top:2px;flex-shrink:0}
+.kyc-error{color:#8a2c1a;font-size:12px}
+.kyc-ok{color:#1f7a3f;font-size:12px;display:inline-flex;align-items:center;gap:5px}
+.btn.btn--secondary.kyc-danger{border-color:#d9a79b;color:#8a2c1a}
+.btn.btn--secondary.kyc-danger:hover{background:#fdf1ee}
+@media(max-width:760px){.kyc-grid,.kyc-uploads{grid-template-columns:1fr}.kyc-meta div{grid-template-columns:1fr}}
+
+/* admin split view */
+.kyc-split{display:grid;grid-template-columns:minmax(240px,.9fr) minmax(0,1.6fr) minmax(240px,1fr);gap:18px;align-items:start}
+.kyc-col{margin-bottom:0;min-width:0}
+.kyc-col h2{font-size:16px}
+.kyc-link-btn{color:#315632;text-decoration:underline;font-size:12px}
+.kyc-viewer{border:1px solid #dfe5d7;border-radius:10px;overflow:hidden;background:#1c2420}
+.kyc-viewer-tools{display:flex;align-items:center;gap:8px;padding:8px 10px;background:#f4f7ef;border-bottom:1px solid #dfe5d7;font-size:12px}
+.kyc-viewer-tools button{border:1px solid #cfd8c8;border-radius:5px;background:#fff;min-width:28px;height:28px;padding:0 8px;font-size:13px}
+.kyc-viewer-tools a{margin-left:auto;color:#315632;display:inline-flex;align-items:center;gap:4px}
+.kyc-viewer-stage{height:520px;overflow:hidden;display:grid;place-items:center;touch-action:none;user-select:none}
+.kyc-viewer.is-compact .kyc-viewer-stage{height:320px}
+.kyc-viewer-stage img{max-width:100%;max-height:100%;object-fit:contain;transition:transform .05s linear;will-change:transform}
+.kyc-pdf-frame{display:grid;gap:10px}
+.kyc-pdf-frame iframe{width:100%;height:560px;border:1px solid #dfe5d7;border-radius:10px;background:#fff}
+.kyc-decision{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
+.btn.kyc-approve{background:#1f7a3f;border-color:#1f7a3f;color:#fff}
+.btn.kyc-approve:hover{background:#19662f}
+.kyc-reasons{display:grid;gap:10px;font-size:14px}
+.kyc-reasons label{display:flex;gap:10px;align-items:center}
+.kyc-reasons textarea{width:100%;border:1px solid #d7dfd0;border-radius:7px;padding:10px;font-size:13px}
+@media(max-width:1100px){.kyc-split{grid-template-columns:1fr}.kyc-viewer-stage{height:380px}}

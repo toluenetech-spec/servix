@@ -1,0 +1,6 @@
+<resources>
+    <string name="app_name">Servix</string>
+    <string name="tagline">Services, delivered professionally.</string>
+    <string name="escrow_copy">The price is locked when you book. Payment is held securely and only released after you confirm completion.</string>
+    <string name="ai_disclaimer">AI suggestions are drafts — check them before you rely on them. Servix AI never moves money or changes your bookings.</string>
+</resources>

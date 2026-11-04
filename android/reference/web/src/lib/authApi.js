@@ -1,0 +1,223 @@
+/**
+ * SERVIX AUTH API — Phase B client.
+ *
+ * Talks to /api/v1/auth on the live backend. Unlike the catalogue data
+ * layer there is NO demo fallback here: authentication is either real or
+ * clearly unavailable — the UI shows an honest "accounts unavailable"
+ * message when no API is configured or reachable. No fake logins.
+ *
+ * Session model:
+ *  - access token kept in memory only (never localStorage)
+ *  - refresh token lives in an httpOnly cookie set by the API
+ *  - on app load, sessions resume via POST /auth/refresh (credentials)
+ */
+
+const BASE = import.meta.env.VITE_API_URL?.replace(/\/$/, '') ?? '';
+const V1 = `${BASE}/api/v1`;
+
+export const authAvailable = Boolean(import.meta.env.VITE_API_URL);
+
+let accessToken = null;
+
+export function getAccessToken() {
+  return accessToken;
+}
+
+export function clearAccessToken() {
+  accessToken = null;
+}
+
+async function toApiError(res) {
+  let payload = null;
+  try {
+    payload = await res.json();
+  } catch {
+    /* non-JSON body */
+  }
+  const err = new Error(payload?.error?.message ?? `Request failed (${res.status})`);
+  err.status = payload?.error?.status ?? res.status;
+  err.code = payload?.error?.code;
+  if (payload?.error?.errors) err.errors = payload.error.errors;
+  return err;
+}
+
+async function post(path, body, { auth = false } = {}) {
+  const headers = {};
+  // Only send a JSON content type when there IS a body — Fastify rejects
+  // an empty body with application/json set (e.g. /auth/refresh, /auth/logout).
+  if (body) headers['Content-Type'] = 'application/json';
+  const init = {
+    method: 'POST',
+    headers,
+    credentials: 'include', // refresh cookie
+    body: body ? JSON.stringify(body) : undefined,
+  };
+  const res = auth ? await authorizedFetch(`${V1}${path}`, init) : await fetch(`${V1}${path}`, init);
+  if (!res.ok) throw await toApiError(res);
+  return res.json();
+}
+
+/* ---------------- auth operations ---------------- */
+
+export async function register({ fullName, email, password, accountType }) {
+  const data = await post('/auth/register', { fullName, email, password, accountType });
+  accessToken = data.accessToken ?? null;
+  return data.security ? { security: data.security } : data.user;
+}
+
+export async function login({ email, password }) {
+  const data = await post('/auth/login', { email, password });
+  accessToken = data.accessToken ?? null;
+  return data.security ? { security: data.security } : data.user;
+}
+
+export async function logout() {
+  try {
+    await post('/auth/logout');
+  } finally {
+    accessToken = null;
+  }
+}
+
+/** Resume a session from the refresh cookie. Returns user or null.
+ * Single-flight: concurrent calls (e.g. React StrictMode double-effects)
+ * share ONE request — two parallel refreshes would otherwise trip the
+ * token-rotation reuse detection and revoke the whole session family. */
+let refreshInFlight = null;
+let refreshPending = false;
+
+/** Renew the access token from the httpOnly refresh cookie (single-flight).
+ * Resolves { ok, user } on success; { ok:false, authFailed } otherwise, where
+ * authFailed=true means the API rejected the session (401/403) rather than a
+ * network hiccup. Never throws. Concurrent callers share one request (token
+ * rotation would otherwise flag a replay); `force` starts a new request when
+ * the previous one has already settled, so a 401 never retries a stale token. */
+function refreshAccessToken({ force = false } = {}) {
+  if (!authAvailable) return Promise.resolve({ ok: false, authFailed: true });
+  if (!refreshInFlight || (force && !refreshPending)) {
+    refreshPending = true;
+    refreshInFlight = post('/auth/refresh')
+      .then((data) => {
+        accessToken = data.accessToken;
+        return { ok: true, user: data.user };
+      })
+      .catch((err) => {
+        const authFailed = err?.status === 401 || err?.status === 403;
+        if (authFailed) accessToken = null;
+        return { ok: false, authFailed };
+      })
+      .finally(() => {
+        refreshPending = false;
+        // allow future explicit refreshes (e.g. after logout+login)
+        setTimeout(() => {
+          refreshInFlight = null;
+        }, 1000);
+      });
+  }
+  return refreshInFlight;
+}
+
+export function resumeSession() {
+  return refreshAccessToken().then((result) => (result.ok ? result.user : null));
+}
+
+/** Fired on window when the API says the session is gone (refresh rejected).
+ * AuthContext listens and clears the user so protected screens return to sign-in
+ * instead of showing "Invalid or expired token" errors. */
+export const SESSION_EXPIRED_EVENT = 'servix:session-expired';
+
+/** fetch() for authenticated API calls. Attaches the current access token and,
+ * when the API answers 401 (the 15-minute token lapsed), renews the token from
+ * the refresh cookie once and retries the same request. */
+export async function authorizedFetch(url, init = {}) {
+  const send = () =>
+    fetch(url, {
+      ...init,
+      credentials: 'include',
+      headers: { ...(init.headers ?? {}), ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) },
+    });
+  const usedToken = accessToken;
+  let res = await send();
+  if (res.status === 401 && authAvailable) {
+    // Another call may already have renewed the token; otherwise renew now.
+    const refreshed = accessToken && accessToken !== usedToken ? { ok: true } : await refreshAccessToken({ force: true });
+    if (refreshed.ok) res = await send();
+    else if (refreshed.authFailed && typeof window !== 'undefined') window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+  }
+  return res;
+}
+
+export async function verifyEmail(token) {
+  const data = await post('/auth/verify-email', { token });
+  return data.user;
+}
+
+export async function resendVerification() {
+  return post('/auth/verify-email/resend', null, { auth: true });
+}
+
+export async function forgotPassword(email) {
+  return post('/auth/forgot-password', { email });
+}
+
+export async function resetPassword({ token, password }) {
+  return post('/auth/reset-password', { token, password });
+}
+
+export async function fetchMe() {
+  if (!accessToken) return null;
+  const res = await authorizedFetch(`${V1}/me`);
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.user;
+}
+
+export async function getVerificationMethod() {
+  const res = await fetch(`${V1}/auth/verification-method`, { credentials: 'include' });
+  if (!res.ok) throw await toApiError(res);
+  return res.json();
+}
+
+export async function verifyEmailCode(code) {
+  const data = await post('/auth/verify-email/code', { code }, { auth: true });
+  return data.user;
+}
+
+
+export const securityAction = (action, body) => post(`/auth/security/${action}`, body);
+export async function finishSecurity(savedRecovery = false) {
+  const data = await securityAction('finish', { savedRecovery });
+  accessToken = data.accessToken;
+  return data.user;
+}
+
+export async function oauthProviders() {
+  if (!authAvailable) return [];
+  const res = await fetch(`${V1}/auth/oauth/config`, { credentials: 'include' });
+  if (!res.ok) return [];
+  return (await res.json()).providers ?? [];
+}
+export async function startProvider(provider, linking = false) {
+  const result = await post(`/auth/${provider}/${linking ? 'link' : 'start'}`, undefined, { auth: linking });
+  // Defense-in-depth: only navigate to these provider authorization endpoints.
+  const url = new URL(result.url);
+  const expected = provider === 'google' ? 'https://accounts.google.com/o/oauth2/v2/auth' : 'https://github.com/login/oauth/authorize';
+  if (`${url.origin}${url.pathname}` !== expected) throw new Error('Invalid provider redirect');
+  clearAccessToken();
+  window.location.assign(url.href);
+}
+
+export async function oauthConnections() {
+  const res = await fetch(`${V1}/auth/oauth/connections`, { credentials: 'include', headers: { Authorization: `Bearer ${accessToken ?? ''}` } });
+  if (!res.ok) throw await toApiError(res);
+  return (await res.json()).providers ?? [];
+}
+
+export const getResetPasswordPolicy = (token) => post('/auth/reset-password/policy', { token });
+
+export async function getAccountOverview() {
+  const res = await authorizedFetch(`${V1}/account/overview`);
+  if (!res.ok) throw await toApiError(res);
+  return res.json();
+}
+export const completeOnboarding = (intent) => post('/account/onboarding', { intent }, { auth: true });
