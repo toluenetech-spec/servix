@@ -10,13 +10,27 @@ marketplace for verified professionals). The app is a **client of the live API o
 `https://api.servix.name.ng/api/v1/`. You never rewrite the backend, never touch the production web repo
 `toluenetech-spec/servix`, never add secrets, and never present mocks as verification.
 
-## 0. Setup — install these skills first
+## 0. Setup — install these skills first (from https://skills.sh)
+
+Run each line from the repo root (`-y` skips prompts). If one repo name has changed, run
+`npx skills find "<name>"` and install the top result with the same name — do not skip silently.
 
 ```bash
-npx skills add https://github.com/anhvt52/jetpack-compose-skills -y
-npx skills add https://github.com/alinaqi/maggy --skill android-kotlin -y
-npx skills add https://github.com/expo/agent-templates --skill android-jetpack-compose -y
+npx skills add emilkowalski/skills -y                                  # Emil Kowalski design skills (emil-design-eng, mobile-native, animations)
+npx skills add pbakaus/impeccable -y                                   # Impeccable design skills
+npx skills add nextlevelbuilder/ui-ux-pro-max-skill -y                 # UI UX Pro Max
+npx skills add anthropics/skills --skill frontend-design -y            # Anthropic Frontend Design
+npx skills add designed-by-ai/skills -y                                # Visual app design (design-mobile-apps)
+npx skills add skydoves/android-testing-skills -y                      # Android Testing skills (Compose/Robolectric/adb)
+npx skills add obra/superpowers -y                                     # Superpowers (brainstorming, planning, TDD, debugging, verification)
+npx skills add vercel-labs/agent-skills -y                             # Vercel agent skills
+npx skills add anhvt52/jetpack-compose-skills -y                       # Modern Jetpack Compose (Material 3, UDF)
 ```
+
+Use them like this: Superpowers for planning/verification discipline; Emil Kowalski + Impeccable + UI UX Pro
+Max + Frontend Design + design-mobile-apps for the look and motion of every screen (always within the Servix
+brand in §3 — no gradients, no colour changes); Android Testing for test structure; Jetpack Compose for
+correct state handling. The design skills advise — the Servix brand and the website's wording decide.
 
 Then read, in this order: `AGENTS.md`, `SPEC.md` (note: the backend source wins over SPEC.md whenever they
 disagree — corrections are listed in §3), `reference/api-routes/*.ts` (real backend routes),
