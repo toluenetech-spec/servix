@@ -2,6 +2,12 @@
 
 All notable changes to the Servix public website.
 
+## 0.9.3 — Native client support
+
+- API: cookie-based auth flows accept native apps via `X-Servix-Client: <application id>` when no browser
+  `Origin` is present (`NATIVE_CLIENT_IDS`, default `ng.name.servix.app`). Web behaviour unchanged.
+  Docs: `api/docs/NATIVE_CLIENTS.md`; test `api/tests/native-client-origin.test.ts`.
+
 ## 0.9.2 — 2026-10-04 (AI answer feedback)
 
 ### Added

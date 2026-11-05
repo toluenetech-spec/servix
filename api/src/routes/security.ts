@@ -12,8 +12,23 @@ import * as security from '../lib/securityFlow.js';
 
 export const FLOW_COOKIE = 'servix_security';
 export const flowCookieOptions = () => ({ path: '/api/v1/auth', httpOnly: true, sameSite: 'lax' as const, secure: process.env.NODE_ENV === 'production' });
+/**
+ * CSRF guard for the cookie-based auth flows. Browsers always send `Origin` on cross-site POSTs, so a browser
+ * request is accepted only from a trusted web origin. Native apps (Android/iOS) have no browser origin; they
+ * identify themselves with `X-Servix-Client: <application id>` instead. A browser cannot forge that header
+ * cross-site without a CORS preflight, which only trusted origins pass, so the guard stays sound.
+ */
+export function nativeClientIds(): string[] {
+  return (process.env.NATIVE_CLIENT_IDS ?? 'ng.name.servix.app').split(',').map(v => v.trim()).filter(Boolean);
+}
+export function isTrustedNativeClient(req: FastifyRequest): boolean {
+  if (req.headers.origin) return false;
+  const client = req.headers['x-servix-client'];
+  return typeof client === 'string' && nativeClientIds().includes(client.trim());
+}
 export function requireSecurityOrigin(req: FastifyRequest) {
   const allowed = (process.env.CORS_ORIGINS ?? 'http://localhost:5173').split(',').map(v => v.trim()).filter(Boolean);
+  if (isTrustedNativeClient(req)) return;
   if (!req.headers.origin || !allowed.includes(req.headers.origin)) throw new ApiError(403, 'ORIGIN_REJECTED', 'Open Servix from its trusted website to continue.');
 }
 export function sendSecurityFlow(reply: FastifyReply, flow: Awaited<ReturnType<typeof security.beginSecurity>>) {
