@@ -2,6 +2,12 @@
 
 All notable changes to the Servix public website.
 
+## 0.9.4 — Native app device names in sign-in alerts
+
+- API: `describeDevice` recognises the Android app's user agent `ServixAndroid/<version> (Android <release>; <model>)`
+  so new-device sign-in alerts and session summaries read "Servix app on Android (<model>)" instead of
+  "Unknown browser on Unknown device". Browser user agents unchanged. Test `api/tests/device-info.test.ts`.
+
 ## 0.9.3 — Native client support
 
 - API: cookie-based auth flows accept native apps via `X-Servix-Client: <application id>` when no browser

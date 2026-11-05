@@ -14,6 +14,13 @@ export function describeDevice(userAgent: string | undefined | null): DeviceInfo
   else if (has(/Macintosh|Mac OS X/i)) os = 'Mac';
   else if (has(/Linux/i)) os = 'Linux';
   let browser = 'Unknown browser';
+  // Native Servix app: "ServixAndroid/<version> (Android <release>; <model>)" — see api/docs/NATIVE_CLIENTS.md.
+  const native = /^ServixAndroid\/[\w.+-]+\s*\(Android\s+[^;)]*;\s*([^)]{1,60})\)/i.exec(ua);
+  if (native) {
+    const model = native[1].trim();
+    const key = `Servix app|Android|${model}`;
+    return { browser: 'Servix app', os: 'Android', key, label: `Servix app on Android (${model})` };
+  }
   if (has(/Edg(e|A|iOS)?\//i)) browser = 'Microsoft Edge';
   else if (has(/OPR\/|Opera/i)) browser = 'Opera';
   else if (has(/SamsungBrowser\//i)) browser = 'Samsung Internet';

@@ -22,3 +22,20 @@ X-Servix-Client: ng.name.servix.app
   JSON contracts as the web app, OpenAPI at `/api/v1/docs/json`.
 
 Test: `api/tests/native-client-origin.test.ts`.
+
+## Device identification (sign-in alerts)
+
+The API already records the `User-Agent` and client IP of every sign-in (`issueSession` → `alertIfNewDevice`,
+`src/lib/loginAlerts.ts`) and emails the account owner when a new kind of device signs in. OkHttp's default
+`okhttp/4.x` user agent would make every phone look like "Unknown browser on Unknown device", so the app sends:
+
+```
+User-Agent: ServixAndroid/<versionName> (Android <release>; <manufacturer> <model>)
+```
+
+`describeDevice` (`src/lib/deviceInfo.ts`) turns that into `Servix app on Android (<manufacturer> <model>)` and
+treats each phone model as its own device for the "new device" check. No new endpoint and no new data is
+collected: the IP address is the ordinary request address already used for web sign-ins (display only, never
+for authorisation). Precise location is **not** sent to the API by the app.
+
+Test: `api/tests/device-info.test.ts`.
