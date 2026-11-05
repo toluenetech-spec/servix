@@ -7,6 +7,8 @@ All notable changes to the Servix public website.
 - API: `describeDevice` recognises the Android app's user agent `ServixAndroid/<version> (Android <release>; <model>)`
   so new-device sign-in alerts and session summaries read "Servix app on Android (<model>)" instead of
   "Unknown browser on Unknown device". Browser user agents unchanged. Test `api/tests/device-info.test.ts`.
+- API: `GET /api/v1/account/device` (signed in, read-only, nothing stored) returns what the API sees for the current
+  request — `{ ip, device, os, client, userAgent, seenAt }` — so the app can show "This device" truthfully.
 
 ## 0.9.3 — Native client support
 

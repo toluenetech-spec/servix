@@ -38,4 +38,7 @@ treats each phone model as its own device for the "new device" check. No new end
 collected: the IP address is the ordinary request address already used for web sign-ins (display only, never
 for authorisation). Precise location is **not** sent to the API by the app.
 
+`GET /account/device` (Bearer) echoes the same two facts for the current request — `{ ip, device, os, client,
+userAgent, seenAt }` — read-only and unstored, for an honest "This device" panel in the app.
+
 Test: `api/tests/device-info.test.ts`.

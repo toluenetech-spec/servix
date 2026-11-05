@@ -10,6 +10,7 @@ import { ApiError } from '../lib/errors.js';
 import { parseBody } from '../lib/query.js';
 import { accountOverview, ONBOARDING_ACTION } from '../lib/accountOverview.js';
 import { audit } from '../lib/audit.js';
+import { describeDevice, clientAddress } from '../lib/deviceInfo.js';
 export async function accountRoutes(app: FastifyInstance) {
   app.patch('/account/profile', { preHandler: requireAuth, config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req, reply) => {
     reply.header('Cache-Control', 'no-store');
@@ -35,6 +36,14 @@ export async function accountRoutes(app: FastifyInstance) {
       prisma.passkeyCredential.count({ where: { userId: id } }),
     ]);
     return { method: security?.method ?? null, recoveryCodesRemaining, passkeys };
+  });
+  /** What the API sees for THIS request — the public address and device summary used in sign-in alerts.
+   *  Read-only, nothing stored; lets the native app show "this device" honestly (display only). */
+  app.get('/account/device', { preHandler: requireAuth, schema: { tags: ['account'], summary: 'Device and address as seen by the API for this request' } }, async (req, reply) => {
+    reply.header('Cache-Control', 'no-store');
+    const userAgent = typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'].slice(0, 300) : '';
+    const device = describeDevice(userAgent);
+    return { ip: clientAddress(req.headers as Record<string, unknown>, req.ip), device: device.label, os: device.os, client: device.browser, userAgent, seenAt: new Date().toISOString() };
   });
   app.get('/account/payments', { preHandler: requireAuth }, async (req, reply) => {
     reply.header('Cache-Control', 'no-store'); await accountOverview(req.auth!.sub);
