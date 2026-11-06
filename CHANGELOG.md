@@ -2,6 +2,13 @@
 
 All notable changes to the Servix public website.
 
+## 0.9.5 — Provider sign-in for the native app
+
+- API: Google/GitHub sign-in hand-off for native apps — `GET /auth/<provider>/native/start?client=`, callback
+  redirects to `NATIVE_OAUTH_REDIRECT` with a one-time ticket, `POST /auth/oauth/native/exchange { ticket }`
+  returns the usual `{ security }` + `servix_security` cookie. Web flow unchanged. Docs `api/docs/NATIVE_CLIENTS.md`;
+  test added to `api/tests/oauth-local.test.ts`.
+
 ## 0.9.4 — Native app device names in sign-in alerts
 
 - API: `describeDevice` recognises the Android app's user agent `ServixAndroid/<version> (Android <release>; <model>)`

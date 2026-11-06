@@ -164,4 +164,37 @@ describe.skipIf(process.env.RUN_LOCAL_OAUTH_TESTS !== '1')('OAuth, isolated loca
     expect((await app.inject(options)).headers.location).toBe(`${origin}/login?oauth_error=failed`);
     expect(exchange).toHaveBeenCalledTimes(1);
   });
+  it('native app hand-off: browser start → ticket redirect → one-time exchange into the app cookie jar', async () => {
+    const person = identity(); vi.spyOn(providerModule, 'exchangeIdentity').mockResolvedValue(person);
+    const native = { 'x-servix-client': 'ng.name.servix.app' };
+    // Unknown client ids are rejected before anything is created.
+    expect((await app.inject({ url: '/api/v1/auth/google/native/start?client=com.evil.app' })).statusCode).toBe(403);
+    const started = await app.inject({ url: '/api/v1/auth/google/native/start?client=ng.name.servix.app' });
+    expect(started.statusCode).toBe(302);
+    const state = new URL(started.headers.location as string).searchParams.get('state')!;
+    const cookie = started.cookies.find(c => c.name === 'servix_oauth_google')!;
+    expect(cookie.httpOnly).toBe(true);
+    // The callback hands the browser to the app with a ticket; it sets NO security cookie in the browser.
+    const back = await app.inject({ url: `/api/v1/auth/google/callback?state=${state}&code=mock-code`, headers: { cookie: `servix_oauth_google=${cookie.value}` } });
+    const target = new URL(back.headers.location as string);
+    expect(`${target.protocol}//${target.host}${target.pathname}`).toBe('ng.name.servix.app://oauth/callback');
+    expect(target.searchParams.get('provider')).toBe('google');
+    const ticket = target.searchParams.get('ticket')!; expect(ticket.length).toBeGreaterThanOrEqual(32);
+    expect(back.cookies.find(c => c.name === 'servix_security')).toBeUndefined();
+    // Exchange needs the native client header (no browser Origin) and works exactly once.
+    const exchangeUrl = '/api/v1/auth/oauth/native/exchange';
+    expect((await app.inject({ method: 'POST', url: exchangeUrl, payload: { ticket } })).statusCode).toBe(403);
+    const swapped = await app.inject({ method: 'POST', url: exchangeUrl, headers: native, payload: { ticket } });
+    expect(swapped.statusCode).toBe(200);
+    expect(swapped.json().security.next).toBe('enroll');
+    expect(swapped.cookies.find(c => c.name === 'servix_security')?.value).toBeTruthy();
+    expect(swapped.cookies.find(c => c.name === 'servix_refresh')?.value).toBeFalsy();
+    expect((await app.inject({ method: 'POST', url: exchangeUrl, headers: native, payload: { ticket } })).statusCode).toBe(400);
+    // Cancelling in the browser also lands in the app, with no ticket.
+    const again = await app.inject({ url: '/api/v1/auth/google/native/start?client=ng.name.servix.app' });
+    const state2 = new URL(again.headers.location as string).searchParams.get('state')!;
+    const cookie2 = again.cookies.find(c => c.name === 'servix_oauth_google')!;
+    const cancelled = await app.inject({ url: `/api/v1/auth/google/callback?state=${state2}&error=access_denied`, headers: { cookie: `servix_oauth_google=${cookie2.value}` } });
+    expect(new URL(cancelled.headers.location as string).searchParams.get('error')).toBe('cancelled');
+  });
 });

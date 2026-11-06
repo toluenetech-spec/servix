@@ -42,3 +42,23 @@ for authorisation). Precise location is **not** sent to the API by the app.
 userAgent, seenAt }` — read-only and unstored, for an honest "This device" panel in the app.
 
 Test: `api/tests/device-info.test.ts`.
+
+## Google / GitHub sign-in from the app (API 0.9.5)
+
+The web flow binds the attempt to the browser with a cookie set by `POST /auth/<provider>/start` and finishes
+by setting `servix_security` in that same browser. A native app has two cookie jars (its HTTP client and the
+system browser / Custom Tab), so it uses the hand-off variant:
+
+1. App opens **`GET /auth/<provider>/native/start?client=ng.name.servix.app`** in a Chrome Custom Tab
+   (`client` must be in `NATIVE_CLIENT_IDS`). The API sets the binding cookie in that browser and 302s to the provider.
+2. Provider → `GET /auth/<provider>/callback` as today. For native attempts the API does **not** set
+   `servix_security`; it parks the new security flow behind a one-time ticket (2 min, single use, sealed in
+   `oauth_attempts`) and redirects to **`NATIVE_OAUTH_REDIRECT?provider=<p>&ticket=<t>`**
+   (default `ng.name.servix.app://oauth/callback`). Cancel/failure → `…?provider=<p>&error=cancelled|failed|link_required`.
+3. The app catches that URI (intent filter for the scheme) and calls
+   **`POST /auth/oauth/native/exchange { ticket }`** with `X-Servix-Client` → the normal `{ security }` response
+   + `servix_security` cookie in the app's jar. From here the existing security-check screens apply unchanged
+   (`next` = `enroll` for a brand-new account, `factor` for an enrolled one).
+
+Nothing changes for the website. Providers available: `GET /auth/oauth/config → { providers }`.
+Test: `api/tests/oauth-local.test.ts` ("native app hand-off").
