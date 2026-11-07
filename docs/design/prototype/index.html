@@ -1,0 +1,558 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Servix app — UI design prototype v1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --forest-deep:#12372A; --forest:#1F5C45; --ivory:#F7F4EC; --sand:#EDE8DC; --coral:#E56B5D;
+  --charcoal:#202622; --muted:#5F675F; --line:rgba(18,55,42,.10); --white:#FFFFFF;
+  --mint:#DDEDE4; --amber:#F3E3C0; --amber-ink:#6B4E0E; --coral-soft:#FBE3DF;
+  --r-card:16px; --r-sheet:24px; --r-chip:12px;
+  --nav-h:64px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#0E1511;font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--charcoal);-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+img{display:block;max-width:100%}
+
+/* ---------- prototype chrome (outside the phone) ---------- */
+.proto-bar{position:fixed;top:0;left:0;right:0;z-index:50;background:#0E1511;color:#CFD8D2;display:flex;gap:6px;align-items:center;padding:8px 10px;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid rgba(255,255,255,.08)}
+.proto-bar::-webkit-scrollbar{display:none}
+.proto-bar .brand{font-weight:600;color:#fff;font-size:13px;white-space:nowrap;margin-right:6px;opacity:.85}
+.proto-bar button{white-space:nowrap;padding:7px 11px;border-radius:999px;font-size:12.5px;font-weight:500;color:#CFD8D2;border:1px solid rgba(255,255,255,.12)}
+.proto-bar button.on{background:#F7F4EC;color:#12372A;border-color:#F7F4EC}
+.proto-note{position:fixed;bottom:0;left:0;right:0;z-index:50;background:#0E1511;color:#AAB5AE;font-size:12px;line-height:1.45;padding:9px 14px calc(9px + env(safe-area-inset-bottom));border-top:1px solid rgba(255,255,255,.08)}
+.proto-note b{color:#fff;font-weight:600}
+.stage{min-height:100%;display:flex;align-items:flex-start;justify-content:center;padding:var(--bar-h,54px) 0 var(--note-h,64px)}
+@media (min-width:700px){.stage{padding:80px 0 90px}}
+
+/* ---------- the phone ---------- */
+.phone{position:relative;width:100%;max-width:430px;height:calc(100dvh - var(--bar-h,54px) - var(--note-h,64px));min-height:560px;background:var(--ivory);overflow:hidden;display:flex;flex-direction:column}
+@media (min-width:700px){.phone{width:390px;height:844px;border-radius:44px;box-shadow:0 30px 80px rgba(0,0,0,.6),0 0 0 10px #1a1f1c,0 0 0 12px #2b332e}}
+.status{height:44px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 22px;font-size:14px;font-weight:600;color:var(--forest-deep)}
+.status .pill{width:96px;height:28px;border-radius:999px;background:#0E1511;position:absolute;left:50%;top:8px;transform:translateX(-50%)}
+.screen{display:none;flex:1;min-height:0;flex-direction:column;position:relative}
+.screen.on{display:flex}
+.scroll{flex:1;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none;padding-bottom:calc(var(--nav-h) + 16px)}
+.scroll::-webkit-scrollbar{display:none}
+.scroll.has-bar{padding-bottom:calc(var(--nav-h) + 96px)}
+
+/* ---------- bottom nav ---------- */
+.nav{position:absolute;left:0;right:0;bottom:0;height:var(--nav-h);background:rgba(247,244,236,.94);backdrop-filter:blur(14px);border-top:1px solid var(--line);display:flex;align-items:stretch;z-index:5}
+.nav button{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;font-weight:500;color:var(--muted)}
+.nav button svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.nav button.on{color:var(--forest-deep);font-weight:600}
+.nav button.on svg{stroke-width:2.2}
+.nav .dot{position:absolute;margin-left:14px;margin-top:-2px;width:8px;height:8px;border-radius:50%;background:var(--coral);border:2px solid var(--ivory)}
+
+/* ---------- type ---------- */
+.h-display{font-size:28px;line-height:34px;font-weight:700;letter-spacing:-.02em;color:var(--forest-deep)}
+.h-title{font-size:20px;line-height:26px;font-weight:600;letter-spacing:-.01em;color:var(--forest-deep)}
+.h-section{font-size:17px;line-height:22px;font-weight:600;color:var(--forest-deep)}
+.body{font-size:15px;line-height:22px}
+.small{font-size:13px;line-height:18px;color:var(--muted)}
+.tiny{font-size:12px;line-height:16px;color:var(--muted)}
+.price{font-variant-numeric:tabular-nums;font-weight:700;letter-spacing:-.01em;color:var(--forest-deep)}
+.sec-head{display:flex;align-items:baseline;justify-content:space-between;padding:22px 20px 10px}
+.sec-head a{font-size:13.5px;font-weight:600;color:var(--forest);text-decoration:none}
+
+/* ---------- atoms ---------- */
+.avatar{border-radius:50%;object-fit:cover;background:var(--sand);flex:none}
+.avatar.initials{display:flex;align-items:center;justify-content:center;font-weight:600;color:var(--forest-deep)}
+.verified{display:inline-flex;width:16px;height:16px;border-radius:50%;background:var(--forest);color:#fff;align-items:center;justify-content:center;vertical-align:-3px;margin-left:4px}
+.verified svg{width:10px;height:10px;stroke:#fff;stroke-width:3;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.star{color:var(--coral)}
+.card{background:var(--white);border:1px solid var(--line);border-radius:var(--r-card)}
+.chip{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 14px;border-radius:999px;font-size:13.5px;font-weight:500;border:1px solid var(--line);background:var(--white);white-space:nowrap}
+.chip.on{background:var(--forest-deep);color:#fff;border-color:var(--forest-deep)}
+.chips{display:flex;gap:8px;overflow-x:auto;padding:4px 20px 4px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.btn{height:52px;border-radius:14px;display:flex;align-items:center;justify-content:center;gap:8px;font-size:15.5px;font-weight:600;padding:0 18px;transition:transform .12s ease,filter .12s ease}
+.btn:active{transform:scale(.98);filter:brightness(.92)}
+.btn.primary{background:var(--forest-deep);color:#fff;flex:1}
+.btn.secondary{background:var(--white);border:1.5px solid var(--forest-deep);color:var(--forest-deep)}
+.btn.ghost{background:var(--sand);color:var(--forest-deep)}
+.btn.icon{width:52px;flex:none;padding:0}
+.btn svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.status-chip{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:999px;font-size:12.5px;font-weight:600}
+.status-chip::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.st-accepted{background:var(--mint);color:var(--forest-deep)}
+.st-pending{background:var(--amber);color:var(--amber-ink)}
+.st-done{background:var(--sand);color:var(--muted)}
+.seg{display:flex;background:var(--sand);border-radius:14px;padding:4px;margin:0 20px}
+.seg button{flex:1;height:40px;border-radius:11px;font-size:14px;font-weight:500;color:var(--forest-deep)}
+.seg button.on{background:var(--forest-deep);color:#fff;font-weight:600}
+.topbar{height:56px;display:flex;align-items:center;gap:12px;padding:0 12px 0 8px;flex:none}
+.topbar .back{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.topbar .back svg,.iconbtn svg{width:22px;height:22px;stroke:var(--forest-deep);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.iconbtn{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;position:relative}
+.iconbtn .dot{position:absolute;top:10px;right:10px;width:8px;height:8px;border-radius:50%;background:var(--coral);border:2px solid var(--ivory)}
+.sticky-bar{position:absolute;left:0;right:0;bottom:var(--nav-h);padding:12px 20px 14px;background:rgba(247,244,236,.96);backdrop-filter:blur(14px);border-top:1px solid var(--line);display:flex;gap:10px;align-items:center;z-index:4}
+.sticky-bar.no-nav{bottom:0;padding-bottom:calc(14px + env(safe-area-inset-bottom))}
+.row{display:flex;align-items:center;gap:12px}
+.divider{height:1px;background:var(--line);margin:0 20px}
+.search{margin:6px 20px 0;height:52px;border-radius:16px;background:var(--white);border:1px solid var(--line);display:flex;align-items:center;gap:10px;padding:0 16px;color:var(--muted);font-size:15px}
+.search svg{width:20px;height:20px;stroke:var(--muted);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.search .k{margin-left:auto;font-size:12px;color:var(--muted);background:var(--sand);border-radius:8px;padding:3px 8px}
+
+/* ---------- HOME ---------- */
+.home-head{display:flex;align-items:center;justify-content:space-between;padding:8px 20px 4px}
+.home-head .hi{font-size:13px;color:var(--muted);font-weight:500}
+.home-head .name{font-size:24px;line-height:30px;font-weight:700;letter-spacing:-.02em;color:var(--forest-deep)}
+.next{margin:14px 20px 0;background:var(--forest-deep);color:#fff;border-radius:20px;padding:18px 18px 16px;position:relative;overflow:hidden}
+.next .lbl{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;opacity:.7}
+.next .what{font-size:19px;line-height:25px;font-weight:600;margin-top:8px;letter-spacing:-.01em}
+.next .who{display:flex;align-items:center;gap:10px;margin-top:12px;font-size:14px;opacity:.92}
+.next .when{display:flex;gap:18px;margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.14)}
+.next .when div span{display:block;font-size:11.5px;opacity:.65;font-weight:500}
+.next .when div b{font-size:15px;font-weight:600}
+.next .cta{margin-top:14px;display:flex;gap:8px}
+.next .cta button{height:42px;border-radius:12px;font-size:14px;font-weight:600;padding:0 16px;background:rgba(255,255,255,.12);color:#fff}
+.next .cta button.main{background:var(--ivory);color:var(--forest-deep)}
+.quick{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 20px 0}
+.quick button{background:var(--white);border:1px solid var(--line);border-radius:16px;padding:14px 12px 12px;text-align:left;display:flex;flex-direction:column;gap:10px}
+.quick .ic{width:36px;height:36px;border-radius:11px;background:var(--mint);display:flex;align-items:center;justify-content:center}
+.quick .ic svg{width:19px;height:19px;stroke:var(--forest-deep);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.quick b{font-size:13.5px;font-weight:600;color:var(--forest-deep);line-height:17px}
+.pros{display:flex;gap:12px;overflow-x:auto;padding:0 20px 6px;scrollbar-width:none}
+.pros::-webkit-scrollbar{display:none}
+.pro-card{flex:none;width:168px;background:var(--white);border:1px solid var(--line);border-radius:18px;overflow:hidden;text-align:left}
+.pro-card img{width:100%;aspect-ratio:1/1;object-fit:cover}
+.pro-card .in{padding:12px 12px 13px}
+.pro-card .n{font-size:14.5px;font-weight:600;color:var(--forest-deep);line-height:19px}
+.pro-card .t{font-size:12.5px;color:var(--muted);line-height:16px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pro-card .m{display:flex;justify-content:space-between;align-items:baseline;margin-top:9px;font-size:12.5px;color:var(--muted)}
+.pro-card .m .price{font-size:13.5px}
+.cats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:0 20px}
+.cats button{display:flex;flex-direction:column;align-items:center;gap:7px}
+.cats .ic{width:60px;height:60px;border-radius:18px;background:var(--white);border:1px solid var(--line);display:flex;align-items:center;justify-content:center}
+.cats .ic svg{width:24px;height:24px;stroke:var(--forest-deep);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.cats span{font-size:11.5px;font-weight:500;color:var(--charcoal);text-align:center;line-height:14px}
+.ai-card{margin:0 20px;background:var(--white);border:1px solid var(--line);border-radius:18px;padding:16px;display:flex;gap:14px;align-items:center;text-align:left}
+.ai-card .orb{width:44px;height:44px;border-radius:14px;background:var(--forest-deep);display:flex;align-items:center;justify-content:center;flex:none}
+.ai-card .orb svg{width:22px;height:22px;stroke:#F7F4EC;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.ai-card b{display:block;font-size:15px;font-weight:600;color:var(--forest-deep)}
+.ai-card span{font-size:13px;color:var(--muted);line-height:18px}
+
+/* ---------- EXPLORE ---------- */
+.result{display:flex;gap:14px;padding:12px 20px;align-items:center;text-align:left;width:100%}
+.result img{width:60px;height:60px}
+.result .mid{flex:1;min-width:0}
+.result .n{font-size:15.5px;font-weight:600;color:var(--forest-deep);line-height:20px}
+.result .t{font-size:13.5px;color:var(--muted);line-height:18px;margin-top:1px}
+.result .meta{font-size:12.5px;color:var(--muted);margin-top:5px;display:flex;gap:6px;align-items:center}
+.result .r{text-align:right;flex:none}
+.result .r .price{font-size:15px;display:block}
+.result .r span{font-size:11.5px;color:var(--muted)}
+.count{padding:12px 20px 2px;font-size:13px;color:var(--muted)}
+
+/* ---------- PROFILE ---------- */
+.prof-head{padding:4px 20px 0}
+.prof-head .top{display:flex;gap:16px;align-items:center}
+.prof-head img{width:88px;height:88px;border:3px solid var(--white);box-shadow:0 2px 10px rgba(18,55,42,.12)}
+.prof-head .n{font-size:22px;line-height:27px;font-weight:700;letter-spacing:-.02em;color:var(--forest-deep)}
+.prof-head .t{font-size:15px;color:var(--charcoal);margin-top:3px}
+.prof-head .l{font-size:13px;color:var(--muted);margin-top:4px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);margin:16px 20px 0;background:var(--white);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.stats div{padding:12px 8px;text-align:center;border-right:1px solid var(--line)}
+.stats div:last-child{border-right:0}
+.stats b{display:block;font-size:17px;font-weight:700;color:var(--forest-deep);letter-spacing:-.01em}
+.stats span{font-size:11.5px;color:var(--muted);font-weight:500}
+.tabs{display:flex;gap:4px;margin:16px 20px 0;border-bottom:1px solid var(--line)}
+.tabs button{padding:10px 12px;font-size:14.5px;font-weight:500;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs button.on{color:var(--forest-deep);font-weight:600;border-color:var(--forest-deep)}
+.svc{display:flex;gap:12px;padding:12px 20px;align-items:center;text-align:left;width:100%}
+.svc img{width:72px;height:72px;border-radius:14px;object-fit:cover;flex:none}
+.svc .mid{flex:1;min-width:0}
+.svc .n{font-size:15px;font-weight:600;color:var(--forest-deep);line-height:20px}
+.svc .d{font-size:13px;color:var(--muted);margin-top:2px;line-height:17px}
+.svc .p{margin-top:6px;font-size:14px}
+.svc .p span{font-size:12px;color:var(--muted);font-weight:400}
+.review{padding:12px 20px}
+.review .who{display:flex;align-items:center;gap:10px}
+.review .who b{font-size:14px;font-weight:600}
+.review .who span{font-size:12px;color:var(--muted)}
+.review p{font-size:14px;line-height:20px;margin-top:8px;color:var(--charcoal)}
+.trust{margin:14px 20px 0;background:var(--mint);border-radius:14px;padding:12px 14px;display:flex;gap:10px;align-items:flex-start;font-size:13px;line-height:18px;color:var(--forest-deep)}
+.trust svg{width:18px;height:18px;flex:none;stroke:var(--forest-deep);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;margin-top:1px}
+
+/* ---------- SERVICE ---------- */
+.hero{position:relative;margin:0 20px;border-radius:20px;overflow:hidden;aspect-ratio:16/10;background:var(--sand)}
+.hero img{width:100%;height:100%;object-fit:cover}
+.hero .dots{position:absolute;bottom:10px;left:0;right:0;display:flex;justify-content:center;gap:5px}
+.hero .dots i{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.5)}
+.hero .dots i.on{background:#fff;width:16px;border-radius:3px}
+.svc-title{padding:16px 20px 0}
+.svc-title .cat{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--forest)}
+.svc-title h2{font-size:22px;line-height:28px;font-weight:700;letter-spacing:-.02em;color:var(--forest-deep);margin-top:6px}
+.svc-title .rate{font-size:13.5px;color:var(--muted);margin-top:6px}
+.pro-row{margin:14px 20px 0;display:flex;align-items:center;gap:12px;padding:12px;background:var(--white);border:1px solid var(--line);border-radius:16px;text-align:left;width:calc(100% - 40px)}
+.pro-row img{width:44px;height:44px}
+.pro-row b{font-size:14.5px;font-weight:600;color:var(--forest-deep);display:block}
+.pro-row span{font-size:12.5px;color:var(--muted)}
+.pro-row svg{margin-left:auto;width:20px;height:20px;stroke:var(--muted);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.facts{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 20px 0}
+.facts div{background:var(--sand);border-radius:12px;padding:10px 12px}
+.facts span{display:block;font-size:11.5px;color:var(--muted);font-weight:500}
+.facts b{font-size:14px;font-weight:600;color:var(--forest-deep)}
+.inc{padding:0 20px}
+.inc li{list-style:none;display:flex;gap:10px;font-size:14.5px;line-height:20px;padding:6px 0}
+.inc li svg{width:18px;height:18px;flex:none;stroke:var(--forest);fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;margin-top:1px}
+.dates{display:flex;gap:8px;overflow-x:auto;padding:0 20px;scrollbar-width:none}
+.dates::-webkit-scrollbar{display:none}
+.dates button{flex:none;width:58px;height:66px;border-radius:14px;background:var(--white);border:1px solid var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.dates button span{font-size:11px;color:var(--muted);font-weight:500}
+.dates button b{font-size:17px;font-weight:600;color:var(--forest-deep)}
+.dates button.on{background:var(--forest-deep);border-color:var(--forest-deep)}
+.dates button.on span,.dates button.on b{color:#fff}
+.times{display:flex;gap:8px;flex-wrap:wrap;padding:10px 20px 0}
+.times button{height:38px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:var(--white);font-size:13.5px;font-weight:500;font-variant-numeric:tabular-nums}
+.times button.on{background:var(--forest-deep);color:#fff;border-color:var(--forest-deep)}
+.times button.off{opacity:.4;text-decoration:line-through}
+.faq{margin:0 20px;border-top:1px solid var(--line)}
+.faq div{padding:13px 0;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;font-size:14.5px;font-weight:500;color:var(--forest-deep)}
+.bar-price b{display:block;font-size:18px;font-weight:700;color:var(--forest-deep);letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+.bar-price span{font-size:12px;color:var(--muted)}
+
+/* ---------- SHEET ---------- */
+.scrim{position:absolute;inset:0;background:rgba(18,55,42,.45);z-index:8;display:none}
+.scrim.on{display:block}
+.sheet{position:absolute;left:0;right:0;bottom:0;z-index:9;background:var(--ivory);border-radius:24px 24px 0 0;transform:translateY(105%);transition:transform .25s cubic-bezier(.2,.8,.2,1);max-height:88%;display:flex;flex-direction:column}
+.sheet.on{transform:translateY(0)}
+.sheet .grab{width:36px;height:4px;border-radius:2px;background:rgba(18,55,42,.2);margin:10px auto 4px}
+.sheet .in{overflow-y:auto;padding:8px 20px 0}
+.field{margin-top:12px}
+.field label{display:block;font-size:12.5px;font-weight:600;color:var(--forest-deep);margin-bottom:6px}
+.field .box{min-height:52px;border-radius:12px;background:var(--white);border:1px solid var(--line);padding:14px 14px;font-size:15px;color:var(--charcoal);display:flex;align-items:center;justify-content:space-between}
+.field .box.textarea{min-height:88px;align-items:flex-start;color:var(--muted)}
+.summary{margin-top:14px;background:var(--white);border:1px solid var(--line);border-radius:16px;padding:4px 14px}
+.summary div{display:flex;justify-content:space-between;padding:10px 0;font-size:14px;border-bottom:1px solid var(--line)}
+.summary div:last-child{border-bottom:0;font-weight:700;font-size:15px}
+.summary span{color:var(--muted)}
+.sheet .foot{padding:12px 20px calc(16px + env(safe-area-inset-bottom))}
+.escrow{text-align:center;font-size:12px;color:var(--muted);margin-top:8px;line-height:16px}
+
+/* ---------- BOOKINGS ---------- */
+.group{padding:18px 20px 6px;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.bk{display:flex;gap:12px;padding:12px 20px;align-items:center;text-align:left;width:100%}
+.bk .date{width:50px;height:54px;border-radius:12px;background:var(--white);border:1px solid var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;flex:none}
+.bk .date span{font-size:10.5px;font-weight:600;color:var(--coral);letter-spacing:.04em}
+.bk .date b{font-size:18px;font-weight:700;color:var(--forest-deep);line-height:20px}
+.bk .mid{flex:1;min-width:0}
+.bk .n{font-size:15px;font-weight:600;color:var(--forest-deep);line-height:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bk .w{font-size:13px;color:var(--muted);margin-top:2px}
+.bk img{width:32px;height:32px}
+.bk .right{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.bk .right .price{font-size:14px}
+
+/* ---------- AI ---------- */
+.usage{height:3px;background:var(--sand);margin:0 20px;border-radius:2px;overflow:hidden}
+.usage i{display:block;height:100%;width:11%;background:var(--forest-deep)}
+.bubble{max-width:82%;padding:12px 14px;font-size:15px;line-height:21px;margin:10px 20px 0}
+.bubble.me{margin-left:auto;background:var(--forest-deep);color:#fff;border-radius:18px 18px 4px 18px}
+.bubble.ai{background:var(--white);border:1px solid var(--line);border-radius:18px 18px 18px 4px}
+.bubble.ai .pro-mini{display:flex;gap:10px;align-items:center;margin-top:10px;padding:10px;background:var(--ivory);border-radius:12px}
+.bubble.ai .pro-mini img{width:36px;height:36px}
+.bubble.ai .pro-mini b{display:block;font-size:13.5px;color:var(--forest-deep)}
+.bubble.ai .pro-mini span{font-size:12px;color:var(--muted)}
+.acts{display:flex;gap:6px;margin:6px 20px 0}
+.acts button{width:36px;height:36px;border-radius:50%;background:var(--sand);display:flex;align-items:center;justify-content:center}
+.acts svg{width:16px;height:16px;stroke:var(--forest-deep);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.composer{position:absolute;left:0;right:0;bottom:var(--nav-h);padding:10px 20px 10px;background:rgba(247,244,236,.96);backdrop-filter:blur(14px);border-top:1px solid var(--line);display:flex;gap:10px;align-items:center;z-index:4}
+.composer .box{flex:1;height:48px;border-radius:999px;background:var(--white);border:1px solid var(--line);display:flex;align-items:center;padding:0 18px;color:var(--muted);font-size:15px}
+.composer .send{width:48px;height:48px;border-radius:50%;background:var(--forest-deep);display:flex;align-items:center;justify-content:center;flex:none}
+.composer .send svg{width:20px;height:20px;stroke:#fff;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+
+/* ---------- ACCOUNT ---------- */
+.acc-head{display:flex;gap:14px;align-items:center;padding:8px 20px 0}
+.acc-head img{width:64px;height:64px}
+.acc-head .n{font-size:20px;font-weight:700;letter-spacing:-.01em;color:var(--forest-deep)}
+.acc-head .e{font-size:13.5px;color:var(--muted);margin-top:2px}
+.plan{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 9px;border-radius:999px;background:var(--mint);color:var(--forest-deep);font-size:12px;font-weight:600;margin-top:6px}
+.list{margin:16px 20px 0;background:var(--white);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.list button{width:100%;display:flex;align-items:center;gap:12px;padding:0 14px;height:54px;border-bottom:1px solid var(--line);text-align:left;font-size:15px;font-weight:500;color:var(--charcoal)}
+.list button:last-child{border-bottom:0}
+.list .ic{width:32px;height:32px;border-radius:9px;background:var(--sand);display:flex;align-items:center;justify-content:center;flex:none}
+.list .ic svg{width:17px;height:17px;stroke:var(--forest-deep);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.list .val{margin-left:auto;font-size:13px;color:var(--muted);font-weight:400}
+.list .chev{width:18px;height:18px;stroke:var(--muted);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;margin-left:4px}
+.list button.danger{color:var(--coral)}
+.list-lbl{padding:18px 20px 0;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<div class="proto-bar" id="protoBar">
+  <span class="brand">Servix · design v1</span>
+  <button data-s="home" class="on">Home</button>
+  <button data-s="explore">Explore</button>
+  <button data-s="profile">Professional</button>
+  <button data-s="service">Service</button>
+  <button data-s="sheet">Booking sheet</button>
+  <button data-s="bookings">Bookings</button>
+  <button data-s="ai">Servix AI</button>
+  <button data-s="account">Account</button>
+</div>
+
+<div class="stage">
+<div class="phone" id="phone">
+  <div class="status"><span>9:41</span><span class="pill"></span><span>●●● ▮</span></div>
+
+  <!-- ================= HOME ================= -->
+  <section class="screen on" id="s-home">
+    <div class="scroll">
+      <div class="home-head">
+        <div><div class="hi">Good morning</div><div class="name">Adaeze</div></div>
+        <div class="row" style="gap:4px">
+          <button class="iconbtn" aria-label="Notifications"><svg viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span class="dot"></span></button>
+          <button onclick="go('account')"><img class="avatar" src="img/pro-chiamaka.jpg" style="width:40px;height:40px" alt=""></button>
+        </div>
+      </div>
+
+      <div class="next">
+        <div class="lbl">Your next booking</div>
+        <div class="what">Complete Brand Identity Package</div>
+        <div class="who"><img class="avatar" src="img/pro-tunde.jpg" style="width:28px;height:28px" alt="">Tunde Bakare <span class="status-chip st-accepted" style="margin-left:auto;background:rgba(255,255,255,.14);color:#fff">Accepted</span></div>
+        <div class="when">
+          <div><span>Date</span><b>Fri, 14 Nov</b></div>
+          <div><span>Time</span><b>10:00</b></div>
+          <div><span>Total</span><b>₦120,000</b></div>
+        </div>
+        <div class="cta"><button class="main" onclick="go('bookings')">View booking</button><button onclick="go('profile')">View Tunde's profile</button></div>
+      </div>
+
+      <div class="quick">
+        <button onclick="go('explore')"><span class="ic"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span><b>Find a professional</b></button>
+        <button onclick="go('ai')"><span class="ic"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.6L18.5 9.4l-4.7 1.8L12 16l-1.8-4.8L5.5 9.4l4.7-1.8z"/><path d="M19 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg></span><b>Ask Servix AI</b></button>
+        <button onclick="go('account')"><span class="ic"><svg viewBox="0 0 24 24"><path d="M19 21l-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></span><b>Saved pros</b></button>
+      </div>
+
+      <div class="sec-head"><div class="h-section">Recommended for you</div><a href="#" onclick="go('explore');return false">See all</a></div>
+      <div class="pros">
+        <button class="pro-card" onclick="go('profile')"><img src="img/pro-tunde.jpg" alt=""><div class="in"><div class="n">Tunde Bakare<span class="verified"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></span></div><div class="t">Brand &amp; Graphic Designer</div><div class="m"><span><span class="star">★</span> 4.9 (156)</span><span class="price">₦120k</span></div></div></button>
+        <button class="pro-card" onclick="go('profile')"><img src="img/pro-chiamaka.jpg" alt=""><div class="in"><div class="n">Chiamaka Eze<span class="verified"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></span></div><div class="t">Product Designer</div><div class="m"><span><span class="star">★</span> 4.8 (92)</span><span class="price">₦180k</span></div></div></button>
+        <button class="pro-card" onclick="go('profile')"><img src="img/pro-ibrahim.jpg" alt=""><div class="in"><div class="n">Ibrahim Yusuf<span class="verified"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></span></div><div class="t">Full-stack Developer</div><div class="m"><span><span class="star">★</span> 4.7 (63)</span><span class="price">₦350k</span></div></div></button>
+        <button class="pro-card" onclick="go('profile')"><img src="img/pro-grace.jpg" alt=""><div class="in"><div class="n">Grace Adeyemi<span class="verified"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></span></div><div class="t">Copywriter</div><div class="m"><span><span class="star">★</span> 5.0 (38)</span><span class="price">₦45k</span></div></div></button>
+      </div>
+
+      <div class="sec-head"><div class="h-section">Browse by category</div><a href="#" onclick="go('explore');return false">All 8</a></div>
+      <div class="cats">
+        <button onclick="go('explore')"><span class="ic"><svg viewBox="0 0 24 24"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.6 7.6"/></svg></span><span>Design</span></button>
+        <button onclick="go('explore')"><span class="ic"><svg viewBox="0 0 24 24"><path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/></svg></span><span>Development</span></button>
+        <button onclick="go('explore')"><span class="ic"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></span><span>Writing</span></button>
+        <button onclick="go('explore')"><span class="ic"><svg viewBox="0 0 24 24"><path d="M3 11l18-5v12L3 14z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg></span><span>Marketing</span></button>
+        <button onclick="go('explore')"><span class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M8 2v4M16 2v4"/></svg></span><span>Events</span></button>
+        <button onclick="go('explore')"><span class="ic"><svg viewBox="0 0 24 24"><path d="M4 4h16v12H4z"/><path d="M8 20h8M12 16v4"/></svg></span><span>IT support</span></button>
+        <button onclick="go('explore')"><span class="ic"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h8"/></svg></span><span>Legal</span></button>
+        <button onclick="go('explore')"><span class="ic"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="m7 15 4-4 4 4 5-6"/></svg></span><span>Finance</span></button>
+      </div>
+
+      <div class="sec-head"><div class="h-section">Servix AI</div></div>
+      <button class="ai-card" onclick="go('ai')"><span class="orb"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.6L18.5 9.4l-4.7 1.8L12 16l-1.8-4.8L5.5 9.4l4.7-1.8z"/></svg></span><span><b>Not sure who to hire?</b><span>Describe the job in plain words and get matched to verified pros with a budget range.</span></span></button>
+      <div style="height:8px"></div>
+    </div>
+    <div class="nav" data-nav="home"></div>
+  </section>
+
+  <!-- ================= EXPLORE ================= -->
+  <section class="screen" id="s-explore">
+    <div class="scroll">
+      <div style="padding:8px 20px 0" class="h-display">Explore</div>
+      <div class="search" style="margin-top:12px"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span style="color:var(--charcoal)">logo designer</span><span class="k">Lagos</span></div>
+      <div class="seg" style="margin-top:12px"><button class="on">Professionals</button><button>Services</button></div>
+      <div class="chips" style="margin-top:12px">
+        <span class="chip on"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M7 12h10M10 18h4"/></svg>Filters · 2</span>
+        <span class="chip">Sort · Recommended</span><span class="chip">Design</span><span class="chip">Available now</span><span class="chip">Under ₦150k</span>
+      </div>
+      <div class="count">12 professionals</div>
+      <button class="result" onclick="go('profile')"><img class="avatar" src="img/pro-tunde.jpg" alt=""><div class="mid"><div class="n">Tunde Bakare<span class="verified"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></span></div><div class="t">Brand &amp; Graphic Designer</div><div class="meta"><span class="star">★</span>4.9 (156) · Abuja · Replies in 1 h</div></div><div class="r"><span class="price">₦120,000</span><span>from</span></div></button>
+      <button class="result" onclick="go('profile')"><img class="avatar" src="img/pro-chiamaka.jpg" alt=""><div class="mid"><div class="n">Chiamaka Eze<span class="verified"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></span></div><div class="t">Product Designer</div><div class="meta"><span class="star">★</span>4.8 (92) · Lagos · Replies in 2 h</div></div><div class="r"><span class="price">₦180,000</span><span>from</span></div></button>
+      <button class="result" onclick="go('profile')"><img class="avatar" src="img/pro-ibrahim.jpg" alt=""><div class="mid"><div class="n">Ibrahim Yusuf<span class="verified"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></span></div><div class="t">Full-stack Developer</div><div class="meta"><span class="star">★</span>4.7 (63) · Kano · Replies in 4 h</div></div><div class="r"><span class="price">₦350,000</span><span>from</span></div></button>
+      <button class="result" onclick="go('profile')"><img class="avatar" src="img/pro-grace.jpg" alt=""><div class="mid"><div class="n">Grace Adeyemi<span class="verified"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></span></div><div class="t">Copywriter</div><div class="meta"><span class="star">★</span>5.0 (38) · Ibadan · Replies in 1 h</div></div><div class="r"><span class="price">₦45,000</span><span>from</span></div></button>
+      <button class="result" onclick="go('profile')"><span class="avatar initials" style="width:60px;height:60px;font-size:18px">OA</span><div class="mid"><div class="n">Olumide Adewale</div><div class="t">Motion Designer</div><div class="meta"><span class="star">★</span>4.6 (21) · Lagos · Replies in 3 h</div></div><div class="r"><span class="price">₦95,000</span><span>from</span></div></button>
+      <button class="result" onclick="go('profile')"><span class="avatar initials" style="width:60px;height:60px;font-size:18px">NK</span><div class="mid"><div class="n">Ngozi Kalu<span class="verified"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></span></div><div class="t">UI Designer</div><div class="meta"><span class="star">★</span>4.9 (44) · Enugu · Replies in 2 h</div></div><div class="r"><span class="price">₦130,000</span><span>from</span></div></button>
+    </div>
+    <div class="nav" data-nav="explore"></div>
+  </section>
+
+  <!-- ================= PROFESSIONAL PROFILE ================= -->
+  <section class="screen" id="s-profile">
+    <div class="topbar"><button class="back" onclick="go('explore')"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button><span style="flex:1"></span><button class="iconbtn"><svg viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="m16 6-4-4-4 4M12 2v13"/></svg></button><button class="iconbtn"><svg viewBox="0 0 24 24"><path d="M19 21l-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button></div>
+    <div class="scroll has-bar">
+      <div class="prof-head">
+        <div class="top"><img class="avatar" src="img/pro-tunde.jpg" alt=""><div><div class="n">Tunde Bakare<span class="verified" style="width:20px;height:20px"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></span></div><div class="t">Brand &amp; Graphic Designer</div><div class="l">Abuja · Replies in about 1 hour · Member since 2023</div></div></div>
+      </div>
+      <div class="stats"><div><b>4.9</b><span>156 reviews</span></div><div><b>212</b><span>projects done</span></div><div><b>98%</b><span>on time</span></div></div>
+      <div class="trust"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg><span><b>Identity verified.</b> You pay through Servix; the money is released to Tunde after you confirm the work.</span></div>
+      <div class="tabs"><button class="on">Services · 4</button><button>About</button><button>Reviews · 156</button></div>
+      <button class="svc" onclick="go('service')"><img src="img/cover-brand.jpg" alt=""><div class="mid"><div class="n">Complete Brand Identity Package</div><div class="d">Logo suite, colour &amp; type system, guidelines PDF</div><div class="p price">₦120,000 <span>· 10 days</span></div></div></button>
+      <div class="divider"></div>
+      <button class="svc" onclick="go('service')"><span style="width:72px;height:72px;border-radius:14px;background:var(--sand);flex:none"></span><div class="mid"><div class="n">Logo Design Only</div><div class="d">3 concepts, 2 revision rounds, source files</div><div class="p price">₦45,000 <span>· 5 days</span></div></div></button>
+      <div class="divider"></div>
+      <button class="svc" onclick="go('service')"><span style="width:72px;height:72px;border-radius:14px;background:var(--sand);flex:none"></span><div class="mid"><div class="n">Social Media Kit</div><div class="d">12 branded templates for Instagram &amp; X</div><div class="p price">₦60,000 <span>· 4 days</span></div></div></button>
+      <div class="sec-head"><div class="h-section">Recent reviews</div><a href="#">All 156</a></div>
+      <div class="review"><div class="who"><span class="avatar initials" style="width:32px;height:32px;font-size:12px">BO</span><div><b>Bola O.</b><br><span><span class="star">★★★★★</span> · 2 weeks ago</span></div></div><p>Tunde understood our bakery's vibe immediately. Delivered two days early and the guidelines PDF is genuinely useful.</p></div>
+      <div class="review"><div class="who"><span class="avatar initials" style="width:32px;height:32px;font-size:12px">EM</span><div><b>Emeka M.</b><br><span><span class="star">★★★★★</span> · 1 month ago</span></div></div><p>Clear communication, fair revisions. Would book again.</p></div>
+    </div>
+    <div class="sticky-bar"><div class="bar-price"><b>From ₦45,000</b><span>Pay safely through Servix</span></div><button class="btn primary" onclick="go('service')">Book Tunde</button></div>
+    <div class="nav" data-nav="explore"></div>
+  </section>
+
+  <!-- ================= SERVICE DETAIL ================= -->
+  <section class="screen" id="s-service">
+    <div class="topbar"><button class="back" onclick="go('profile')"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button><span style="flex:1"></span><button class="iconbtn"><svg viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="m16 6-4-4-4 4M12 2v13"/></svg></button><button class="iconbtn"><svg viewBox="0 0 24 24"><path d="M19 21l-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button></div>
+    <div class="scroll has-bar">
+      <div class="hero"><img src="img/cover-brand.jpg" alt=""><div class="dots"><i class="on"></i><i></i><i></i><i></i></div></div>
+      <div class="svc-title"><div class="cat">Design · Branding</div><h2>Complete Brand Identity Package</h2><div class="rate"><span class="star">★</span> 4.9 (156 reviews) · 212 orders</div></div>
+      <button class="pro-row" onclick="go('profile')"><img class="avatar" src="img/pro-tunde.jpg" alt=""><div><b>Tunde Bakare<span class="verified"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></span></b><span>Replies in about 1 hour</span></div><svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
+      <div class="facts"><div><span>Delivery</span><b>10 days</b></div><div><span>Revisions</span><b>3 rounds</b></div><div><span>Format</span><b>Remote</b></div></div>
+      <div class="sec-head"><div class="h-section">What's included</div></div>
+      <ul class="inc">
+        <li><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg>Primary logo, secondary mark and favicon</li>
+        <li><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg>Colour palette and type system</li>
+        <li><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg>Brand guidelines PDF (12–16 pages)</li>
+        <li><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg>Source files (AI, SVG, PNG)</li>
+      </ul>
+      <div class="sec-head"><div class="h-section">Pick a start date</div><span class="small">Next 14 days</span></div>
+      <div class="dates"><button><span>Thu</span><b>13</b></button><button class="on"><span>Fri</span><b>14</b></button><button><span>Sat</span><b>15</b></button><button><span>Mon</span><b>17</b></button><button><span>Tue</span><b>18</b></button><button><span>Wed</span><b>19</b></button><button><span>Thu</span><b>20</b></button></div>
+      <div class="times"><button class="off">09:00</button><button class="on">10:00</button><button>11:30</button><button>14:00</button><button>16:00</button></div>
+      <div class="sec-head"><div class="h-section">About this service</div></div>
+      <p class="body" style="padding:0 20px;color:var(--charcoal)">A complete identity for a small business that needs to look established from day one. We start with a 30-minute call, then I deliver three directions within 4 days…<a href="#" style="color:var(--forest);font-weight:600;text-decoration:none"> Read more</a></p>
+      <div class="sec-head"><div class="h-section">Questions</div></div>
+      <div class="faq"><div>Do you need my existing logo files? <span>+</span></div><div>Can I add a website design later? <span>+</span></div><div>What if I don't like any direction? <span>+</span></div></div>
+      <div style="height:12px"></div>
+    </div>
+    <div class="sticky-bar"><div class="bar-price"><b>₦120,000</b><span>Fri 14 Nov · 10:00</span></div><button class="btn primary" onclick="openSheet()">Book this service</button></div>
+    <div class="nav" data-nav="explore"></div>
+    <div class="scrim" id="scrim" onclick="closeSheet()"></div>
+    <div class="sheet" id="sheet">
+      <div class="grab"></div>
+      <div class="in">
+        <div class="h-title">Confirm your booking</div>
+        <div class="small" style="margin-top:2px">Pay now through Servix; released to Tunde after you confirm the work.</div>
+        <div class="field"><label>Service</label><div class="box"><span>Complete Brand Identity Package</span><span class="small">Tunde B.</span></div></div>
+        <div class="field"><label>When</label><div class="box"><span>Fri 14 Nov · 10:00</span><span style="color:var(--forest);font-weight:600;font-size:13.5px">Change</span></div></div>
+        <div class="field"><label>Notes for Tunde <span style="font-weight:400;color:var(--muted)">(optional)</span></label><div class="box textarea">Tell Tunde about your business, deadline and anything they should know…</div></div>
+        <div class="summary"><div><span>Service</span>₦120,000</div><div><span>Service fee</span>₦0</div><div><span>Total</span>₦120,000</div></div>
+        <div style="height:8px"></div>
+      </div>
+      <div class="foot"><button class="btn primary" style="width:100%" onclick="closeSheet();go('bookings')">Book &amp; Pay ₦120,000</button><div class="escrow">Paid securely via Paystack · Released after you confirm the work</div></div>
+    </div>
+  </section>
+
+  <!-- ================= BOOKINGS ================= -->
+  <section class="screen" id="s-bookings">
+    <div class="scroll">
+      <div style="padding:8px 20px 12px" class="h-display">Bookings</div>
+      <div class="seg"><button class="on">Active · 3</button><button>Past · 7</button></div>
+      <div class="group">Today</div>
+      <button class="bk"><div class="date"><span>THU</span><b>13</b></div><div class="mid"><div class="n">Website copy refresh</div><div class="w">Grace Adeyemi · 15:00</div></div><div class="right"><span class="status-chip st-pending">Awaiting payment</span><span class="price">₦45,000</span></div></button>
+      <div class="group">This week</div>
+      <button class="bk"><div class="date"><span>FRI</span><b>14</b></div><div class="mid"><div class="n">Complete Brand Identity Package</div><div class="w">Tunde Bakare · 10:00</div></div><div class="right"><span class="status-chip st-accepted">Accepted</span><span class="price">₦120,000</span></div></button>
+      <div class="group">Later</div>
+      <button class="bk"><div class="date"><span>NOV</span><b>24</b></div><div class="mid"><div class="n">Booking app MVP (Phase 1)</div><div class="w">Ibrahim Yusuf · 09:00</div></div><div class="right"><span class="status-chip st-accepted">In progress</span><span class="price">₦350,000</span></div></button>
+      <div class="sec-head"><div class="h-section">Needs your review</div></div>
+      <div class="card" style="margin:0 20px;padding:14px;display:flex;gap:12px;align-items:center"><img class="avatar" src="img/pro-chiamaka.jpg" style="width:44px;height:44px" alt=""><div style="flex:1"><b style="font-size:14.5px;color:var(--forest-deep)">Onboarding flow redesign</b><div class="small">Delivered by Chiamaka Eze · Confirm to release ₦180,000</div></div><button class="btn ghost" style="height:40px;padding:0 14px;font-size:14px">Review</button></div>
+    </div>
+    <div class="nav" data-nav="bookings"></div>
+  </section>
+
+  <!-- ================= SERVIX AI ================= -->
+  <section class="screen" id="s-ai">
+    <div class="topbar" style="padding:0 20px;justify-content:space-between"><span class="h-title">Servix AI</span><span class="small">2,300 / 20,000</span></div>
+    <div class="usage"><i></i></div>
+    <div class="seg" style="margin-top:12px"><button class="on">Assistant</button><button>Budget guide</button></div>
+    <div class="scroll" style="padding-bottom:calc(var(--nav-h) + 84px)">
+      <div class="bubble me">Who can design a logo for a small bakery in Lagos?</div>
+      <div class="bubble ai">Tunde Bakare is a strong fit — a verified brand designer with a 4.9 rating from 156 reviews. His Complete Brand Identity Package starts at ₦120,000 and includes a logo suite, colour and type system, and guidelines.
+        <button class="pro-mini" style="width:100%;text-align:left" onclick="go('profile')"><img class="avatar" src="img/pro-tunde.jpg" alt=""><div><b>Tunde Bakare</b><span>Brand &amp; Graphic Designer · from ₦120,000</span></div></button>
+      </div>
+      <div class="acts"><button><svg viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><button><svg viewBox="0 0 24 24"><path d="M7 10v12M15 5.9 14 10h5.8a2 2 0 0 1 1.9 2.6l-2.3 7a2 2 0 0 1-1.9 1.4H7V10l4-8a3 3 0 0 1 3 3z"/></svg></button><button><svg viewBox="0 0 24 24"><path d="M17 14V2M9 18.1 10 14H4.2a2 2 0 0 1-1.9-2.6l2.3-7A2 2 0 0 1 6.5 3H17v11l-4 8a3 3 0 0 1-3-3z"/></svg></button></div>
+      <div class="bubble me">Does that price include brand guidelines?</div>
+      <div class="bubble ai">Yes — the ₦120,000 package includes a logo suite, colour and type system, and a short brand guidelines PDF. Revisions are included; extra deliverables are quoted separately.</div>
+      <div class="acts"><button><svg viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><button><svg viewBox="0 0 24 24"><path d="M7 10v12M15 5.9 14 10h5.8a2 2 0 0 1 1.9 2.6l-2.3 7a2 2 0 0 1-1.9 1.4H7V10l4-8a3 3 0 0 1 3 3z"/></svg></button><button><svg viewBox="0 0 24 24"><path d="M17 14V2M9 18.1 10 14H4.2a2 2 0 0 1-1.9-2.6l2.3-7A2 2 0 0 1 6.5 3H17v11l-4 8a3 3 0 0 1-3-3z"/></svg></button></div>
+      <div class="tiny" style="text-align:center;padding:16px 28px 0">Servix AI suggests — it never moves money or changes bookings.</div>
+    </div>
+    <div class="composer"><div class="box">Ask about pros, prices or timing…</div><button class="send"><svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button></div>
+    <div class="nav" data-nav="ai"></div>
+  </section>
+
+  <!-- ================= ACCOUNT ================= -->
+  <section class="screen" id="s-account">
+    <div class="scroll">
+      <div style="padding:8px 20px 14px" class="h-display">Account</div>
+      <div class="acc-head"><img class="avatar" src="img/pro-chiamaka.jpg" alt=""><div><div class="n">Adaeze Okafor</div><div class="e">adaeze@example.com</div><span class="plan">Free plan</span></div></div>
+      <div class="list-lbl">You</div>
+      <div class="list">
+        <button><span class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span>Profile &amp; photo<svg class="chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
+        <button><span class="ic"><svg viewBox="0 0 24 24"><path d="M19 21l-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></span>Saved professionals<span class="val">6</span><svg class="chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
+        <button><span class="ic"><svg viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></span>Notifications<span class="val">2 new</span><svg class="chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
+      </div>
+      <div class="list-lbl">Plan &amp; security</div>
+      <div class="list">
+        <button><span class="ic"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.6L18.5 9.4l-4.7 1.8L12 16l-1.8-4.8L5.5 9.4l4.7-1.8z"/></svg></span>Plan &amp; AI usage<span class="val">Free · 11%</span><svg class="chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
+        <button><span class="ic"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>Security<span class="val">Email code</span><svg class="chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
+        <button><span class="ic"><svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg></span>This device<span class="val">Pixel 8 · Lagos</span><svg class="chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
+      </div>
+      <div class="list-lbl">App</div>
+      <div class="list">
+        <button><span class="ic"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg></span>Updates<span class="val">1.0.0 · up to date</span><svg class="chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
+        <button><span class="ic"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></span>Terms &amp; privacy<svg class="chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
+        <button class="danger"><span class="ic"><svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/></svg></span>Sign out</button>
+      </div>
+      <div class="tiny" style="text-align:center;padding:18px 20px 8px">Delete your account on the website · servix.name.ng</div>
+    </div>
+    <div class="nav" data-nav="account"></div>
+  </section>
+
+</div>
+</div>
+
+<div class="proto-note" id="note"></div>
+
+<script>
+const NAV = [
+ ['home','Home','<svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v9a2 2 0 0 1-2 2h-4v-7H9v7H5a2 2 0 0 1-2-2z"/></svg>'],
+ ['explore','Explore','<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>'],
+ ['bookings','Bookings','<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/></svg>'],
+ ['ai','Servix AI','<svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.6L18.5 9.4l-4.7 1.8L12 16l-1.8-4.8L5.5 9.4l4.7-1.8z"/><path d="M19 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg>'],
+ ['account','Account','<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>'],
+];
+const NOTES = {
+ home:'<b>Home = dashboard.</b> One hero card for the next booking, three quick actions, real photos on pro cards, categories as a grid, AI as a soft invitation. No landing-page copy anywhere.',
+ explore:'<b>Explore owns search.</b> Photos first, price right-aligned, one line of trust signals (rating · city · reply time). Filters as chips, not a two-button mode switch.',
+ profile:'<b>Professional.</b> 88dp photo, stats strip, one trust card that explains escrow in plain words, real tabs, and a sticky "Book" bar with the lowest price.',
+ service:'<b>Service.</b> 16:10 cover, facts strip, included list, date → time pickers inline, FAQ accordion, sticky bar that already shows the chosen slot.',
+ sheet:'<b>Booking sheet.</b> Confirm, not configure: what · when · notes · total, then one button. Escrow sentence under the button.',
+ bookings:'<b>Bookings.</b> Calendar tile for the date, status chip + price on the right, grouped Today / This week / Later. Pending reviews pulled up as a card.',
+ ai:'<b>Servix AI.</b> Bubbles, a tappable pro card inside the answer, usage bar in the header, pinned composer, honest footer.',
+ account:'<b>Account.</b> Photo + plan chip in the header; grouped settings with live values (count, plan %, device). Danger action last.'
+};
+function nav(active){document.querySelectorAll('.nav').forEach(n=>{n.innerHTML=NAV.map(([id,l,svg])=>`<button class="${id===active?'on':''}" onclick="go('${id}')">${svg}<span>${l}</span>${id==='home'&&false?'':''}</button>`).join('');});}
+function go(id){
+  closeSheet();
+  const screen = id==='sheet' ? 'service' : id;
+  document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id==='s-'+screen));
+  const section = document.getElementById('s-'+screen);
+  const n = section.querySelector('.nav'); const active = n.dataset.nav;
+  section.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('on', b.textContent.trim()===NAV.find(x=>x[0]===active)[1]));
+  document.querySelectorAll('#protoBar button').forEach(b=>b.classList.toggle('on',b.dataset.s===id));
+  document.getElementById('note').innerHTML = NOTES[id];
+  const sc = section.querySelector('.scroll'); if(sc) sc.scrollTop=0;
+  if(id==='sheet') setTimeout(openSheet,250);
+}
+function openSheet(){document.getElementById('scrim').classList.add('on');document.getElementById('sheet').classList.add('on');}
+function closeSheet(){document.getElementById('scrim').classList.remove('on');document.getElementById('sheet').classList.remove('on');}
+document.querySelectorAll('#protoBar button').forEach(b=>b.addEventListener('click',()=>go(b.dataset.s)));
+document.querySelectorAll('.nav').forEach(n=>{const a=n.dataset.nav;n.innerHTML=NAV.map(([id,l,svg])=>`<button class="${id===a?'on':''}" onclick="go('${id}')">${svg}<span>${l}</span></button>`).join('');});
+function fit(){document.documentElement.style.setProperty('--bar-h',document.getElementById('protoBar').offsetHeight+'px');document.documentElement.style.setProperty('--note-h',document.getElementById('note').offsetHeight+'px');}
+window.addEventListener('resize',fit);
+const _go=go; go=function(id){_go(id);fit();};
+go('home');
+</script>
+</body>
+</html>
