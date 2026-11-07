@@ -34,6 +34,11 @@ export function TypingBubble({ name }) {
 }
 
 export const I = {
+  user: <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg>,
+  calendar: <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /></svg>,
+  link: <svg viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" /><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" /></svg>,
+  flag: <svg viewBox="0 0 24 24"><path d="M5 21V4M5 4h12l-2 4 2 4H5" /></svg>,
+  info: <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></svg>,
   pin: <svg viewBox="0 0 24 24"><path d="M12 22s7-6.1 7-12a7 7 0 1 0-14 0c0 5.9 7 12 7 12z" /><circle cx="12" cy="10" r="2.5" /></svg>,
   photo: <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2" /><circle cx="8.5" cy="10" r="1.5" /><path d="m21 15-5-5L5 21" /></svg>,
   doc: <svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5M9 13h6M9 17h6" /></svg>,
@@ -224,7 +229,7 @@ export function MessageBubble({ m, mine, grouped, me, otherName, thread, onOpenA
         <span className="msg-meta"><time dateTime={m.createdAt}>{timeOf(m.createdAt)}</time>{mine && !deleted && <Ticks state={tickState(m, thread)} />}</span>
       </div>
       <Reactions reactions={m.reactions} me={me} onToggle={(e) => onToggleReaction(m, e)} />
-      {m.failed && <button type="button" className="msg-retry" onClick={() => onRetry(m)}>Not sent · Retry</button>}
+      {m.failed && <button type="button" className="msg-retry" onClick={() => onRetry(m)}>Not sent{m.failReason ? ` — ${m.failReason}` : ''} · Tap to retry</button>}
     </div>
   );
 }

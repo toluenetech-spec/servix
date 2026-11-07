@@ -13,6 +13,7 @@ import { ListSkeleton, Skeleton } from '../../components/ui/States.jsx';
 import { AiAvatar } from '../../components/ai/AiBits.jsx';
 import { CommunityGate } from './NetworkPage.jsx';
 import { Avatar, Ticks, TypingBubble, MessageBubble, ActionSheet, Lightbox, EmojiPicker, I } from '../../components/chat/ChatBits.jsx';
+import { ProfileSheet } from '../../components/chat/ProfileSheet.jsx';
 import { AiThread, loadAiHistory } from '../../components/chat/AiThread.jsx';
 import { useVoiceRecorder } from '../../components/chat/useVoiceRecorder.js';
 import { LOCATION_PREFIX, TYPING_TTL, dayLabel, relativeSeen, listTime, sortMessages, tickState, previewOf, mergeMessage, formatDuration, formatBytes, newClientId, mediaSrc } from '../../components/chat/chatUtils.js';
@@ -55,6 +56,7 @@ function MessagesContent() {
   const [staged, setStaged] = useState(null); // { file, kind, previewUrl }
   const [sheet, setSheet] = useState(null); // { message, anchor }
   const [lightbox, setLightbox] = useState(null);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [attachOpen, setAttachOpen] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -183,6 +185,7 @@ function MessagesContent() {
   /* ---------------- scrolling ---------------- */
   const active = useMemo(() => threads?.find((t) => t.id === humanId) ?? null, [threads, humanId]);
   const conv = byThread[humanId] ?? null;
+  useEffect(() => { setProfileOpen(false); }, [humanId]);
   const lastMessageId = conv?.messages[conv.messages.length - 1]?.id;
   const typingHere = Boolean(humanId && typing[humanId] > Date.now());
   useEffect(() => { const el = listRef.current; if (!el) return; if (stickToBottom.current) { el.scrollTop = el.scrollHeight; setUnseenBelow(0); } }, [lastMessageId, humanId, typingHere, conv?.loaded, staged, reply]);
@@ -230,8 +233,9 @@ function MessagesContent() {
       setThreads((old) => { if (!old) return old; const idx = old.findIndex((t) => t.id === target); if (idx < 0) return old; const updated = { ...old[idx], lastMessage: previewOf(saved), lastMessageKind: saved.kind, lastMessageAt: saved.createdAt, lastMessageSenderId: user.id, lastMessageId: saved.id }; return [updated, ...old.slice(0, idx), ...old.slice(idx + 1)]; });
       if (attachment && previewUrl && !attachment.previewUrl) setTimeout(() => URL.revokeObjectURL(previewUrl), 60_000);
     } catch (e) {
-      patchMessage(target, clientId, { pending: false, failed: true, uploadProgress: undefined });
-      setError(e.message);
+      const reason = e?.message || 'Something went wrong';
+      patchMessage(target, clientId, { pending: false, failed: true, uploadProgress: undefined, failReason: reason });
+      setError(attachment || uploaded ? `Could not send the ${kind === 'image' ? 'photo' : kind === 'audio' ? 'voice note' : 'file'}: ${reason}` : reason);
     } finally { setSending(false); }
   };
 
@@ -251,6 +255,7 @@ function MessagesContent() {
   const stage = (file) => {
     if (!file) return;
     const kind = kindForFile(file);
+
     if (kind === 'chat-audio') { setError('Use the microphone button to send a voice note.'); return; }
     const limit = CHAT_LIMITS[kind];
     const type = (file.type || '').split(';')[0];
@@ -417,19 +422,12 @@ function MessagesContent() {
             <>
               <header className="msg-chat-head">
                 <button type="button" className="msg-icon-btn msg-back" onClick={() => setParams({})} aria-label="Back to conversations">{I.back}</button>
-                {active?.person.professionalProfile?.slug ? (
-                  <Link to={`/professionals/${active.person.professionalProfile.slug}`} className="msg-chat-person" title="View profile">
-                    <Avatar person={active.person} size={40} online={otherPresence?.online} />
-                    <span><strong>{active.person.fullName}</strong><small className={typingHere ? 'typing' : ''}>{statusLine}</small></span>
-                  </Link>
-                ) : (
-                  <span className="msg-chat-person">
-                    <Avatar person={active?.person} size={40} online={otherPresence?.online} />
-                    <span><strong>{active?.person.fullName ?? 'Conversation'}</strong><small className={typingHere ? 'typing' : ''}>{statusLine}</small></span>
-                  </span>
-                )}
+                <button type="button" className="msg-chat-person" onClick={() => setProfileOpen(true)} title="Contact info" aria-haspopup="dialog">
+                  <Avatar person={active?.person} size={40} online={otherPresence?.online} />
+                  <span><strong>{active?.person.fullName ?? 'Conversation'}</strong><small className={typingHere ? 'typing' : ''}>{statusLine}</small></span>
+                </button>
                 {active?.booking && <Link className="msg-booking-pill" to={`/bookings/${active.bookingId}`} title="Open booking">{active.booking.reference}</Link>}
-                <button type="button" className="msg-icon-btn" onClick={block} aria-label="Block this conversation" title="Block">{I.block}</button>
+                <button type="button" className="msg-icon-btn" onClick={() => setProfileOpen(true)} aria-label="Contact info" title="Contact info">{I.info}</button>
               </header>
 
               <div className="msg-scroll" ref={listRef} onScroll={onScroll} role="log" aria-label="Messages" aria-live="polite">
@@ -511,6 +509,7 @@ function MessagesContent() {
         </section>
       </div>
       {sheet && <ActionSheet message={sheet.message} anchor={sheet.anchor} mine={{ userId: user.id, isMine: sheet.message.senderId === user.id }} onClose={() => setSheet(null)} onReact={(e) => toggleReaction(sheet.message, e)} onReply={() => replyTo(sheet.message)} onCopy={() => copyText(sheet.message)} onDelete={() => removeMessage(sheet.message)} />}
+      {profileOpen && active && !aiOpen && <ProfileSheet thread={active} presence={otherPresence} messages={conv?.messages ?? []} me={user.id} onClose={() => setProfileOpen(false)} onOpenImage={(a) => { setProfileOpen(false); setLightbox(a); }} onBlock={block} onJump={jumpTo} />}
       {lightbox && <Lightbox src={mediaSrc(lightbox.url)} name={lightbox.name} onClose={() => setLightbox(null)} />}
     </>
   );

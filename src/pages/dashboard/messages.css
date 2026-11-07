@@ -328,3 +328,48 @@ a.msg-chat-person:hover { background: var(--color-ivory); }
   .msg-rec-hint { display: none; }
   .msg-quote span { max-width: 220px; }
 }
+
+/* ---------- contact info sheet ---------- */
+button.msg-chat-person { border: 0; background: transparent; font: inherit; color: inherit; text-align: left; cursor: pointer; border-radius: 12px; padding: 4px 8px 4px 4px; margin-left: -4px; transition: background var(--dur-fast); }
+button.msg-chat-person:hover { background: var(--color-ivory); }
+.msg-profile-scrim { position: fixed; inset: 0; z-index: 170; background: rgba(18, 55, 42, 0.35); display: flex; justify-content: flex-end; animation: msg-fade var(--dur-fast) var(--ease); }
+.msg-profile { width: min(400px, 100%); height: 100%; overflow-y: auto; background: #fff; box-shadow: -16px 0 48px rgba(18, 55, 42, 0.2); animation: msg-slide-in var(--dur-med) var(--ease); overscroll-behavior: contain; }
+.msg-profile-head { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: #fff; border-bottom: 1px solid var(--msg-line); font-weight: 600; }
+.msg-profile-hero { display: grid; justify-items: center; gap: 6px; padding: 22px 18px 18px; text-align: center; background: var(--color-ivory); }
+.msg-profile-hero .msg-avatar { font-size: 32px !important; }
+.msg-profile-hero h3 { margin: 6px 0 0; font-size: 20px; color: var(--color-deep-forest); }
+.msg-profile-hero p { margin: 0; font-size: 13.5px; color: var(--color-muted); }
+.msg-profile-hero p .on { color: var(--color-forest); font-weight: 600; }
+.msg-profile-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 10px; }
+.msg-profile-btn { display: inline-flex; align-items: center; gap: 8px; padding: 9px 14px; border-radius: 999px; border: 1px solid var(--msg-line); background: #fff; color: var(--color-deep-forest); font-size: 13.5px; font-weight: 600; text-decoration: none !important; transition: transform var(--dur-fast) var(--ease), background var(--dur-fast); }
+.msg-profile-btn:hover { transform: translateY(-1px); }
+.msg-profile-btn.primary { background: var(--color-deep-forest); border-color: var(--color-deep-forest); color: #fff; }
+.msg-profile-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.msg-profile-section { padding: 16px 18px; border-bottom: 1px solid var(--msg-line); }
+.msg-profile-section h4 { margin: 0 0 10px; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-muted); display: flex; align-items: center; gap: 6px; }
+.msg-profile-section h4 small { font-size: 11px; background: var(--color-sand); border-radius: 999px; padding: 1px 7px; color: var(--color-deep-forest); }
+.msg-profile-section dl { margin: 0; display: grid; gap: 8px; }
+.msg-profile-section dl div { display: flex; justify-content: space-between; gap: 12px; font-size: 13.5px; }
+.msg-profile-section dt { color: var(--color-muted); } .msg-profile-section dd { margin: 0; text-align: right; color: var(--text-primary); }
+.msg-profile-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.msg-profile-grid button { aspect-ratio: 1; border: 0; padding: 0; border-radius: 10px; overflow: hidden; background: var(--color-sand); cursor: zoom-in; }
+.msg-profile-grid img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform var(--dur-med) var(--ease); }
+.msg-profile-grid button:hover img { transform: scale(1.05); }
+.msg-profile-empty, .msg-profile-note { margin: 0; font-size: 13.5px; color: var(--color-muted); }
+.msg-profile-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.msg-profile-list a, .msg-profile-list button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px; border: 0; border-radius: 10px; background: transparent; font: inherit; text-align: left; color: inherit; text-decoration: none !important; cursor: pointer; }
+.msg-profile-list a:hover, .msg-profile-list button:hover { background: var(--color-ivory); }
+.msg-profile-list .msg-file-badge { width: 38px; height: 38px; font-size: 10px; }
+.msg-profile-list .msg-file-badge.link { background: var(--color-forest); } .msg-profile-list .msg-file-badge svg { width: 16px; height: 16px; fill: none; stroke: #fff; stroke-width: 2; }
+.msg-profile-list strong { display: block; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px; }
+.msg-profile-list small { font-size: 12px; color: var(--color-muted); }
+.msg-profile-danger { display: grid; gap: 4px; margin-top: 10px; }
+.msg-profile-danger button, .msg-profile-danger a { display: flex; align-items: center; gap: 10px; padding: 10px 8px; border: 0; border-radius: 10px; background: transparent; font: inherit; font-size: 14px; font-weight: 600; color: #b3261e; text-align: left; text-decoration: none !important; cursor: pointer; }
+.msg-profile-danger a { color: var(--color-deep-forest); font-weight: 500; }
+.msg-profile-danger button:hover, .msg-profile-danger a:hover { background: var(--color-ivory); }
+.msg-profile-danger svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+@keyframes msg-slide-in { from { transform: translateX(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (max-width: 880px) {
+  .msg-profile-scrim { align-items: flex-end; }
+  .msg-profile { width: 100%; height: min(92%, 100%); border-radius: 20px 20px 0 0; animation: msg-up var(--dur-med) var(--ease); }
+}

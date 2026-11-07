@@ -20,9 +20,17 @@ export const CHAT_LIMITS = {
   },
 };
 
+const IMAGE_EXT = /\.(jpe?g|png|webp|gif|heic|heif|bmp|avif)$/i;
+const AUDIO_EXT = /\.(m4a|mp3|ogg|opus|wav|aac|weba|webm)$/i;
+/** Some phones hand over files with an empty or generic MIME type — fall back to the extension. */
 export function kindForFile(file) {
-  if (file.type.startsWith('image/')) return 'chat-image';
-  if (file.type.startsWith('audio/')) return 'chat-audio';
+  const type = (file.type || '').split(';')[0];
+  if (type.startsWith('image/')) return 'chat-image';
+  if (type.startsWith('audio/')) return 'chat-audio';
+  if (!type || type === 'application/octet-stream') {
+    if (IMAGE_EXT.test(file.name || '')) return 'chat-image';
+    if (AUDIO_EXT.test(file.name || '')) return 'chat-audio';
+  }
   return 'chat-file';
 }
 
@@ -45,7 +53,13 @@ async function imageSize(file) {
 /** Upload one attachment with progress. Resolves `{ key, url, name, mime, size, width?, height? }`. */
 export async function uploadChatAttachment(rawFile, kind, { onProgress, signal, durationMs } = {}) {
   let file = rawFile;
-  if (kind === 'chat-image' && rawFile.type !== 'image/gif') file = await prepareImage(rawFile, { maxEdge: 1600 });
+  if (kind === 'chat-image' && rawFile.type !== 'image/gif') {
+    // Downsize in the browser; if decoding stalls (huge/odd photos on some phones) fall back to the original file.
+    file = await Promise.race([
+      prepareImage(rawFile, { maxEdge: 1600 }).catch(() => rawFile),
+      new Promise((resolve) => setTimeout(() => resolve(rawFile), 15_000)),
+    ]);
+  }
   const problem = checkChatFile(file, kind);
   if (problem) throw Object.assign(new Error(problem), { status: 422 });
   const contentType = (file.type || 'application/octet-stream').split(';')[0];

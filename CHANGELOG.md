@@ -18,6 +18,10 @@ All notable changes to the Servix public website.
   record with live meter, waveform player with 1×/1.5×/2× speed), paste or drag-and-drop files, emoji picker,
   reply with quote (tap to jump), long-press/⋯ action sheet with reactions · reply · copy · download · delete for
   everyone, lightbox, upload progress rings, retry; Servix-branded doodle wallpaper.
+- Web: tap the person's name/avatar in a chat (or the ⓘ button) for a **contact card** — title, online status, link
+  to the public profile and booking, photos / files / links shared in the conversation, block and report.
+- Web: photo sending hardened — files with a missing or generic MIME type are recognised by extension, client-side
+  downsizing falls back to the original after 15 s, and a failed bubble now shows the reason next to "Tap to retry".
 - Web: Servix AI is pinned at the top of the chat list and chats like any conversation
   (`/dashboard/messages?thread=ai`, streamed answers, history kept on the device). The floating AI button is hidden
   on the Messages page only.
