@@ -295,6 +295,10 @@ img{display:block;max-width:100%}
   <button data-s="sheet">Booking sheet</button>
   <button data-s="bookings">Bookings</button>
   <button data-s="ai">Servix AI</button>
+  <button data-s="messages">Messages</button>
+  <button data-s="chat">Chat</button>
+  <button data-s="post">Post a job</button>
+  <button data-s="network">Network</button>
   <button data-s="account">Account</button>
 </div>
 
@@ -308,6 +312,7 @@ img{display:block;max-width:100%}
       <div class="home-head">
         <div><div class="hi">Good morning</div><div class="name">Adaeze</div></div>
         <div class="row" style="gap:4px">
+          <button class="iconbtn" aria-label="Messages" onclick="go('messages')"><svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.2L4 21l1.8-5.4A8 8 0 1 1 21 12z"/></svg><span class="dot"></span></button>
           <button class="iconbtn" aria-label="Notifications"><svg viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span class="dot"></span></button>
           <button onclick="go('account')"><img class="avatar" src="img/pro-chiamaka.jpg" style="width:40px;height:40px" alt=""></button>
         </div>
@@ -328,7 +333,7 @@ img{display:block;max-width:100%}
       <div class="quick">
         <button onclick="go('explore')"><span class="ic"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span><b>Find a professional</b></button>
         <button onclick="go('ai')"><span class="ic"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.6L18.5 9.4l-4.7 1.8L12 16l-1.8-4.8L5.5 9.4l4.7-1.8z"/><path d="M19 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg></span><b>Ask Servix AI</b></button>
-        <button onclick="go('account')"><span class="ic"><svg viewBox="0 0 24 24"><path d="M19 21l-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></span><b>Saved pros</b></button>
+        <button onclick="go('post')"><span class="ic"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span><b>Post a job</b></button>
       </div>
 
       <div class="sec-head"><div class="h-section">Recommended for you</div><a href="#" onclick="go('explore');return false">See all</a></div>
@@ -386,6 +391,7 @@ img{display:block;max-width:100%}
       <div class="prof-head">
         <div class="top"><img class="avatar" src="img/pro-tunde.jpg" alt=""><div><div class="n">Tunde Bakare<span class="verified" style="width:20px;height:20px"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></span></div><div class="t">Brand &amp; Graphic Designer</div><div class="l">Abuja · Replies in about 1 hour · Member since 2023</div></div></div>
       </div>
+      <div class="row" style="margin:14px 20px 0;gap:10px"><button class="btn secondary" style="flex:1;height:44px;font-size:14px" onclick="go('chat')">Message</button><button class="btn ghost" style="flex:1;height:44px;font-size:14px" onclick="go('network')">Connect</button></div>
       <div class="stats"><div><b>4.9</b><span>156 reviews</span></div><div><b>212</b><span>projects done</span></div><div><b>98%</b><span>on time</span></div></div>
       <div class="trust"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg><span><b>Identity verified.</b> You pay through Servix; the money is released to Tunde after you confirm the work.</span></div>
       <div class="tabs"><button class="on">Services · 4</button><button>About</button><button>Reviews · 156</button></div>
@@ -448,7 +454,7 @@ img{display:block;max-width:100%}
   <section class="screen" id="s-bookings">
     <div class="scroll">
       <div style="padding:8px 20px 12px" class="h-display">Bookings</div>
-      <div class="seg"><button class="on">Active · 3</button><button>Past · 7</button></div>
+      <div class="seg"><button class="on">Active · 3</button><button>Past · 7</button><button onclick="go('post')">Job posts · 1</button></div>
       <div class="group">Today</div>
       <button class="bk"><div class="date"><span>THU</span><b>13</b></div><div class="mid"><div class="n">Website copy refresh</div><div class="w">Grace Adeyemi · 15:00</div></div><div class="right"><span class="status-chip st-pending">Awaiting payment</span><span class="price">₦45,000</span></div></button>
       <div class="group">This week</div>
@@ -481,6 +487,73 @@ img{display:block;max-width:100%}
     <div class="nav" data-nav="ai"></div>
   </section>
 
+  <!-- ================= MESSAGES ================= -->
+  <section class="screen" id="s-messages">
+    <div class="topbar"><button class="back" onclick="go('home')"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button><span class="h-title">Messages</span></div>
+    <div class="scroll">
+      <div class="search" style="height:44px;font-size:14px"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>Search conversations</div>
+      <div class="group">Bookings</div>
+      <button class="result" onclick="go('chat')"><img class="avatar" src="img/pro-tunde.jpg" alt=""><div class="mid"><div class="n" style="display:flex;justify-content:space-between"><span>Tunde Bakare</span><span class="tiny" style="color:var(--forest);font-weight:600">10:42</span></div><div class="t" style="color:var(--charcoal);font-weight:500">Sent the first two logo directions — have a look before our call.</div><div class="meta">Complete Brand Identity Package · SVX-2041</div></div><span style="width:10px;height:10px;border-radius:50%;background:var(--coral);flex:none"></span></button>
+      <button class="result" onclick="go('chat')"><img class="avatar" src="img/pro-grace.jpg" alt=""><div class="mid"><div class="n" style="display:flex;justify-content:space-between"><span>Grace Adeyemi</span><span class="tiny">Yesterday</span></div><div class="t">Thanks! I'll start once the payment clears.</div><div class="meta">Website copy refresh · SVX-2038</div></div></button>
+      <div class="group">Connections</div>
+      <button class="result" onclick="go('chat')"><img class="avatar" src="img/pro-chiamaka.jpg" alt=""><div class="mid"><div class="n" style="display:flex;justify-content:space-between"><span>Chiamaka Eze</span><span class="tiny">Mon</span></div><div class="t">Happy to quote for the onboarding flow next month.</div><div class="meta">Connected · Product Designer</div></div></button>
+      <button class="result" onclick="go('chat')"><span class="avatar initials" style="width:60px;height:60px;font-size:18px">NK</span><div class="mid"><div class="n" style="display:flex;justify-content:space-between"><span>Ngozi Kalu</span><span class="tiny">2 Nov</span></div><div class="t">You: Great — let's talk after my launch.</div><div class="meta">Connected · UI Designer</div></div></button>
+      <div class="tiny" style="text-align:center;padding:18px 28px 0">You can message a professional once you have booked them or connected with them.</div>
+    </div>
+    <div class="nav" data-nav="home"></div>
+  </section>
+
+  <!-- ================= CHAT ================= -->
+  <section class="screen" id="s-chat">
+    <div class="topbar" style="border-bottom:1px solid var(--line)"><button class="back" onclick="go('messages')"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button><button class="row" style="flex:1;text-align:left" onclick="go('profile')"><img class="avatar" src="img/pro-tunde.jpg" style="width:36px;height:36px" alt=""><div><div style="font-size:15px;font-weight:600;color:var(--forest-deep);line-height:18px">Tunde Bakare</div><div class="tiny">Complete Brand Identity Package · Accepted</div></div></button><button class="iconbtn"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg></button></div>
+    <div class="scroll" style="padding-bottom:calc(var(--nav-h) + 84px)">
+      <div class="tiny" style="text-align:center;padding:14px 0 0">Thu 13 Nov</div>
+      <div class="card" style="margin:10px 20px 0;padding:12px 14px;display:flex;gap:10px;align-items:center;background:var(--mint);border:0"><svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:var(--forest-deep);fill:none;stroke-width:2;flex:none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg><span class="small" style="color:var(--forest-deep)">Keep payments inside Servix — it's how your booking stays protected.</span></div>
+      <div class="bubble ai">Hi Adaeze — thanks for booking. Could you send me your current logo files and 3 brands you admire?</div>
+      <div class="tiny" style="margin:4px 20px 0">09:58</div>
+      <div class="bubble me">Sure! Sending the files now. We like Kuda, Paystack and a bakery called Cakes by Tolu.</div>
+      <div class="tiny" style="margin:4px 20px 0;text-align:right">10:05 · Read</div>
+      <div class="bubble ai">Perfect. Sent the first two logo directions to your email — have a look before our call.</div>
+      <div class="tiny" style="margin:4px 20px 0">10:42</div>
+    </div>
+    <div class="composer"><div class="box">Message Tunde…</div><button class="send"><svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button></div>
+    <div class="nav" data-nav="home"></div>
+  </section>
+
+  <!-- ================= POST A JOB ================= -->
+  <section class="screen" id="s-post">
+    <div class="topbar"><button class="back" onclick="go('home')"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button><span class="h-title">Post a job</span><span style="flex:1"></span><span class="small">Step 1 of 2</span></div>
+    <div class="scroll has-bar" style="padding-left:0;padding-right:0">
+      <div style="padding:4px 20px 0" class="small">Describe what you need. Verified professionals send proposals; you pick one and it becomes a normal, protected booking.</div>
+      <div class="field" style="padding:0 20px"><label>Title</label><div class="box" style="color:var(--charcoal)">Logo and packaging for a small bakery</div></div>
+      <div class="field" style="padding:0 20px"><label>Category</label><div class="box"><span>Design</span><svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:var(--muted);fill:none;stroke-width:2"><path d="m6 9 6 6 6-6"/></svg></div></div>
+      <div class="field" style="padding:0 20px"><label>What do you need?</label><div class="box textarea" style="color:var(--charcoal)">We're opening a second branch in Lekki in January and need a refreshed logo, box and sticker designs. We have brand colours already…</div><div class="tiny" style="margin-top:4px;text-align:right">148 / 5000 · at least 40</div></div>
+      <div class="field" style="padding:0 20px"><label>Budget</label><div class="seg" style="margin:0"><button class="on">Fixed</button><button>Range</button></div><div class="box" style="margin-top:8px;color:var(--charcoal)">₦ 150,000</div></div>
+      <div class="field" style="padding:0 20px"><label>Where</label><div class="row" style="gap:8px"><span class="chip on">Remote</span><span class="chip">On-site · Lagos</span></div></div>
+      <div class="field" style="padding:0 20px"><label>Needed by <span style="font-weight:400;color:var(--muted)">(optional)</span></label><div class="box"><span>15 Dec 2026</span><svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:var(--muted);fill:none;stroke-width:2"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/></svg></div></div>
+      <div class="field" style="padding:0 20px"><label>Skills <span style="font-weight:400;color:var(--muted)">(up to 15)</span></label><div class="row" style="gap:8px;flex-wrap:wrap"><span class="chip">Logo design ×</span><span class="chip">Packaging ×</span><span class="chip" style="border-style:dashed;color:var(--muted)">+ Add</span></div></div>
+      <div style="height:16px"></div>
+    </div>
+    <div class="sticky-bar"><button class="btn secondary" style="flex:1">Save draft</button><button class="btn primary" onclick="go('bookings')">Publish job</button></div>
+    <div class="nav" data-nav="home"></div>
+  </section>
+
+  <!-- ================= NETWORK ================= -->
+  <section class="screen" id="s-network">
+    <div class="topbar"><button class="back" onclick="go('account')"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button><span class="h-title">Connections</span></div>
+    <div class="seg"><button class="on">Connected · 14</button><button>Requests · 2</button></div>
+    <div class="scroll">
+      <div class="group">New requests</div>
+      <div class="card" style="margin:0 20px;padding:14px"><div class="row"><img class="avatar" src="img/pro-ibrahim.jpg" style="width:48px;height:48px" alt=""><div style="flex:1"><b style="font-size:15px;color:var(--forest-deep)">Ibrahim Yusuf</b><div class="small">Full-stack Developer · Kano · Worked together on 1 booking</div></div></div><div class="row" style="margin-top:12px;gap:8px"><button class="btn primary" style="height:42px;font-size:14px">Accept</button><button class="btn ghost" style="height:42px;font-size:14px;flex:1">Decline</button></div></div>
+      <div class="group">Connected</div>
+      <button class="result" onclick="go('chat')"><img class="avatar" src="img/pro-chiamaka.jpg" alt=""><div class="mid"><div class="n">Chiamaka Eze<span class="verified"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></span></div><div class="t">Product Designer · Lagos</div><div class="meta">Connected 3 weeks ago</div></div><span class="chip" style="height:32px;font-size:12.5px">Message</span></button>
+      <button class="result" onclick="go('chat')"><img class="avatar" src="img/pro-tunde.jpg" alt=""><div class="mid"><div class="n">Tunde Bakare<span class="verified"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></span></div><div class="t">Brand &amp; Graphic Designer · Abuja</div><div class="meta">Connected 2 months ago · 1 booking</div></div><span class="chip" style="height:32px;font-size:12.5px">Message</span></button>
+      <button class="result" onclick="go('chat')"><span class="avatar initials" style="width:60px;height:60px;font-size:18px">NK</span><div class="mid"><div class="n">Ngozi Kalu</div><div class="t">UI Designer · Enugu</div><div class="meta">Connected 1 month ago</div></div><span class="chip" style="height:32px;font-size:12.5px">Message</span></button>
+      <div class="tiny" style="text-align:center;padding:18px 28px 0">Connect from any professional's profile. Connections can message each other without a booking.</div>
+    </div>
+    <div class="nav" data-nav="account"></div>
+  </section>
+
   <!-- ================= ACCOUNT ================= -->
   <section class="screen" id="s-account">
     <div class="scroll">
@@ -489,6 +562,7 @@ img{display:block;max-width:100%}
       <div class="list-lbl">You</div>
       <div class="list">
         <button><span class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span>Profile &amp; photo<svg class="chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
+        <button onclick="go('network')"><span class="ic"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2 20a7 7 0 0 1 14 0"/><circle cx="17.5" cy="9" r="2.5"/><path d="M16 15.5a5 5 0 0 1 6 4.5"/></svg></span>Connections<span class="val">14 · 2 requests</span><svg class="chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
         <button><span class="ic"><svg viewBox="0 0 24 24"><path d="M19 21l-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></span>Saved professionals<span class="val">6</span><svg class="chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
         <button><span class="ic"><svg viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></span>Notifications<span class="val">2 new</span><svg class="chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
       </div>
@@ -530,6 +604,10 @@ const NOTES = {
  sheet:'<b>Booking sheet.</b> Confirm, not configure: what · when · notes · total, then one button. Escrow sentence under the button.',
  bookings:'<b>Bookings.</b> Calendar tile for the date, status chip + price on the right, grouped Today / This week / Later. Pending reviews pulled up as a card.',
  ai:'<b>Servix AI.</b> Bubbles, a tappable pro card inside the answer, usage bar in the header, pinned composer, honest footer.',
+ messages:'<b>Messages.</b> One inbox, grouped by how you know the person (booking or connection). Unread dot, booking reference under each row.',
+ chat:'<b>Chat.</b> Booking context in the header, safety reminder once, read receipts, text only (files go through the booking). Plain bubbles — no fancy effects.',
+ post:'<b>Post a job.</b> One screen, the same fields the website uses (title, category, description ≥ 40 chars, budget, remote/on-site, deadline, skills). Save draft or publish.',
+ network:'<b>Connections.</b> LinkedIn-style: requests to accept/decline on top, connected people below with a Message shortcut.',
  account:'<b>Account.</b> Photo + plan chip in the header; grouped settings with live values (count, plan %, device). Danger action last.'
 };
 function nav(active){document.querySelectorAll('.nav').forEach(n=>{n.innerHTML=NAV.map(([id,l,svg])=>`<button class="${id===active?'on':''}" onclick="go('${id}')">${svg}<span>${l}</span>${id==='home'&&false?'':''}</button>`).join('');});}
