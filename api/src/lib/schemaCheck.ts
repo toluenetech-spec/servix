@@ -7,13 +7,14 @@
 import { prisma } from './db.js';
 
 /** Markers of the newest migration that every request path depends on. Extend when a new migration lands. */
-export const LATEST_MIGRATION = '20261004000000_subscriptions_entitlements';
+export const LATEST_MIGRATION = '20261108000000_chat_media';
 const REQUIRED_COLUMNS: Array<{ table: string; column: string }> = [
   { table: 'users', column: 'plan_slug' },
   { table: 'plans', column: 'limits' },
   { table: 'organizations', column: 'id' },
   { table: 'usage_periods', column: 'id' },
   { table: 'ai_usage_events', column: 'id' },
+  { table: 'chat_messages', column: 'kind' },
 ];
 
 /**

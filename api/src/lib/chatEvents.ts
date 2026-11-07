@@ -16,9 +16,13 @@
  */
 import { prisma } from './db.js';
 
+/** Wire shape of a chat message (see `shapeMessage` in routes/community.ts). */
+export type ChatMessagePayload = { id: string; body: string; senderId: string; createdAt: Date | string; clientId?: string; [extra: string]: unknown };
+
 export type ChatEvent =
   | { type: 'hello'; online: string[]; lastSeen: Record<string, string> }
-  | { type: 'message'; threadId: string; message: { id: string; body: string; senderId: string; createdAt: Date | string; clientId?: string } }
+  | { type: 'message'; threadId: string; message: ChatMessagePayload }
+  | { type: 'message_update'; threadId: string; message: ChatMessagePayload }
   | { type: 'typing'; threadId: string; userId: string; typing: boolean }
   | { type: 'read'; threadId: string; userId: string; at: string }
   | { type: 'delivered'; threadId: string; userId: string; at: string }

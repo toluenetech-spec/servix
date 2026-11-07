@@ -4,11 +4,18 @@ import { useAuth } from '../../lib/AuthContext.jsx';
 import { useWorkspace } from '../../components/dashboard/WorkspaceShell.jsx';
 import { getMyBookings, getProBookings } from '../../lib/bookingApi.js';
 import * as api from '../../lib/workspaceApi.js';
+import { uploadChatAttachment, sendChatMessage, deleteChatMessage, reactToMessage, kindForFile, CHAT_LIMITS } from '../../lib/chatApi.js';
 import { subscribeChatEvents } from '../../lib/chatRealtime.js';
 import { useDocumentMeta } from '../../lib/useDocumentMeta.js';
+import { useFeatures } from '../../lib/useFeatures.js';
 import { PageHead, LoadState, Empty, useResource } from './shared.jsx';
 import { ListSkeleton, Skeleton } from '../../components/ui/States.jsx';
+import { AiAvatar } from '../../components/ai/AiBits.jsx';
 import { CommunityGate } from './NetworkPage.jsx';
+import { Avatar, Ticks, TypingBubble, MessageBubble, ActionSheet, Lightbox, EmojiPicker, I } from '../../components/chat/ChatBits.jsx';
+import { AiThread, loadAiHistory } from '../../components/chat/AiThread.jsx';
+import { useVoiceRecorder } from '../../components/chat/useVoiceRecorder.js';
+import { LOCATION_PREFIX, TYPING_TTL, dayLabel, relativeSeen, listTime, sortMessages, tickState, previewOf, mergeMessage, formatDuration, formatBytes, newClientId, mediaSrc } from '../../components/chat/chatUtils.js';
 import './messages.css';
 
 export default function MessagesPage() {
@@ -21,97 +28,22 @@ export default function MessagesPage() {
   );
 }
 
-/* ------------------------------------------------------------------ helpers */
-
-const TYPING_TTL = 4500;
-const LOCATION_PREFIX = '📍 My location: ';
-const URL_RE = /(https?:\/\/[^\s<>"']+)/g;
-
-const timeOf = (iso) => new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-function dayLabel(iso) {
-  const d = new Date(iso); const now = new Date();
-  const start = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
-  const diff = Math.round((start(now) - start(d)) / 86_400_000);
-  if (diff === 0) return 'Today';
-  if (diff === 1) return 'Yesterday';
-  return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', ...(d.getFullYear() !== now.getFullYear() ? { year: 'numeric' } : {}) });
-}
-function relativeSeen(iso) {
-  if (!iso) return null;
-  const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60_000));
-  if (mins < 1) return 'Last seen just now';
-  if (mins < 60) return `Last seen ${mins} min ago`;
-  const d = new Date(iso); const label = dayLabel(iso);
-  return `Last seen ${label === 'Today' ? '' : `${label} at `}${timeOf(d)}`.replace('  ', ' ');
-}
-function listTime(iso) {
-  if (!iso) return '';
-  const label = dayLabel(iso);
-  return label === 'Today' ? timeOf(iso) : label;
-}
-const initials = (name = '') => name.trim().split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase() ?? '').join('') || 'S';
-const sortMessages = (list) => list.slice().sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
-const after = (iso, mark) => Boolean(mark) && new Date(mark).getTime() >= new Date(iso).getTime();
-
-function tickState(m, thread) {
-  if (m.pending) return 'pending';
-  if (m.failed) return 'failed';
-  if (after(m.createdAt, thread?.otherReadAt)) return 'seen';
-  if (after(m.createdAt, thread?.otherDeliveredAt)) return 'delivered';
-  return 'sent';
-}
-
-function renderBody(body) {
-  const parts = body.split(URL_RE);
-  return parts.map((part, i) => (i % 2 === 1
-    ? <a key={i} href={part} target="_blank" rel="noopener noreferrer">{part.length > 60 ? `${part.slice(0, 57)}…` : part}</a>
-    : <span key={i}>{part}</span>));
-}
-
-/* ------------------------------------------------------------------ atoms */
-
-function Avatar({ person, size = 44, online }) {
-  const src = person?.professionalProfile?.imageUrl;
-  return (
-    <span className="msg-avatar" style={{ width: size, height: size, fontSize: Math.round(size * 0.36) }} aria-hidden="true">
-      {src ? <img src={src} alt="" loading="lazy" /> : initials(person?.fullName)}
-      {online && <i className="msg-online" />}
-    </span>
-  );
-}
-
-function Ticks({ state }) {
-  if (state === 'pending') return <svg className="msg-tick pending" viewBox="0 0 24 24" aria-label="Sending"><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></svg>;
-  if (state === 'failed') return <svg className="msg-tick failed" viewBox="0 0 24 24" aria-label="Not sent"><circle cx="12" cy="12" r="8.5" /><path d="M12 8v5M12 16.5h.01" /></svg>;
-  if (state === 'sent') return <svg className="msg-tick" viewBox="0 0 24 24" aria-label="Sent"><path d="M4 12.5l5 5L19 7" /></svg>;
-  return (
-    <svg className={`msg-tick double ${state === 'seen' ? 'seen' : ''}`} viewBox="0 0 30 24" aria-label={state === 'seen' ? 'Seen' : 'Delivered'}>
-      <path d="M2 12.5l5 5L17 7" /><path d="M10.5 15.5l2.5 2L25 7" />
-    </svg>
-  );
-}
-
-function TypingBubble({ person }) {
-  return (
-    <div className="msg-row theirs typing" aria-live="polite" aria-label={`${person?.fullName ?? 'They'} is typing`}>
-      <div className="msg-bubble theirs"><span className="msg-dots"><i /><i /><i /></span></div>
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ main */
+const AI_THREAD = 'ai';
 
 function MessagesContent() {
   const { user } = useAuth();
   const { overview } = useWorkspace();
+  const features = useFeatures();
   const [params, setParams] = useSearchParams();
   const activeId = params.get('thread');
+  const aiOpen = activeId === AI_THREAD;
+  const humanId = aiOpen ? null : activeId;
 
   const [threads, setThreads] = useState(null);
   const [threadError, setThreadError] = useState('');
-  const [byThread, setByThread] = useState({}); // id → { messages, before, canSend, loaded, loading, error }
-  const [presence, setPresence] = useState({}); // userId → { online, lastSeen }
-  const [typing, setTyping] = useState({}); // threadId → expiresAt
+  const [byThread, setByThread] = useState({});
+  const [presence, setPresence] = useState({});
+  const [typing, setTyping] = useState({});
   const [stream, setStream] = useState('connecting');
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
@@ -119,14 +51,25 @@ function MessagesContent() {
   const [newChat, setNewChat] = useState(false);
   const [booking, setBooking] = useState('');
   const [query, setQuery] = useState('');
+  const [reply, setReply] = useState(null);
+  const [staged, setStaged] = useState(null); // { file, kind, previewUrl }
+  const [sheet, setSheet] = useState(null); // { message, anchor }
+  const [lightbox, setLightbox] = useState(null);
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  const [attachOpen, setAttachOpen] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const [aiTick, setAiTick] = useState(0);
+  const voice = useVoiceRecorder();
 
-  const activeRef = useRef(activeId); activeRef.current = activeId;
+  const activeRef = useRef(humanId); activeRef.current = humanId;
   const listRef = useRef(null);
   const stickToBottom = useRef(true);
   const [unseenBelow, setUnseenBelow] = useState(0);
   const typingSentAt = useRef(0);
   const typingStopTimer = useRef(null);
   const textareaRef = useRef(null);
+  const photoInput = useRef(null);
+  const fileInput = useRef(null);
 
   const bookings = useResource(async () => {
     const mine = await getMyBookings();
@@ -134,34 +77,16 @@ function MessagesContent() {
     return [...new Map([...mine, ...work].map((b) => [b.id, b])).values()];
   }, [overview?.canManageServices]);
 
-  /* ---- threads ---- */
+  /* ---------------- threads ---------------- */
   const loadThreads = useCallback(async () => {
     try {
       const data = await api.getThreads();
-      setThreads(data);
-      setThreadError('');
-      setPresence((old) => {
-        const next = { ...old };
-        for (const t of data) next[t.person.id] = { online: t.online, lastSeen: t.lastSeenAt ?? old[t.person.id]?.lastSeen ?? null };
-        return next;
-      });
+      setThreads(data); setThreadError('');
+      setPresence((old) => { const next = { ...old }; for (const t of data) next[t.person.id] = { online: t.online, lastSeen: t.lastSeenAt ?? old[t.person.id]?.lastSeen ?? null }; return next; });
     } catch (e) { setThreadError(e.message); }
   }, []);
-
   useEffect(() => { loadThreads(); }, [loadThreads]);
 
-  // Fallback polling only while the live stream is not available.
-  useEffect(() => {
-    if (stream === 'live') return undefined;
-    const timer = setInterval(() => {
-      if (document.hidden) return;
-      loadThreads();
-      if (activeRef.current) loadMessages(activeRef.current, { merge: true });
-    }, 15_000);
-    return () => clearInterval(timer);
-  }, [stream, loadThreads]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  /* ---- messages ---- */
   const loadMessages = useCallback(async (id, { merge = false } = {}) => {
     setByThread((old) => ({ ...old, [id]: { ...(old[id] ?? { messages: [] }), loading: !merge && !old[id]?.loaded, error: '' } }));
     try {
@@ -180,196 +105,185 @@ function MessagesContent() {
     }
   }, []);
 
+  useEffect(() => {
+    if (stream === 'live') return undefined;
+    const timer = setInterval(() => { if (document.hidden) return; loadThreads(); if (activeRef.current) loadMessages(activeRef.current, { merge: true }); }, 15_000);
+    return () => clearInterval(timer);
+  }, [stream, loadThreads, loadMessages]);
+
   const acknowledge = useCallback((id) => {
     api.markDelivered(id).catch(() => {});
-    if (!document.hidden) {
-      api.markRead(id).then(() => setThreads((old) => old?.map((t) => (t.id === id ? { ...t, unread: false, unreadCount: 0 } : t)))).catch(() => {});
-    }
+    if (!document.hidden) api.markRead(id).then(() => setThreads((old) => old?.map((t) => (t.id === id ? { ...t, unread: false, unreadCount: 0 } : t)))).catch(() => {});
   }, []);
 
   useEffect(() => {
-    setDraft(''); setError(''); setUnseenBelow(0); stickToBottom.current = true;
-    if (!activeId) return;
-    loadMessages(activeId).then((data) => { if (data && activeRef.current === activeId) acknowledge(activeId); });
+    setDraft(''); setError(''); setUnseenBelow(0); setReply(null); setStaged(null); setSheet(null); setEmojiOpen(false); setAttachOpen(false); stickToBottom.current = true;
+    if (!humanId) return;
+    loadMessages(humanId).then((data) => { if (data && activeRef.current === humanId) acknowledge(humanId); });
     setTimeout(() => textareaRef.current?.focus(), 50);
-  }, [activeId, loadMessages, acknowledge]);
+  }, [humanId, loadMessages, acknowledge]);
 
-  // When the tab comes back, the open conversation counts as read.
   useEffect(() => {
     const onVisible = () => { if (document.visibilityState === 'visible' && activeRef.current) acknowledge(activeRef.current); };
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, [acknowledge]);
 
-  /* ---- realtime ---- */
+  /* ---------------- realtime ---------------- */
   useEffect(() => {
     const stop = subscribeChatEvents((ev) => {
       switch (ev.type) {
         case 'hello': {
-          setPresence((old) => {
-            const next = { ...old };
-            for (const id of ev.online ?? []) next[id] = { online: true, lastSeen: null };
-            for (const [id, at] of Object.entries(ev.lastSeen ?? {})) if (!next[id]?.online) next[id] = { online: false, lastSeen: at };
-            return next;
-          });
-          // Catch up anything that happened while we were disconnected.
-          loadThreads();
-          if (activeRef.current) loadMessages(activeRef.current, { merge: true });
+          setPresence((old) => { const next = { ...old }; for (const id of ev.online ?? []) next[id] = { online: true, lastSeen: null }; for (const [id, at] of Object.entries(ev.lastSeen ?? {})) if (!next[id]?.online) next[id] = { online: false, lastSeen: at }; return next; });
+          loadThreads(); if (activeRef.current) loadMessages(activeRef.current, { merge: true });
           break;
         }
         case 'message': {
-          const { threadId, message } = ev;
-          const mine = message.senderId === user.id;
-          setByThread((old) => {
-            const prev = old[threadId];
-            if (!prev) return old; // not loaded yet; the list refresh covers it
-            const map = new Map(prev.messages.filter((m) => !(m.pending && m.clientId === message.clientId)).map((m) => [m.id, m]));
-            map.set(message.id, message);
-            return { ...old, [threadId]: { ...prev, messages: sortMessages([...map.values()]) } };
-          });
+          const { threadId, message } = ev; const mine = message.senderId === user.id;
+          setByThread((old) => { const prev = old[threadId]; if (!prev) return old; const map = new Map(prev.messages.filter((m) => !(m.pending && m.clientId === message.clientId)).map((m) => [m.id, m])); map.set(message.id, message); return { ...old, [threadId]: { ...prev, messages: sortMessages([...map.values()]) } }; });
           setThreads((old) => {
-            if (!old) return old;
-            const idx = old.findIndex((t) => t.id === threadId);
-            if (idx < 0) { loadThreads(); return old; }
-            const current = old[idx];
-            const isOpen = activeRef.current === threadId && !document.hidden;
-            const updated = { ...current, lastMessage: message.body, lastMessageAt: message.createdAt, lastMessageSenderId: message.senderId, lastMessageId: message.id, unread: !mine && !isOpen ? true : current.unread && !isOpen, unreadCount: !mine && !isOpen ? (current.unreadCount ?? 0) + 1 : isOpen ? 0 : current.unreadCount };
+            if (!old) return old; const idx = old.findIndex((t) => t.id === threadId); if (idx < 0) { loadThreads(); return old; }
+            const current = old[idx]; const isOpen = activeRef.current === threadId && !document.hidden;
+            const updated = { ...current, lastMessage: previewOf(message), lastMessageKind: message.kind, lastMessageAt: message.createdAt, lastMessageSenderId: message.senderId, lastMessageId: message.id, unread: !mine && !isOpen ? true : current.unread && !isOpen, unreadCount: !mine && !isOpen ? (current.unreadCount ?? 0) + 1 : isOpen ? 0 : current.unreadCount };
             return [updated, ...old.slice(0, idx), ...old.slice(idx + 1)];
           });
           if (!mine) {
             setTyping((old) => { const n = { ...old }; delete n[threadId]; return n; });
-            if (activeRef.current === threadId) {
-              acknowledge(threadId);
-              if (!stickToBottom.current) setUnseenBelow((n) => n + 1);
-            } else {
-              api.markDelivered(threadId).catch(() => {});
-            }
+            if (activeRef.current === threadId) { acknowledge(threadId); if (!stickToBottom.current) setUnseenBelow((n) => n + 1); } else api.markDelivered(threadId).catch(() => {});
           }
           break;
         }
-        case 'typing': {
-          setTyping((old) => {
-            const next = { ...old };
-            if (ev.typing) next[ev.threadId] = Date.now() + TYPING_TTL; else delete next[ev.threadId];
-            return next;
-          });
+        case 'message_update': {
+          const { threadId, message } = ev;
+          setByThread((old) => (old[threadId] ? { ...old, [threadId]: { ...old[threadId], messages: mergeMessage(old[threadId].messages, message) } } : old));
+          setThreads((old) => old?.map((t) => (t.id === threadId && t.lastMessageId === message.id ? { ...t, lastMessage: previewOf(message), lastMessageKind: message.kind } : t)));
           break;
         }
-        case 'read':
-        case 'delivered': {
+        case 'typing': { setTyping((old) => { const next = { ...old }; if (ev.typing) next[ev.threadId] = Date.now() + TYPING_TTL; else delete next[ev.threadId]; return next; }); break; }
+        case 'read': case 'delivered': {
           const key = ev.type === 'read' ? 'otherReadAt' : 'otherDeliveredAt';
           setByThread((old) => (old[ev.threadId] ? { ...old, [ev.threadId]: { ...old[ev.threadId], [key]: ev.at } } : old));
           setThreads((old) => old?.map((t) => (t.id === ev.threadId ? { ...t, [key]: ev.at } : t)));
           break;
         }
-        case 'presence': {
-          setPresence((old) => ({ ...old, [ev.userId]: { online: ev.online, lastSeen: ev.lastSeen ?? old[ev.userId]?.lastSeen ?? null } }));
-          break;
-        }
-        case 'thread':
-        case 'connection': {
-          loadThreads();
-          break;
-        }
+        case 'presence': { setPresence((old) => ({ ...old, [ev.userId]: { online: ev.online, lastSeen: ev.lastSeen ?? old[ev.userId]?.lastSeen ?? null } })); break; }
+        case 'thread': case 'connection': { loadThreads(); break; }
         default:
       }
     }, setStream);
     return stop;
   }, [user.id, loadThreads, loadMessages, acknowledge]);
 
-  // Expire typing indicators.
   useEffect(() => {
-    const ids = Object.keys(typing);
-    if (!ids.length) return undefined;
-    const timer = setInterval(() => {
-      const now = Date.now();
-      setTyping((old) => {
-        const next = {}; let changed = false;
-        for (const [k, v] of Object.entries(old)) { if (v > now) next[k] = v; else changed = true; }
-        return changed ? next : old;
-      });
-    }, 1000);
+    if (!Object.keys(typing).length) return undefined;
+    const timer = setInterval(() => { const now = Date.now(); setTyping((old) => { const next = {}; let changed = false; for (const [k, v] of Object.entries(old)) { if (v > now) next[k] = v; else changed = true; } return changed ? next : old; }); }, 1000);
     return () => clearInterval(timer);
   }, [typing]);
 
-  /* ---- scrolling ---- */
-  const active = useMemo(() => threads?.find((t) => t.id === activeId) ?? null, [threads, activeId]);
-  const conv = byThread[activeId] ?? null;
+  /* ---------------- scrolling ---------------- */
+  const active = useMemo(() => threads?.find((t) => t.id === humanId) ?? null, [threads, humanId]);
+  const conv = byThread[humanId] ?? null;
   const lastMessageId = conv?.messages[conv.messages.length - 1]?.id;
-  const typingHere = Boolean(activeId && typing[activeId] > Date.now());
-
-  useEffect(() => {
-    const el = listRef.current;
-    if (!el) return;
-    if (stickToBottom.current) { el.scrollTop = el.scrollHeight; setUnseenBelow(0); }
-  }, [lastMessageId, activeId, typingHere, conv?.loaded]);
-
-  const onScroll = () => {
-    const el = listRef.current;
-    if (!el) return;
-    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-    stickToBottom.current = nearBottom;
-    if (nearBottom) setUnseenBelow(0);
-  };
+  const typingHere = Boolean(humanId && typing[humanId] > Date.now());
+  useEffect(() => { const el = listRef.current; if (!el) return; if (stickToBottom.current) { el.scrollTop = el.scrollHeight; setUnseenBelow(0); } }, [lastMessageId, humanId, typingHere, conv?.loaded, staged, reply]);
+  const onScroll = () => { const el = listRef.current; if (!el) return; const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80; stickToBottom.current = nearBottom; if (nearBottom) setUnseenBelow(0); };
   const jumpToBottom = () => { const el = listRef.current; if (el) { stickToBottom.current = true; el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' }); setUnseenBelow(0); } };
+  const jumpTo = (id) => { const el = document.getElementById(`msg-${id}`); if (!el) return; stickToBottom.current = false; el.scrollIntoView({ block: 'center', behavior: 'smooth' }); el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 1400); };
 
-  /* ---- composing ---- */
+  /* ---------------- typing signal ---------------- */
   const signalTyping = (nextDraft) => {
-    if (!activeId || !conv?.canSend) return;
+    if (!humanId || !conv?.canSend) return;
     clearTimeout(typingStopTimer.current);
     if (nextDraft.trim()) {
       const now = Date.now();
-      if (now - typingSentAt.current > 2500) { typingSentAt.current = now; api.sendTyping(activeId, true).catch(() => {}); }
-      typingStopTimer.current = setTimeout(() => { typingSentAt.current = 0; api.sendTyping(activeId, false).catch(() => {}); }, 3000);
-    } else if (typingSentAt.current) {
-      typingSentAt.current = 0; api.sendTyping(activeId, false).catch(() => {});
-    }
+      if (now - typingSentAt.current > 2500) { typingSentAt.current = now; api.sendTyping(humanId, true).catch(() => {}); }
+      typingStopTimer.current = setTimeout(() => { typingSentAt.current = 0; api.sendTyping(humanId, false).catch(() => {}); }, 3000);
+    } else if (typingSentAt.current) { typingSentAt.current = 0; api.sendTyping(humanId, false).catch(() => {}); }
   };
+  const stopTyping = (target) => { clearTimeout(typingStopTimer.current); if (typingSentAt.current && target) { typingSentAt.current = 0; api.sendTyping(target, false).catch(() => {}); } };
 
-  const send = async (text, clientId = crypto.randomUUID()) => {
-    const target = activeId; const body = text.trim();
-    if (!target || !body || !conv?.canSend) return;
-    clearTimeout(typingStopTimer.current);
-    if (typingSentAt.current) { typingSentAt.current = 0; api.sendTyping(target, false).catch(() => {}); }
-    const optimistic = { id: `local-${clientId}`, clientId, body, senderId: user.id, createdAt: new Date().toISOString(), pending: true };
+  /* ---------------- sending ---------------- */
+  const patchMessage = (target, clientId, patch) => setByThread((old) => (old[target] ? { ...old, [target]: { ...old[target], messages: old[target].messages.map((m) => (m.clientId === clientId ? { ...m, ...(typeof patch === 'function' ? patch(m) : patch) } : m)) } } : old));
+
+  const send = async ({ text = '', attachment = null, replyTo = null, clientId = newClientId(), uploaded = null }) => {
+    const target = humanId; const body = text.trim();
+    if (!target || (!body && !attachment && !uploaded) || !conv?.canSend) return;
+    stopTyping(target);
+    const kind = attachment ? attachment.kind.replace('chat-', '') : uploaded ? uploaded.key.split('/')[0].replace('chat-', '') : 'text';
+    const previewUrl = attachment ? (attachment.previewUrl || URL.createObjectURL(attachment.file)) : uploaded?.url;
+    const optimistic = {
+      id: `local-${clientId}`, clientId, body, senderId: user.id, createdAt: new Date().toISOString(), pending: true, kind, reactions: {},
+      attachment: attachment ? { url: previewUrl, name: attachment.file.name, mime: attachment.file.type, size: attachment.file.size, durationMs: attachment.durationMs ?? null, width: attachment.width, height: attachment.height } : uploaded ? { ...uploaded } : null,
+      replyTo: replyTo ? { id: replyTo.id, senderId: replyTo.senderId, kind: replyTo.kind, body: replyTo.body, attachmentName: replyTo.attachment?.name ?? null } : null,
+      uploadProgress: 0, local: { attachment, uploaded, replyTo, text: body },
+    };
     setByThread((old) => ({ ...old, [target]: { ...old[target], messages: sortMessages([...old[target].messages.filter((m) => m.clientId !== clientId), optimistic]) } }));
-    stickToBottom.current = true;
-    setError(''); setSending(true);
+    stickToBottom.current = true; setError(''); setSending(true);
     try {
-      const saved = await api.sendMessage(target, body, clientId);
-      setByThread((old) => {
-        const prev = old[target]; if (!prev) return old;
-        const map = new Map(prev.messages.filter((m) => m.clientId !== clientId).map((m) => [m.id, m]));
-        map.set(saved.id, { ...saved, clientId });
-        return { ...old, [target]: { ...prev, messages: sortMessages([...map.values()]) } };
-      });
-      setThreads((old) => {
-        if (!old) return old;
-        const idx = old.findIndex((t) => t.id === target); if (idx < 0) return old;
-        const updated = { ...old[idx], lastMessage: body, lastMessageAt: saved.createdAt, lastMessageSenderId: user.id, lastMessageId: saved.id };
-        return [updated, ...old.slice(0, idx), ...old.slice(idx + 1)];
-      });
+      let stored = uploaded;
+      if (attachment && !stored) {
+        stored = await uploadChatAttachment(attachment.file, attachment.kind, { durationMs: attachment.durationMs, onProgress: (p) => patchMessage(target, clientId, { uploadProgress: p }) });
+        patchMessage(target, clientId, (m) => ({ uploadProgress: 1, local: { ...m.local, uploaded: stored } }));
+      }
+      const saved = await sendChatMessage(target, { body, clientId, ...(stored ? { attachment: { key: stored.key, name: stored.name, mime: stored.mime, size: stored.size, ...(stored.durationMs != null ? { durationMs: stored.durationMs } : {}), ...(stored.width ? { width: stored.width, height: stored.height } : {}) } } : {}), ...(replyTo ? { replyToId: replyTo.id } : {}) });
+      setByThread((old) => { const prev = old[target]; if (!prev) return old; const map = new Map(prev.messages.filter((m) => m.clientId !== clientId).map((m) => [m.id, m])); map.set(saved.id, { ...saved, clientId }); return { ...old, [target]: { ...prev, messages: sortMessages([...map.values()]) } }; });
+      setThreads((old) => { if (!old) return old; const idx = old.findIndex((t) => t.id === target); if (idx < 0) return old; const updated = { ...old[idx], lastMessage: previewOf(saved), lastMessageKind: saved.kind, lastMessageAt: saved.createdAt, lastMessageSenderId: user.id, lastMessageId: saved.id }; return [updated, ...old.slice(0, idx), ...old.slice(idx + 1)]; });
+      if (attachment && previewUrl && !attachment.previewUrl) setTimeout(() => URL.revokeObjectURL(previewUrl), 60_000);
     } catch (e) {
-      setByThread((old) => ({ ...old, [target]: { ...old[target], messages: old[target].messages.map((m) => (m.clientId === clientId ? { ...m, pending: false, failed: true } : m)) } }));
+      patchMessage(target, clientId, { pending: false, failed: true, uploadProgress: undefined });
       setError(e.message);
     } finally { setSending(false); }
   };
 
-  const submit = (e) => { e.preventDefault(); if (!draft.trim()) return; const text = draft; setDraft(''); send(text); };
-  const retry = (m) => { setByThread((old) => ({ ...old, [activeId]: { ...old[activeId], messages: old[activeId].messages.filter((x) => x.clientId !== m.clientId) } })); send(m.body, m.clientId); };
+  const submit = (e) => {
+    e?.preventDefault?.();
+    if (!draft.trim() && !staged) return;
+    const text = draft; const att = staged; const rt = reply;
+    setDraft(''); setStaged(null); setReply(null); setEmojiOpen(false);
+    if (textareaRef.current) textareaRef.current.style.height = 'auto';
+    send({ text, attachment: att, replyTo: rt });
+  };
+  const retry = (m) => {
+    setByThread((old) => ({ ...old, [humanId]: { ...old[humanId], messages: old[humanId].messages.filter((x) => x.clientId !== m.clientId) } }));
+    send({ text: m.local?.text ?? m.body, attachment: m.local?.uploaded ? null : m.local?.attachment ?? null, uploaded: m.local?.uploaded ?? null, replyTo: m.local?.replyTo ?? null, clientId: m.clientId });
+  };
+
+  const stage = (file) => {
+    if (!file) return;
+    const kind = kindForFile(file);
+    if (kind === 'chat-audio') { setError('Use the microphone button to send a voice note.'); return; }
+    const limit = CHAT_LIMITS[kind];
+    const type = (file.type || '').split(';')[0];
+    if (kind === 'chat-file' && !limit.accept.split(',').includes(type)) { setError(`That file type isn’t supported. Use ${limit.label}.`); return; }
+    if (kind === 'chat-file' && file.size > limit.maxBytes) { setError(`That file is too large. Use ${limit.label}.`); return; }
+    setError(''); setAttachOpen(false);
+    setStaged({ file, kind, previewUrl: kind === 'chat-image' ? URL.createObjectURL(file) : null });
+    setTimeout(() => textareaRef.current?.focus(), 30);
+  };
+  const unstage = () => { if (staged?.previewUrl) URL.revokeObjectURL(staged.previewUrl); setStaged(null); };
 
   const shareLocation = () => {
+    setAttachOpen(false);
     if (!navigator.geolocation) { setError('Location is not available in this browser.'); return; }
     setError('');
     navigator.geolocation.getCurrentPosition(
-      (pos) => send(`${LOCATION_PREFIX}https://maps.google.com/?q=${pos.coords.latitude.toFixed(5)},${pos.coords.longitude.toFixed(5)}`),
+      (pos) => send({ text: `${LOCATION_PREFIX}https://maps.google.com/?q=${pos.coords.latitude.toFixed(5)},${pos.coords.longitude.toFixed(5)}`, replyTo: reply }),
       () => setError('Could not read your location. Check the browser permission and try again.'),
       { enableHighAccuracy: false, timeout: 10_000, maximumAge: 60_000 },
     );
   };
 
+  const startVoice = async () => { setError(''); setEmojiOpen(false); setAttachOpen(false); const ok = await voice.start(); if (!ok && voice.error) setError(voice.error); };
+  const finishVoice = async () => {
+    const result = await voice.stop();
+    if (!result) { setError('Hold a little longer to record a voice note.'); return; }
+    const rt = reply; setReply(null);
+    send({ attachment: { file: result.file, kind: 'chat-audio', durationMs: result.durationMs }, replyTo: rt });
+  };
+  useEffect(() => { if (voice.error) setError(voice.error); }, [voice.error]);
+
   const loadEarlier = async () => {
-    const target = activeId; const before = conv?.before; if (!target || !before) return;
+    const target = humanId; const before = conv?.before; if (!target || !before) return;
     const el = listRef.current; const prevHeight = el?.scrollHeight ?? 0;
     try {
       const data = await api.getMessages(target, before);
@@ -379,17 +293,31 @@ function MessagesContent() {
   };
 
   const openBookingChat = async (e) => {
-    e.preventDefault(); if (!booking) return;
-    setError('');
+    e.preventDefault(); if (!booking) return; setError('');
     try { const t = await api.openThread({ bookingId: booking }); setNewChat(false); setBooking(''); await loadThreads(); setParams({ thread: t.id }); } catch (err) { setError(err.message); }
   };
-
   const block = async () => {
-    if (!activeId || !window.confirm('Block new messages with this person? Existing messages remain available.')) return;
-    try { await api.blockThread(activeId); setByThread((old) => ({ ...old, [activeId]: { ...old[activeId], canSend: false } })); } catch (e) { setError(e.message); }
+    if (!humanId || !window.confirm('Block new messages with this person? Existing messages remain available.')) return;
+    try { await api.blockThread(humanId); setByThread((old) => ({ ...old, [humanId]: { ...old[humanId], canSend: false } })); } catch (e) { setError(e.message); }
   };
 
-  /* ---- derived ---- */
+  /* ---------------- message actions ---------------- */
+  const toggleReaction = async (m, emoji) => {
+    if (!humanId || m.pending || m.kind === 'deleted') return;
+    setSheet(null);
+    try { const updated = await reactToMessage(humanId, m.id, emoji); setByThread((old) => ({ ...old, [humanId]: { ...old[humanId], messages: mergeMessage(old[humanId].messages, updated) } })); } catch (e) { setError(e.message); }
+  };
+  const removeMessage = async (m) => {
+    setSheet(null);
+    if (!humanId || !window.confirm('Delete this message for everyone?')) return;
+    try { const updated = await deleteChatMessage(humanId, m.id); setByThread((old) => ({ ...old, [humanId]: { ...old[humanId], messages: mergeMessage(old[humanId].messages, updated) } })); } catch (e) { setError(e.message); }
+  };
+  const copyText = async (m) => { setSheet(null); try { await navigator.clipboard.writeText(m.body); } catch { /* ignore */ } };
+  const replyTo = (m) => { setSheet(null); setReply(m); setTimeout(() => textareaRef.current?.focus(), 30); };
+
+  /* ---------------- derived ---------------- */
+  const aiHistory = useMemo(() => (features.ai ? loadAiHistory(user.id) : []), [features.ai, user.id, aiTick, aiOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!aiOpen) setAiTick((n) => n + 1); }, [aiOpen]);
   const visibleThreads = useMemo(() => {
     if (!threads) return null;
     const q = query.trim().toLowerCase();
@@ -399,6 +327,8 @@ function MessagesContent() {
   const totalUnread = useMemo(() => (threads ?? []).reduce((n, t) => n + (t.unreadCount ?? (t.unread ? 1 : 0)), 0), [threads]);
   const otherPresence = active ? presence[active.person.id] : null;
   const statusLine = !active ? '' : typingHere ? 'typing…' : otherPresence?.online ? 'Online' : relativeSeen(otherPresence?.lastSeen) || active.booking?.serviceTitle || (active.connectionId ? 'Connected on Servix' : 'Private Servix messages');
+  const aiRole = user.role === 'admin' ? 'admin' : overview?.canManageServices ? 'professional' : 'customer';
+  const showAi = features.ai && (!query.trim() || 'servix ai'.includes(query.trim().toLowerCase()));
 
   const grouped = useMemo(() => {
     if (!conv) return [];
@@ -406,27 +336,25 @@ function MessagesContent() {
     for (const m of conv.messages) {
       const day = dayLabel(m.createdAt);
       if (day !== lastDay) { out.push({ kind: 'day', key: `day-${day}-${m.id}`, label: day }); lastDay = day; prev = null; }
-      const grouped = prev && prev.senderId === m.senderId && new Date(m.createdAt) - new Date(prev.createdAt) < 5 * 60_000;
-      out.push({ kind: 'msg', key: m.id, m, grouped });
+      const isGrouped = prev && prev.senderId === m.senderId && new Date(m.createdAt) - new Date(prev.createdAt) < 5 * 60_000;
+      out.push({ kind: 'msg', key: m.id, m, grouped: isGrouped });
       prev = m;
     }
     return out;
   }, [conv]);
 
-  /* ---- render ---- */
+  const canSend = conv?.canSend !== false;
+  const hasContent = Boolean(draft.trim() || staged);
+
+  /* ---------------- render ---------------- */
   return (
     <>
-      {error && <p className="ws-alert" role="alert">{error}</p>}
+      {error && <p className="ws-alert" role="alert">{error} <button type="button" className="msg-link" onClick={() => setError('')}>Dismiss</button></p>}
       <div className={`msg-inbox ${activeId ? 'has-thread' : ''}`}>
         <aside className="msg-list" aria-label="Conversations">
           <div className="msg-list-head">
-            <div>
-              <strong>Chats</strong>
-              {totalUnread > 0 && <span className="msg-badge" aria-label={`${totalUnread} unread`}>{totalUnread > 99 ? '99+' : totalUnread}</span>}
-            </div>
-            <button type="button" className="msg-icon-btn" onClick={() => setNewChat((v) => !v)} aria-expanded={newChat} aria-label="Start a conversation about a booking" title="New chat">
-              <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg>
-            </button>
+            <div><strong>Chats</strong>{totalUnread > 0 && <span className="msg-badge" aria-label={`${totalUnread} unread`}>{totalUnread > 99 ? '99+' : totalUnread}</span>}</div>
+            <button type="button" className="msg-icon-btn" onClick={() => setNewChat((v) => !v)} aria-expanded={newChat} aria-label="Start a conversation about a booking" title="New chat">{I.plus}</button>
           </div>
           {newChat && (
             <form className="msg-newchat" onSubmit={openBookingChat}>
@@ -441,28 +369,31 @@ function MessagesContent() {
               <small>To message someone without a booking, <Link to="/dashboard/network">connect with them</Link> first.</small>
             </form>
           )}
-          <label className="msg-search">
-            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
-            <input type="search" placeholder="Search" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search conversations" />
-          </label>
+          <label className="msg-search">{I.search}<input type="search" placeholder="Search" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search conversations" /></label>
           <div className="msg-list-scroll">
+            {showAi && (
+              <button type="button" className={`msg-row-item ai ${aiOpen ? 'selected' : ''}`} onClick={() => setParams({ thread: AI_THREAD })}>
+                <AiAvatar size={48} state="still" />
+                <span className="msg-row-text">
+                  <span className="msg-row-top"><strong>Servix AI</strong><time>{aiHistory.length ? listTime(aiHistory[aiHistory.length - 1].at) : ''}</time></span>
+                  <span className="msg-row-bottom"><span className="msg-preview">{aiHistory.length ? `${aiHistory[aiHistory.length - 1].role === 'user' ? 'You: ' : ''}${aiHistory[aiHistory.length - 1].content.slice(0, 80)}` : 'Ask about professionals, prices, bookings…'}</span><span className="msg-pin" aria-label="Pinned">📌</span></span>
+                  <span className="msg-row-context">Assistant · always online</span>
+                </span>
+              </button>
+            )}
             {threadError ? <p className="msg-muted" role="alert">{threadError} <button type="button" className="msg-link" onClick={loadThreads}>Retry</button></p>
               : !visibleThreads ? <ListSkeleton rows={5} panel={false} label="Loading conversations…" />
                 : !visibleThreads.length ? <p className="msg-muted">{query ? 'No conversations match.' : 'No conversations yet. Start one from a booking or an accepted connection.'}</p>
                   : visibleThreads.map((t) => {
-                    const p = presence[t.person.id];
-                    const isTyping = typing[t.id] > Date.now();
-                    const mineLast = t.lastMessageSenderId === user.id;
-                    const state = mineLast ? tickState({ createdAt: t.lastMessageAt }, t) : null;
+                    const p = presence[t.person.id]; const isTyping = typing[t.id] > Date.now(); const mineLast = t.lastMessageSenderId === user.id;
+                    const state = mineLast && t.lastMessageKind !== 'deleted' ? tickState({ createdAt: t.lastMessageAt }, t) : null;
                     return (
-                      <button type="button" key={t.id} className={`msg-row-item ${t.id === activeId ? 'selected' : ''} ${t.unread ? 'unread' : ''}`} onClick={() => setParams({ thread: t.id })}>
+                      <button type="button" key={t.id} className={`msg-row-item ${t.id === humanId ? 'selected' : ''} ${t.unread ? 'unread' : ''}`} onClick={() => setParams({ thread: t.id })}>
                         <Avatar person={t.person} size={48} online={p?.online} />
                         <span className="msg-row-text">
                           <span className="msg-row-top"><strong>{t.person.fullName}</strong><time dateTime={t.lastMessageAt ?? undefined}>{listTime(t.lastMessageAt)}</time></span>
                           <span className="msg-row-bottom">
-                            <span className={`msg-preview ${isTyping ? 'typing' : ''}`}>
-                              {isTyping ? 'typing…' : <>{mineLast && state && <Ticks state={state} />}{mineLast && 'You: '}{t.lastMessage?.startsWith(LOCATION_PREFIX) ? '📍 Location' : t.lastMessage || 'Say hello'}</>}
-                            </span>
+                            <span className={`msg-preview ${isTyping ? 'typing' : ''}`}>{isTyping ? 'typing…' : <>{state && <Ticks state={state} />}{mineLast && 'You: '}{t.lastMessage?.startsWith(LOCATION_PREFIX) ? '📍 Location' : t.lastMessage || 'Say hello'}</>}</span>
                             {t.unreadCount > 0 && <span className="msg-badge">{t.unreadCount > 99 ? '99+' : t.unreadCount}</span>}
                           </span>
                           <span className="msg-row-context">{t.booking ? `${t.booking.reference} · ${t.booking.serviceTitle}` : t.person.professionalProfile?.title || 'Connection'}</span>
@@ -471,20 +402,21 @@ function MessagesContent() {
                     );
                   })}
           </div>
-          <p className="msg-stream" data-state={stream}>
-            <i />{stream === 'live' ? 'Live' : stream === 'connecting' ? 'Connecting…' : stream === 'reconnecting' ? 'Reconnecting…' : 'Live updates paused · refreshing every 15 s'}
-          </p>
+          <p className="msg-stream" data-state={stream}><i />{stream === 'live' ? 'Live' : stream === 'connecting' ? 'Connecting…' : stream === 'reconnecting' ? 'Reconnecting…' : 'Live updates paused · refreshing every 15 s'}</p>
         </aside>
 
-        <section className="msg-chat" aria-label="Conversation">
+        <section className={`msg-chat ${dragging ? 'dragging' : ''}`} aria-label="Conversation"
+          onDragOver={(e) => { if (humanId && e.dataTransfer?.types?.includes('Files')) { e.preventDefault(); setDragging(true); } }}
+          onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setDragging(false); }}
+          onDrop={(e) => { if (!humanId) return; e.preventDefault(); setDragging(false); stage(e.dataTransfer.files?.[0]); }}>
           {!activeId ? (
-            <div className="msg-chat-empty">
-              <Empty title="Your messages live here" description="Pick a conversation, or start one from a booking. Professionals you connect with can be messaged any time." to="/dashboard/network" label="Open my network" icon="mail" />
-            </div>
+            <div className="msg-chat-empty"><Empty title="Your messages live here" description="Pick a conversation, or start one from a booking. Professionals you connect with can be messaged any time." to="/dashboard/network" label="Open my network" icon="mail" /></div>
+          ) : aiOpen ? (
+            <AiThread user={user} role={aiRole} onBack={() => setParams({})} />
           ) : (
             <>
               <header className="msg-chat-head">
-                <button type="button" className="msg-icon-btn msg-back" onClick={() => setParams({})} aria-label="Back to conversations"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6" /></svg></button>
+                <button type="button" className="msg-icon-btn msg-back" onClick={() => setParams({})} aria-label="Back to conversations">{I.back}</button>
                 {active?.person.professionalProfile?.slug ? (
                   <Link to={`/professionals/${active.person.professionalProfile.slug}`} className="msg-chat-person" title="View profile">
                     <Avatar person={active.person} size={40} online={otherPresence?.online} />
@@ -497,76 +429,89 @@ function MessagesContent() {
                   </span>
                 )}
                 {active?.booking && <Link className="msg-booking-pill" to={`/bookings/${active.bookingId}`} title="Open booking">{active.booking.reference}</Link>}
-                <button type="button" className="msg-icon-btn" onClick={block} aria-label="Block this conversation" title="Block"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M5.6 5.6l12.8 12.8" /></svg></button>
+                <button type="button" className="msg-icon-btn" onClick={block} aria-label="Block this conversation" title="Block">{I.block}</button>
               </header>
 
               <div className="msg-scroll" ref={listRef} onScroll={onScroll} role="log" aria-label="Messages" aria-live="polite">
                 {conv?.before && <button type="button" className="msg-earlier" onClick={loadEarlier}>Load earlier messages</button>}
                 {conv?.loading ? (
-                  <div role="status" aria-busy="true" className="msg-skeleton">
-                    <span className="sr-only">Loading messages…</span>
-                    {[55, 40, 70, 35, 50].map((w, i) => <Skeleton key={i} height="2.4rem" width={`${w}%`} style={{ borderRadius: 18, marginLeft: i % 2 ? 'auto' : 0 }} />)}
-                  </div>
-                ) : conv?.error ? <p className="msg-muted" role="alert">{conv.error} <button type="button" className="msg-link" onClick={() => loadMessages(activeId)}>Retry</button></p>
+                  <div role="status" aria-busy="true" className="msg-skeleton"><span className="sr-only">Loading messages…</span>{[55, 40, 70, 35, 50].map((w, i) => <Skeleton key={i} height="2.4rem" width={`${w}%`} style={{ borderRadius: 18, marginLeft: i % 2 ? 'auto' : 0 }} />)}</div>
+                ) : conv?.error ? <p className="msg-muted" role="alert">{conv.error} <button type="button" className="msg-link" onClick={() => loadMessages(humanId)}>Retry</button></p>
                   : (
                     <>
-                      <div className="msg-notice">
-                        <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="m9 12 2 2 4-4" /></svg>
-                        Messages are private to the two of you. Keep payments inside Servix — it is how your booking stays protected.
-                      </div>
+                      <div className="msg-notice"><i>{I.shield}</i>Messages are private to the two of you. Keep payments inside Servix — it is how your booking stays protected.</div>
                       {conv?.loaded && conv.messages.length === 0 && <p className="msg-muted center">No messages yet. Say hello 👋</p>}
-                      {grouped.map((item) => {
-                        if (item.kind === 'day') return <div key={item.key} className="msg-day"><span>{item.label}</span></div>;
-                        const m = item.m; const mine = m.senderId === user.id;
-                        const isLocation = m.body.startsWith(LOCATION_PREFIX);
-                        const url = isLocation ? m.body.slice(LOCATION_PREFIX.length).trim() : '';
-                        return (
-                          <div key={item.key} className={`msg-row ${mine ? 'mine' : 'theirs'} ${item.grouped ? 'grouped' : ''} ${m.failed ? 'failed' : ''}`}>
-                            <div className={`msg-bubble ${mine ? 'mine' : 'theirs'} ${isLocation ? 'location' : ''}`}>
-                              {isLocation ? (
-                                <a className="msg-location" href={url} target="_blank" rel="noopener noreferrer">
-                                  <span className="msg-location-pin"><svg viewBox="0 0 24 24"><path d="M12 22s7-6.1 7-12a7 7 0 1 0-14 0c0 5.9 7 12 7 12z" /><circle cx="12" cy="10" r="2.5" /></svg></span>
-                                  <span><strong>{mine ? 'Your location' : `${active?.person.fullName.split(' ')[0]}'s location`}</strong><small>Open in Maps</small></span>
-                                </a>
-                              ) : <p>{renderBody(m.body)}</p>}
-                              <span className="msg-meta"><time dateTime={m.createdAt}>{timeOf(m.createdAt)}</time>{mine && <Ticks state={tickState(m, conv)} />}</span>
-                            </div>
-                            {m.failed && <button type="button" className="msg-retry" onClick={() => retry(m)}>Not sent · Retry</button>}
-                          </div>
-                        );
-                      })}
-                      {typingHere && <TypingBubble person={active?.person} />}
+                      {grouped.map((item) => (item.kind === 'day'
+                        ? <div key={item.key} className="msg-day"><span>{item.label}</span></div>
+                        : <MessageBubble key={item.key} m={item.m} mine={item.m.senderId === user.id} grouped={item.grouped} me={user.id} otherName={active?.person.fullName ?? ''} thread={conv}
+                            onOpenActions={(m, anchor) => setSheet({ message: m, anchor })} onOpenImage={setLightbox} onJump={jumpTo} onToggleReaction={toggleReaction} onRetry={retry} />))}
+                      {typingHere && <TypingBubble name={active?.person.fullName} />}
                     </>
                   )}
               </div>
               {unseenBelow > 0 && <button type="button" className="msg-jump" onClick={jumpToBottom}>↓ {unseenBelow} new message{unseenBelow > 1 ? 's' : ''}</button>}
+              {dragging && <div className="msg-drop"><span>{I.photo}</span>Drop to send</div>}
 
-              <form className="msg-compose" onSubmit={submit}>
-                <button type="button" className="msg-icon-btn" onClick={shareLocation} disabled={!conv?.canSend} aria-label="Share my location" title="Share my location">
-                  <svg viewBox="0 0 24 24"><path d="M12 22s7-6.1 7-12a7 7 0 1 0-14 0c0 5.9 7 12 7 12z" /><circle cx="12" cy="10" r="2.5" /></svg>
-                </button>
-                <label className="sr-only" htmlFor="message-text">Your message</label>
-                <textarea
-                  id="message-text"
-                  ref={textareaRef}
-                  rows={1}
-                  maxLength={4000}
-                  placeholder={conv?.canSend === false ? 'Messaging is unavailable for this conversation.' : 'Message…'}
-                  value={draft}
-                  disabled={conv?.canSend === false}
-                  onChange={(e) => { setDraft(e.target.value); signalTyping(e.target.value); e.target.style.height = 'auto'; e.target.style.height = `${Math.min(e.target.scrollHeight, 140)}px`; }}
-                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); if (draft.trim()) { const text = draft; setDraft(''); e.target.style.height = 'auto'; send(text); } } }}
-                  onBlur={() => { if (typingSentAt.current && activeId) { typingSentAt.current = 0; api.sendTyping(activeId, false).catch(() => {}); } }}
-                />
-                <button className="msg-send" disabled={!conv?.canSend || !draft.trim() || sending} aria-label="Send">
-                  <svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
-                </button>
-              </form>
+              {voice.recording ? (
+                <div className="msg-compose recording" role="status" aria-live="polite">
+                  <button type="button" className="msg-icon-btn danger" onClick={voice.cancel} aria-label="Cancel recording">{I.trash}</button>
+                  <span className="msg-rec-dot" />
+                  <span className="msg-rec-time">{formatDuration(voice.elapsed)}</span>
+                  <span className="msg-rec-level" aria-hidden="true">{Array.from({ length: 24 }).map((_, i) => <i key={i} style={{ transform: `scaleY(${Math.min(1, 0.15 + Math.max(0, voice.level * 3 - Math.abs(i - 12) / 30) + Math.abs(Math.sin((i + 1) * 1.7)) * voice.level)})` }} />)}</span>
+                  <span className="msg-rec-hint">Recording… tap ✓ to send</span>
+                  <button type="button" className="msg-send" onClick={finishVoice} aria-label="Stop and send voice note"><svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L19 7" /></svg></button>
+                </div>
+              ) : (
+                <form className="msg-compose" onSubmit={submit}>
+                  {(reply || staged) && (
+                    <div className="msg-compose-tray">
+                      {reply && <div className="msg-reply-bar"><span className="msg-quote static"><strong>{reply.senderId === user.id ? 'You' : active?.person.fullName}</strong><span>{previewOf(reply) || 'Message'}</span></span><button type="button" className="msg-icon-btn small" onClick={() => setReply(null)} aria-label="Cancel reply">{I.close}</button></div>}
+                      {staged && (
+                        <div className="msg-staged">
+                          {staged.previewUrl ? <img src={staged.previewUrl} alt="" /> : <span className="msg-file-badge">{(staged.file.name.split('.').pop() || 'FILE').toUpperCase().slice(0, 4)}</span>}
+                          <span className="msg-staged-text"><strong>{staged.file.name}</strong><small>{formatBytes(staged.file.size)} · {staged.kind === 'chat-image' ? 'add a caption below or just send' : 'ready to send'}</small></span>
+                          <button type="button" className="msg-icon-btn small" onClick={unstage} aria-label="Remove attachment">{I.close}</button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <div className="msg-compose-row">
+                    <div className="msg-compose-tools">
+                      <button type="button" className={`msg-icon-btn ${emojiOpen ? 'on' : ''}`} onClick={() => { setEmojiOpen((v) => !v); setAttachOpen(false); }} disabled={!canSend} aria-label="Emoji" aria-expanded={emojiOpen}>{I.smile}</button>
+                      <div className="msg-attach-wrap">
+                        <button type="button" className={`msg-icon-btn ${attachOpen ? 'on rot' : ''}`} onClick={() => { setAttachOpen((v) => !v); setEmojiOpen(false); }} disabled={!canSend} aria-label="Attach" aria-expanded={attachOpen}>{I.plus}</button>
+                        {attachOpen && (
+                          <div className="msg-attach-menu" role="menu">
+                            <button type="button" role="menuitem" onClick={() => photoInput.current?.click()}><span className="photo">{I.photo}</span>Photo</button>
+                            <button type="button" role="menuitem" onClick={() => fileInput.current?.click()}><span className="doc">{I.doc}</span>Document</button>
+                            <button type="button" role="menuitem" onClick={shareLocation}><span className="pin">{I.pin}</span>Location</button>
+                          </div>
+                        )}
+                      </div>
+                      {emojiOpen && <EmojiPicker onClose={() => setEmojiOpen(false)} onPick={(e) => { const el = textareaRef.current; const start = el?.selectionStart ?? draft.length; const next = `${draft.slice(0, start)}${e}${draft.slice(start)}`; setDraft(next); signalTyping(next); requestAnimationFrame(() => { el?.focus(); el?.setSelectionRange(start + e.length, start + e.length); }); }} />}
+                    </div>
+                    <input ref={photoInput} type="file" accept="image/*" hidden onChange={(e) => { stage(e.target.files?.[0]); e.target.value = ''; }} />
+                    <input ref={fileInput} type="file" accept={CHAT_LIMITS['chat-file'].accept} hidden onChange={(e) => { stage(e.target.files?.[0]); e.target.value = ''; }} />
+                    <label className="sr-only" htmlFor="message-text">Your message</label>
+                    <textarea id="message-text" ref={textareaRef} rows={1} maxLength={4000} value={draft} disabled={!canSend}
+                      placeholder={!canSend ? 'Messaging is unavailable for this conversation.' : staged ? 'Add a caption…' : 'Message…'}
+                      onChange={(e) => { setDraft(e.target.value); signalTyping(e.target.value); e.target.style.height = 'auto'; e.target.style.height = `${Math.min(e.target.scrollHeight, 140)}px`; }}
+                      onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); submit(); } }}
+                      onPaste={(e) => { const f = e.clipboardData?.files?.[0]; if (f) { e.preventDefault(); stage(f); } }}
+                      onBlur={() => stopTyping(humanId)} />
+                    {hasContent || !voice.supported
+                      ? <button className="msg-send" disabled={!canSend || !hasContent || sending} aria-label="Send">{I.send}</button>
+                      : <button type="button" className="msg-send mic" onClick={startVoice} disabled={!canSend} aria-label="Record a voice note">{I.mic}</button>}
+                  </div>
+                </form>
+              )}
               <p className="msg-safety"><span className="msg-kbd-hint">Enter to send · Shift+Enter for a new line · </span>Never share payment details or verification codes. <Link to="/contact">Report a concern</Link></p>
             </>
           )}
         </section>
       </div>
+      {sheet && <ActionSheet message={sheet.message} anchor={sheet.anchor} mine={{ userId: user.id, isMine: sheet.message.senderId === user.id }} onClose={() => setSheet(null)} onReact={(e) => toggleReaction(sheet.message, e)} onReply={() => replyTo(sheet.message)} onCopy={() => copyText(sheet.message)} onDelete={() => removeMessage(sheet.message)} />}
+      {lightbox && <Lightbox src={mediaSrc(lightbox.url)} name={lightbox.name} onClose={() => setLightbox(null)} />}
     </>
   );
 }

@@ -33,9 +33,25 @@ export type UploadKind =
   | 'avatar'
   | 'resume'
   | 'service-video'
-  | 'service-document';
+  | 'service-document'
+  | 'chat-image'
+  | 'chat-audio'
+  | 'chat-file';
 
-export const UPLOAD_KINDS: UploadKind[] = ['profile', 'portfolio', 'service', 'avatar', 'resume', 'service-video', 'service-document'];
+export const UPLOAD_KINDS: UploadKind[] = ['profile', 'portfolio', 'service', 'avatar', 'resume', 'service-video', 'service-document', 'chat-image', 'chat-audio', 'chat-file'];
+
+/* Chat attachments (Messages): photos, voice notes and documents. */
+export const ALLOWED_CHAT_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+export const ALLOWED_CHAT_AUDIO_TYPES = ['audio/webm', 'audio/mp4', 'audio/mpeg', 'audio/ogg', 'audio/wav', 'audio/aac', 'audio/x-m4a', 'audio/m4a'];
+export const ALLOWED_CHAT_FILE_TYPES = [
+  'application/pdf', 'text/plain', 'text/csv',
+  'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+];
+export const MAX_CHAT_IMAGE_BYTES = 10 * 1024 * 1024;
+export const MAX_CHAT_AUDIO_BYTES = 10 * 1024 * 1024;
+export const MAX_CHAT_FILE_BYTES = 20 * 1024 * 1024;
 
 /** Content-type whitelist and size cap per upload kind (enforced server-side). */
 export function uploadRules(kind: UploadKind): { types: string[]; maxBytes: number; label: string } {
@@ -45,6 +61,12 @@ export function uploadRules(kind: UploadKind): { types: string[]; maxBytes: numb
       return { types: ALLOWED_DOCUMENT_TYPES, maxBytes: MAX_DOCUMENT_BYTES, label: 'PDF documents up to 10 MB' };
     case 'service-video':
       return { types: ALLOWED_VIDEO_TYPES, maxBytes: MAX_VIDEO_BYTES, label: 'MP4, WebM or MOV videos up to 50 MB' };
+    case 'chat-image':
+      return { types: ALLOWED_CHAT_IMAGE_TYPES, maxBytes: MAX_CHAT_IMAGE_BYTES, label: 'JPEG, PNG, WebP or GIF photos up to 10 MB' };
+    case 'chat-audio':
+      return { types: ALLOWED_CHAT_AUDIO_TYPES, maxBytes: MAX_CHAT_AUDIO_BYTES, label: 'voice notes up to 10 MB' };
+    case 'chat-file':
+      return { types: ALLOWED_CHAT_FILE_TYPES, maxBytes: MAX_CHAT_FILE_BYTES, label: 'PDF, Word, Excel, PowerPoint, text or CSV files up to 20 MB' };
     default:
       return { types: ALLOWED_IMAGE_TYPES, maxBytes: MAX_UPLOAD_BYTES, label: 'JPEG, PNG or WebP images up to 5 MB' };
   }
@@ -81,6 +103,7 @@ export interface StorageProvider {
 
 /** Keys we mint: `<kind>/<uuid>.<ext>` — anything else is refused by GET /media. */
 export const MEDIA_KEY_RE = new RegExp(`^(${UPLOAD_KINDS.join('|')})/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.[a-z0-9]{2,5}$`);
+const MEDIA_KEY_IN_URL_RE = new RegExp(`(?:^|/)((?:${UPLOAD_KINDS.join('|')})/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.[a-z0-9]{2,5})$`);
 
 function safeExt(fileName: string, contentType: string): string {
   const byType: Record<string, string> = {
@@ -91,6 +114,23 @@ function safeExt(fileName: string, contentType: string): string {
     'video/mp4': 'mp4',
     'video/webm': 'webm',
     'video/quicktime': 'mov',
+    'image/gif': 'gif',
+    'audio/webm': 'weba',
+    'audio/mp4': 'm4a',
+    'audio/x-m4a': 'm4a',
+    'audio/m4a': 'm4a',
+    'audio/mpeg': 'mp3',
+    'audio/ogg': 'ogg',
+    'audio/wav': 'wav',
+    'audio/aac': 'aac',
+    'text/plain': 'txt',
+    'text/csv': 'csv',
+    'application/msword': 'doc',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+    'application/vnd.ms-excel': 'xls',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+    'application/vnd.ms-powerpoint': 'ppt',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx',
   };
   return byType[contentType] ?? 'bin';
 }
@@ -111,9 +151,16 @@ export function mediaUrl(stored: string | null | undefined): string | null {
   const base = resolveStorageEnv().publicBaseUrl.replace(/\/$/, '');
   if (!base) return stored;
   if (stored.startsWith(`${base}/`)) return stored;
-  const m = /(?:^|\/)((?:profile|portfolio|service|avatar|resume|service-video|service-document)\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.[a-z0-9]{2,5})$/.exec(stored);
+  const m = MEDIA_KEY_IN_URL_RE.exec(stored);
   if (!m) return stored;
   return `${base}/${m[1]}`;
+}
+
+/** Public URL for a key we minted (chat attachments store the key, not a URL). */
+export function mediaUrlForKey(key: string | null | undefined): string | null {
+  if (!key) return null;
+  const base = resolveStorageEnv().publicBaseUrl.replace(/\/$/, '');
+  return base ? `${base}/${key}` : `/media/${key}`;
 }
 
 /* ---------------- SigV4 (S3-compatible presigned URLs) ---------------- */

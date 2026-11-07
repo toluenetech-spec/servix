@@ -40,7 +40,7 @@ describe.skipIf(process.env.RUN_LOCAL_COMMUNITY_TESTS !== '1')('community and wo
     const slug=randomUUID();if(pro)await prisma.professionalProfile.create({data:{userId:user.id,name:'Test Professional',title:'Developer',slug}});
     const token=await(await import('../src/lib/tokens.js')).signAccessToken({sub:user.id,role:user.role,status:'active'});return {user,token,slug};
   }
-  function call(token:string,path:string,body?:object,method?:'GET'|'POST'|'PATCH'){return app.inject({method:method??(body?'POST':'GET'),url:`/api/v1/${path}`,payload:body,headers:{authorization:`Bearer ${token}`},remoteAddress:`192.0.2.${ip++%240+1}`});}
+  function call(token:string,path:string,body?:object,method?:'GET'|'POST'|'PATCH'|'DELETE'){return app.inject({method:method??(body?'POST':'GET'),url:`/api/v1/${path}`,payload:body,headers:{authorization:`Bearer ${token}`},remoteAddress:`192.0.2.${ip++%240+1}`});}
   async function connected(){const a=await account(),b=await account(true);const c=(await call(a.token,'community/connections',{profileSlug:b.slug})).json();await call(b.token,`community/connections/${c.id}/action`,{action:'accept'});const t=(await call(a.token,'community/threads',{connectionId:c.id})).json();return {a,b,c,t};}
   async function connectedThread(){const a=await account(),b=await account(true);const c=(await call(a.token,'community/connections',{profileSlug:b.slug})).json();await call(b.token,`community/connections/${c.id}/action`,{action:'accept'});const t=(await call(a.token,'community/threads',{connectionId:c.id})).json();return {a,b,connection:c.id,thread:t.id as string};}
   it('requires authenticated verified accounts and respects the default-off switch',async()=>{
@@ -122,6 +122,36 @@ describe.skipIf(process.env.RUN_LOCAL_COMMUNITY_TESTS !== '1')('community and wo
       await call(b.token,`community/threads/${thread}/messages`,{body:'streamed',clientId:randomUUID()});
       expect(await readUntil('"body":"streamed"')).toBe(true);
     }finally{ac.abort();}
+  });
+  it('attachments, replies, reactions and delete-for-everyone',async()=>{
+    const {a,b,thread}=await connectedThread();
+    // empty messages are rejected; a text message can be replied to
+    expect((await call(a.token,`community/threads/${thread}/messages`,{body:'   ',clientId:randomUUID()})).statusCode).toBe(422);
+    const first=(await call(a.token,`community/threads/${thread}/messages`,{body:'Can you send the quote?',clientId:randomUUID()})).json();
+    expect(first.kind).toBe('text');expect(first.attachment).toBeNull();expect(first.reactions).toEqual({});
+    // attachment keys must have been uploaded by the sender
+    const key=`chat-file/${randomUUID()}.pdf`;const att={key,name:'quote.pdf',mime:'application/pdf',size:1234};
+    expect((await call(b.token,`community/threads/${thread}/messages`,{clientId:randomUUID(),attachment:att})).statusCode).toBe(422);
+    await prisma.auditLog.create({data:{actorId:b.user.id,action:'upload.stored',entity:'storage',entityId:key,data:{}}});
+    const fileRes=await call(b.token,`community/threads/${thread}/messages`,{clientId:randomUUID(),attachment:att,replyToId:first.id});expect(fileRes.json()).toMatchObject({kind:'file'});const file=fileRes.json();expect(file.attachment.url).toBe(`/media/${att.key}`);
+    expect(file.kind).toBe('file');expect(file.attachment.name).toBe('quote.pdf');expect(file.replyTo.id).toBe(first.id);expect(file.replyTo.body).toBe('Can you send the quote?');
+    // the same file cannot be attached twice; replies must be in the same thread
+    expect((await call(b.token,`community/threads/${thread}/messages`,{clientId:randomUUID(),attachment:att})).statusCode).toBe(409);
+    expect((await call(a.token,`community/threads/${thread}/messages`,{body:'x',clientId:randomUUID(),replyToId:randomUUID()})).statusCode).toBe(422);
+    // reactions: one per member, toggled; invalid emoji rejected
+    expect((await call(a.token,`community/threads/${thread}/messages/${file.id}/react`,{emoji:'💩'})).statusCode).toBe(422);
+    expect((await call(a.token,`community/threads/${thread}/messages/${file.id}/react`,{emoji:'👍'})).json().reactions).toEqual({'👍':[a.user.id]});
+    expect((await call(a.token,`community/threads/${thread}/messages/${file.id}/react`,{emoji:'❤️'})).json().reactions).toEqual({'❤️':[a.user.id]});
+    expect((await call(a.token,`community/threads/${thread}/messages/${file.id}/react`,{emoji:'❤️'})).json().reactions).toEqual({});
+    // inbox preview + list shape
+    const list=(await call(a.token,'community/threads')).json();expect(list[0].lastMessage).toBe('📄 quote.pdf');expect(list[0].lastMessageKind).toBe('file');
+    // only the sender may delete; the tombstone keeps its place and the attachment disappears
+    expect((await call(a.token,`community/threads/${thread}/messages/${file.id}`,undefined,'DELETE')).statusCode).toBe(403);
+    const gone=(await call(b.token,`community/threads/${thread}/messages/${file.id}`,undefined,'DELETE')).json();
+    expect(gone.kind).toBe('deleted');expect(gone.attachment).toBeNull();expect(gone.body).toBe('');
+    const page=(await call(a.token,`community/threads/${thread}/messages`)).json();
+    expect(page.messages.map((m:{id:string})=>m.id)).toEqual([first.id,file.id]);expect(page.reactions).toContain('👍');
+    expect((await call(a.token,`community/threads/${thread}/messages/${file.id}/react`,{emoji:'👍'})).statusCode).toBe(409);
   });
   it('settings rejects role/email injection and security summary contains no secrets',async()=>{
     const a=await account();expect((await call(a.token,'account/profile',{fullName:'New Name'},'PATCH')).statusCode).toBe(200);expect((await prisma.user.findUniqueOrThrow({where:{id:a.user.id}})).fullName).toBe('New Name');expect((await call(a.token,'account/profile',{fullName:'Fake',role:'admin'},'PATCH')).statusCode).toBe(422);const s=(await call(a.token,'account/security-summary')).json();expect(Object.keys(s).sort()).toEqual(['method','passkeys','recoveryCodesRemaining']);expect((await call(a.token,'account/payments')).json()).toMatchObject({mode:'test',records:[]});

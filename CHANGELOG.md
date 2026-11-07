@@ -2,6 +2,26 @@
 
 All notable changes to the Servix public website.
 
+## 0.9.7 — Chat media, replies, reactions, Servix AI in Messages
+
+- API: chat attachments — upload kinds `chat-image` (≤10 MB), `chat-audio` (voice notes, ≤10 MB), `chat-file`
+  (PDF/Office/TXT/CSV, ≤20 MB) on `POST /uploads`; `POST /community/threads/:id/messages` accepts
+  `attachment { key, name, mime, size, durationMs?, width?, height? }` (key must be this account's upload, single
+  use) and `replyToId`. Messages carry `kind`, `attachment`, `replyTo`, `deletedAt`, `reactions`.
+- API: `DELETE /community/threads/:id/messages/:mid` (sender; tombstone + object removed) and
+  `POST …/messages/:mid/react { emoji }` (toggle 👍 ❤️ 😂 😮 😢 🙏 🔥 ✅). New SSE frame `message_update`.
+  Thread list gets `lastMessageKind` and media previews.
+- API: additive migration `20261108000000_chat_media` — run `api/docs/manual-chat-media-upgrade.sql` once in Neon
+  **before** this version is live (adds nullable columns, relaxes the body check so attachment-only messages are
+  allowed). `/readyz` lists the columns until applied.
+- Web: WhatsApp-style Messages — send photos (downsized client-side), documents and voice notes (hold-free
+  record with live meter, waveform player with 1×/1.5×/2× speed), paste or drag-and-drop files, emoji picker,
+  reply with quote (tap to jump), long-press/⋯ action sheet with reactions · reply · copy · download · delete for
+  everyone, lightbox, upload progress rings, retry; Servix-branded doodle wallpaper.
+- Web: Servix AI is pinned at the top of the chat list and chats like any conversation
+  (`/dashboard/messages?thread=ai`, streamed answers, history kept on the device). The floating AI button is hidden
+  on the Messages page only.
+
 ## 0.9.6 — Live chat
 
 - API: `GET /api/v1/community/events` — authenticated server-sent event stream (one per tab/app session, max 6 per

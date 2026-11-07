@@ -13,10 +13,13 @@ import { prisma } from '../lib/db.js';
 import { requireAuth } from '../lib/authGuard.js';
 import { ApiError } from '../lib/errors.js';
 import { audit } from '../lib/audit.js';
-import { getStorage, uploadRules, UPLOAD_KINDS, MAX_VIDEO_BYTES, type UploadKind } from '../lib/storage.js';
+import { getStorage, uploadRules, UPLOAD_KINDS, MAX_VIDEO_BYTES, ALLOWED_CHAT_IMAGE_TYPES, ALLOWED_CHAT_AUDIO_TYPES, ALLOWED_CHAT_FILE_TYPES, type UploadKind } from '../lib/storage.js';
 import { resolveStorageEnv } from '../lib/config.js';
 
-export const UPLOAD_CONTENT_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf', 'video/mp4', 'video/webm', 'video/quicktime'];
+export const UPLOAD_CONTENT_TYPES = [...new Set([
+  'image/jpeg', 'image/png', 'image/webp', 'application/pdf', 'video/mp4', 'video/webm', 'video/quicktime',
+  ...ALLOWED_CHAT_IMAGE_TYPES, ...ALLOWED_CHAT_AUDIO_TYPES, ...ALLOWED_CHAT_FILE_TYPES,
+])];
 
 const querySchema = z.object({
   kind: z.enum(UPLOAD_KINDS as [UploadKind, ...UploadKind[]]),

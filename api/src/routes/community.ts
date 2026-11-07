@@ -6,10 +6,43 @@ import { requireAuth } from '../lib/authGuard.js';
 import { ApiError, forbidden, notFound } from '../lib/errors.js';
 import { parseBody } from '../lib/query.js';
 import { audit } from '../lib/audit.js';
-import { mediaUrl } from '../lib/storage.js';
+import { MEDIA_KEY_RE, MAX_CHAT_FILE_BYTES, getStorage, mediaUrl, mediaUrlForKey } from '../lib/storage.js';
 import { MAX_STREAMS_PER_USER, deliveryMarks, isOnline, lastSeenAt, markDelivered, publish, publishMany, sseFrame, streamsFor, subscribe } from '../lib/chatEvents.js';
 const pair = (a:string,b:string) => [a,b].sort().join(':');
 const absent = () => notFound('NOT_FOUND','Conversation or connection not available.');
+type StoredMessage = NonNullable<Awaited<ReturnType<typeof prisma.chatMessage.findFirst>>>;
+/** Reactions a member can put on a message (one per member per message). */
+export const CHAT_REACTIONS = ['👍','❤️','😂','😮','😢','🙏','🔥','✅'];
+const attachmentSchema = z.object({
+  key:z.string().regex(MEDIA_KEY_RE),name:z.string().trim().min(1).max(200),mime:z.string().trim().min(1).max(100),size:z.number().int().positive().max(MAX_CHAT_FILE_BYTES),
+  durationMs:z.number().int().nonnegative().max(3_600_000).optional(),width:z.number().int().positive().max(20_000).optional(),height:z.number().int().positive().max(20_000).optional(),
+}).strict();
+const kindOfKey = (key:string) => key.startsWith('chat-image/')?'image':key.startsWith('chat-audio/')?'audio':key.startsWith('chat-file/')?'file':null;
+function attachmentOf(m:StoredMessage){
+  if(!m.attachmentKey||m.deletedAt) return null;
+  return {url:mediaUrlForKey(m.attachmentKey),name:m.attachmentName,mime:m.attachmentMime,size:m.attachmentSize,durationMs:m.attachmentDurationMs,width:m.attachmentWidth,height:m.attachmentHeight};
+}
+/** Public shape of one message. `replies` lets quoted messages carry a short preview. */
+export function shapeMessage(m:StoredMessage,replies?:Map<string,StoredMessage>){
+  const r=m.replyToId?replies?.get(m.replyToId):undefined;
+  return {id:m.id,body:m.deletedAt?'':m.body,senderId:m.senderId,createdAt:m.createdAt,clientId:m.clientId,kind:m.deletedAt?'deleted':m.kind,attachment:attachmentOf(m),
+    replyTo:r?{id:r.id,senderId:r.senderId,kind:r.deletedAt?'deleted':r.kind,body:r.deletedAt?'':r.body.slice(0,200),attachmentName:r.deletedAt?null:r.attachmentName}:m.replyToId?{id:m.replyToId}:null,
+    deletedAt:m.deletedAt,reactions:(m.reactions??{}) as Record<string,string[]>};
+}
+async function shapeMany(messages:StoredMessage[]){
+  const ids=[...new Set(messages.map(m=>m.replyToId).filter((x):x is string=>Boolean(x)))];
+  const map=new Map<string,StoredMessage>(ids.length?(await prisma.chatMessage.findMany({where:{id:{in:ids}}})).map(r=>[r.id,r]):[]);
+  return messages.map(m=>shapeMessage(m,map));
+}
+/** One-line preview for the inbox list. */
+function previewOf(m:StoredMessage|undefined){
+  if(!m) return '';
+  if(m.deletedAt) return 'This message was deleted';
+  if(m.kind==='image') return m.body?`📷 ${m.body}`:'📷 Photo';
+  if(m.kind==='audio') return '🎤 Voice note';
+  if(m.kind==='file') return `📄 ${m.attachmentName??'File'}`;
+  return m.body;
+}
 const member = (id:string) => ({OR:[{requesterId:id},{recipientId:id}]});
 const participant = (id:string) => ({OR:[{participantAId:id},{participantBId:id}]});
 const person = {id:true,fullName:true,professionalProfile:{select:{slug:true,title:true,imageUrl:true}}} as const;
@@ -79,7 +112,7 @@ export async function communityRoutes(app:FastifyInstance) {
         const last=t.messages[0],mine=t.participantAId===id,read=mine?t.readAtA:t.readAtB,otherId=mine?t.participantBId:t.participantAId,mark=marks.get(t.id);
         const unreadCount=unreadBy.get(t.id)??0;
         return {id:t.id,person:who(mine?t.participantB:t.participantA),booking:t.booking,bookingId:t.bookingId,connectionId:t.connectionId,
-          lastMessage:last?.body??'',lastMessageAt:last?.createdAt??null,lastMessageSenderId:last?.senderId??null,lastMessageId:last?.id??null,
+          lastMessage:previewOf(last),lastMessageKind:last?(last.deletedAt?'deleted':last.kind):null,lastMessageAt:last?.createdAt??null,lastMessageSenderId:last?.senderId??null,lastMessageId:last?.id??null,
           unread:Boolean(last&&last.senderId!==id&&(!read||last.createdAt>read))||unreadCount>0,unreadCount,
           myReadAt:read,otherReadAt:mine?t.readAtB:t.readAtA,otherDeliveredAt:mark?(mine?mark.deliveredAtB:mark.deliveredAtA):null,
           online:isOnline(otherId),lastSeenAt:lastSeenAt(otherId),updatedAt:t.updatedAt};
@@ -103,7 +136,7 @@ export async function communityRoutes(app:FastifyInstance) {
       const otherId=t.participantAId===id?t.participantBId:t.participantAId;
       const other=await prisma.user.findUnique({where:{id:otherId}});
       const mine=t.participantAId===id;const mark=(await deliveryMarks([t.id])).get(t.id);
-      return {messages:messages.slice().reverse().map(m=>({id:m.id,body:m.body,senderId:m.senderId,createdAt:m.createdAt,clientId:m.clientId})),before:messages.length===50?messages[messages.length-1].id:null,canSend:Boolean(other&&!other.deletedAt&&other.status==='active'&&c?.status!=='blocked'&&(!t.connectionId||c?.status==='accepted')),
+      return {messages:await shapeMany(messages.slice().reverse()),reactions:CHAT_REACTIONS,before:messages.length===50?messages[messages.length-1].id:null,canSend:Boolean(other&&!other.deletedAt&&other.status==='active'&&c?.status!=='blocked'&&(!t.connectionId||c?.status==='accepted')),
         myReadAt:mine?t.readAtA:t.readAtB,otherReadAt:mine?t.readAtB:t.readAtA,otherDeliveredAt:mark?(mine?mark.deliveredAtB:mark.deliveredAtA):null,online:isOnline(otherId),lastSeenAt:lastSeenAt(otherId),otherUserId:otherId};
     });
     scoped.post('/community/threads/:id/read',async req=>{
@@ -114,7 +147,10 @@ export async function communityRoutes(app:FastifyInstance) {
       return {ok:true};
     });
     scoped.post('/community/threads/:id/messages',{config:{rateLimit:{max:30,timeWindow:'1 minute'}}},async req=>{
-      const {body,clientId}=parseBody(z.object({body:z.string().trim().min(1).max(4000),clientId:z.string().uuid()}).strict(),req.body);const id=req.auth!.sub,tid=(req.params as {id:string}).id;
+      const {body,clientId,attachment,replyToId}=parseBody(z.object({body:z.string().trim().max(4000).default(''),clientId:z.string().uuid(),attachment:attachmentSchema.optional(),replyToId:z.string().uuid().optional()}).strict(),req.body);const id=req.auth!.sub,tid=(req.params as {id:string}).id;
+      if(!body&&!attachment) throw new ApiError(422,'VALIDATION_ERROR','Write a message or attach a file.');
+      const kind=attachment?kindOfKey(attachment.key):'text';
+      if(!kind) throw new ApiError(422,'VALIDATION_ERROR','That file cannot be attached to a message.');
       const sent=await prisma.$transaction(async tx=>{
         const t=await tx.chatThread.findFirst({where:{id:tid,...participant(id)}});if(!t) throw absent();
         await tx.$queryRaw`SELECT id FROM users WHERE id = ${id} FOR UPDATE`;
@@ -126,13 +162,55 @@ export async function communityRoutes(app:FastifyInstance) {
         const c=await tx.communityConnection.findUnique({where:{pairKey:key}});
         const other=await tx.user.findUnique({where:{id:t.participantAId===id?t.participantBId:t.participantAId}});
         if(!other||other.deletedAt||other.status!=='active'||c?.status==='blocked'||(t.connectionId&&c?.status!=='accepted')) throw forbidden('Messaging is not available for this relationship.');
-        const m=await tx.chatMessage.upsert({where:{senderId_clientId:{senderId:id,clientId}},create:{threadId:tid,senderId:id,body,clientId},update:{}});
+        let replyTo:StoredMessage|null=null;
+        if(!prior){
+          if(attachment){
+            // Only files this member uploaded through /uploads, and each file on one message only.
+            const owned=await tx.auditLog.findFirst({where:{entity:'storage',entityId:attachment.key,actorId:id,action:'upload.stored'},select:{id:true}});
+            if(!owned) throw new ApiError(422,'VALIDATION_ERROR','Upload the file through Servix first.');
+            if(await tx.chatMessage.findFirst({where:{attachmentKey:attachment.key},select:{id:true}})) throw new ApiError(409,'ATTACHMENT_USED','That file is already attached to a message.');
+          }
+          if(replyToId){replyTo=await tx.chatMessage.findFirst({where:{id:replyToId,threadId:tid}});if(!replyTo) throw new ApiError(422,'VALIDATION_ERROR','The message you are replying to is not in this conversation.');}
+        }
+        const m=await tx.chatMessage.upsert({where:{senderId_clientId:{senderId:id,clientId}},create:{threadId:tid,senderId:id,body,clientId,kind,replyToId:replyTo?.id??null,
+          ...(attachment?{attachmentKey:attachment.key,attachmentName:attachment.name,attachmentMime:attachment.mime,attachmentSize:attachment.size,attachmentDurationMs:attachment.durationMs??null,attachmentWidth:attachment.width??null,attachmentHeight:attachment.height??null}:{})},update:{}});
         if(m.threadId!==tid) throw new ApiError(409,'MESSAGE_CONFLICT','Start a new message.');
+        if(prior&&m.replyToId) replyTo=await tx.chatMessage.findFirst({where:{id:m.replyToId}});
         if(!prior){const me=await tx.user.findUniqueOrThrow({where:{id},select:{fullName:true}});await notifyChatOnce(tx,other.id,tid,me.fullName);}
-        await tx.chatThread.update({where:{id:tid},data:{updatedAt:new Date()}});return {message:{id:m.id,body:m.body,senderId:m.senderId,createdAt:m.createdAt,clientId:m.clientId},participants:[t.participantAId,t.participantBId]};
+        await tx.chatThread.update({where:{id:tid},data:{updatedAt:new Date()}});
+        return {message:shapeMessage(m,replyTo?new Map([[replyTo.id,replyTo]]):undefined),participants:[t.participantAId,t.participantBId]};
       });
       publishMany(sent.participants,{type:'message',threadId:tid,message:sent.message});
-      return {id:sent.message.id,body:sent.message.body,senderId:sent.message.senderId,createdAt:sent.message.createdAt,clientId:sent.message.clientId};
+      return sent.message;
+    });
+    // Delete for everyone (sender only). The row stays as a tombstone so ordering and replies keep working.
+    scoped.delete('/community/threads/:id/messages/:mid',{config:{rateLimit:{max:60,timeWindow:'1 minute'}}},async req=>{
+      const id=req.auth!.sub;const {id:tid,mid}=req.params as {id:string;mid:string};
+      const t=await prisma.chatThread.findFirst({where:{id:tid,...participant(id)}});if(!t) throw absent();
+      const m=await prisma.chatMessage.findFirst({where:{id:mid,threadId:tid}});if(!m) throw absent();
+      if(m.senderId!==id) throw forbidden('You can only delete your own messages.');
+      const key=m.deletedAt?null:m.attachmentKey;
+      const updated=m.deletedAt?m:await prisma.chatMessage.update({where:{id:mid},data:{deletedAt:new Date(),body:'',attachmentKey:null,attachmentName:null,attachmentMime:null,attachmentSize:null,attachmentDurationMs:null,attachmentWidth:null,attachmentHeight:null}});
+      if(key){try{await getStorage().deleteObject(key);}catch(err){req.log.warn({err,key},'chat attachment delete failed');}}
+      const [shaped]=await shapeMany([updated]);
+      publishMany([t.participantAId,t.participantBId],{type:'message_update',threadId:tid,message:shaped});
+      return shaped;
+    });
+    // Toggle a reaction (one per member per message).
+    scoped.post('/community/threads/:id/messages/:mid/react',{config:{rateLimit:{max:120,timeWindow:'1 minute'}}},async req=>{
+      const {emoji}=parseBody(z.object({emoji:z.enum(CHAT_REACTIONS as [string,...string[]])}).strict(),req.body);
+      const id=req.auth!.sub;const {id:tid,mid}=req.params as {id:string;mid:string};
+      const t=await prisma.chatThread.findFirst({where:{id:tid,...participant(id)}});if(!t) throw absent();
+      const m=await prisma.chatMessage.findFirst({where:{id:mid,threadId:tid}});if(!m) throw absent();
+      if(m.deletedAt) throw new ApiError(409,'MESSAGE_DELETED','That message was deleted.');
+      const current=(m.reactions??{}) as Record<string,string[]>;const had=(current[emoji]??[]).includes(id);
+      const next:Record<string,string[]>={};
+      for(const [k,users] of Object.entries(current)){const rest=users.filter(u=>u!==id);if(rest.length) next[k]=rest;}
+      if(!had) next[emoji]=[...(next[emoji]??[]),id];
+      const updated=await prisma.chatMessage.update({where:{id:mid},data:{reactions:next}});
+      const [shaped]=await shapeMany([updated]);
+      publishMany([t.participantAId,t.participantBId],{type:'message_update',threadId:tid,message:shaped});
+      return shaped;
     });
     // Ephemeral typing signal, forwarded to the other participant's open streams only.
     scoped.post('/community/threads/:id/typing',{config:{rateLimit:{max:120,timeWindow:'1 minute'}}},async req=>{
