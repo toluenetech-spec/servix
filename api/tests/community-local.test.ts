@@ -42,6 +42,7 @@ describe.skipIf(process.env.RUN_LOCAL_COMMUNITY_TESTS !== '1')('community and wo
   }
   function call(token:string,path:string,body?:object,method?:'GET'|'POST'|'PATCH'){return app.inject({method:method??(body?'POST':'GET'),url:`/api/v1/${path}`,payload:body,headers:{authorization:`Bearer ${token}`},remoteAddress:`192.0.2.${ip++%240+1}`});}
   async function connected(){const a=await account(),b=await account(true);const c=(await call(a.token,'community/connections',{profileSlug:b.slug})).json();await call(b.token,`community/connections/${c.id}/action`,{action:'accept'});const t=(await call(a.token,'community/threads',{connectionId:c.id})).json();return {a,b,c,t};}
+  async function connectedThread(){const a=await account(),b=await account(true);const c=(await call(a.token,'community/connections',{profileSlug:b.slug})).json();await call(b.token,`community/connections/${c.id}/action`,{action:'accept'});const t=(await call(a.token,'community/threads',{connectionId:c.id})).json();return {a,b,connection:c.id,thread:t.id as string};}
   it('requires authenticated verified accounts and respects the default-off switch',async()=>{
     expect((await call('','community/connections')).statusCode).toBe(401);const a=await account();process.env.COMMUNITY_ENABLED='false';expect((await call(a.token,'community/connections')).statusCode).toBe(503);process.env.COMMUNITY_ENABLED='true';await prisma.user.update({where:{id:a.user.id},data:{emailVerifiedAt:null}});expect((await call(a.token,'community/connections')).statusCode).toBe(403);
   });
@@ -74,6 +75,53 @@ describe.skipIf(process.env.RUN_LOCAL_COMMUNITY_TESTS !== '1')('community and wo
   });
   it('does not accept cross-thread cursors or reuse a client ID in a different thread',async()=>{
     const first=await connected(),other=await account(true);const c=(await call(first.a.token,'community/connections',{profileSlug:other.slug})).json();await call(other.token,`community/connections/${c.id}/action`,{action:'accept'});const t=(await call(first.a.token,'community/threads',{connectionId:c.id})).json();const body={body:'Only once',clientId:randomUUID()};const msg=(await call(first.a.token,`community/threads/${first.t.id}/messages`,body)).json();expect((await call(first.a.token,`community/threads/${t.id}/messages`,body)).statusCode).toBe(409);expect((await call(first.a.token,`community/threads/${t.id}/messages?before=${msg.id}`)).statusCode).toBe(404);
+  });
+  it('realtime: send publishes to the event stream, typing/delivered/read fan out, watermarks are exposed',async()=>{
+    const {a,b,thread}=await connectedThread();
+    const events=await import('../src/lib/chatEvents.js');
+    const gotB:unknown[]=[];const offB=events.subscribe(b.user.id,e=>gotB.push(e));
+    const gotA:unknown[]=[];const offA=events.subscribe(a.user.id,e=>gotA.push(e));
+    expect(events.isOnline(b.user.id)).toBe(true);
+    const sent=(await call(a.token,`community/threads/${thread}/messages`,{body:'hello there',clientId:randomUUID()})).json();
+    expect(gotB.find((e:any)=>e.type==='message'&&e.message.id===sent.id)).toBeTruthy();
+    expect(gotA.find((e:any)=>e.type==='message'&&e.message.id===sent.id)).toBeTruthy();
+    expect((await call(a.token,`community/threads/${thread}/typing`,{typing:true})).json()).toEqual({ok:true});
+    expect(gotB.find((e:any)=>e.type==='typing'&&e.typing===true&&e.userId===a.user.id)).toBeTruthy();
+    expect(gotA.find((e:any)=>e.type==='typing')).toBeFalsy();
+    const delivered=(await call(b.token,`community/threads/${thread}/delivered`,{})).json();
+    expect(delivered.supported).toBe(true);expect(gotA.find((e:any)=>e.type==='delivered'&&e.userId===b.user.id)).toBeTruthy();
+    await call(b.token,`community/threads/${thread}/read`,{});
+    expect(gotA.find((e:any)=>e.type==='read'&&e.userId===b.user.id)).toBeTruthy();
+    const view=(await call(a.token,`community/threads/${thread}/messages`)).json();
+    expect(new Date(view.otherDeliveredAt).getTime()).toBeGreaterThanOrEqual(new Date(sent.createdAt).getTime()-5);
+    expect(new Date(view.otherReadAt).getTime()).toBeGreaterThanOrEqual(new Date(sent.createdAt).getTime()-5);
+    expect(view.online).toBe(true);
+    const list=(await call(b.token,'community/threads')).json();const row=list.find((t:any)=>t.id===thread);
+    expect(row.unreadCount).toBe(0);expect(row.unread).toBe(false);expect(row.lastMessageSenderId).toBe(a.user.id);
+    const outsider=await account();
+    expect((await call(outsider.token,`community/threads/${thread}/typing`,{typing:true})).statusCode).toBe(404);
+    expect((await call(outsider.token,`community/threads/${thread}/delivered`,{})).statusCode).toBe(404);
+    offA();offB();expect(events.isOnline(b.user.id)).toBe(false);expect(events.lastSeenAt(b.user.id)).toBeInstanceOf(Date);
+    // Unread count counts only the other side's messages after my read watermark.
+    await call(a.token,`community/threads/${thread}/messages`,{body:'second',clientId:randomUUID()});
+    await call(a.token,`community/threads/${thread}/messages`,{body:'third',clientId:randomUUID()});
+    const again=(await call(b.token,'community/threads')).json().find((t:any)=>t.id===thread);
+    expect(again.unreadCount).toBe(2);expect(again.unread).toBe(true);
+  });
+  it('event stream answers with text/event-stream, a hello frame, then live message frames',async()=>{
+    const {a,b,thread}=await connectedThread();
+    const address=await app.listen({port:0,host:'127.0.0.1'});
+    const ac=new AbortController();
+    try{
+      const res=await fetch(`${address}/api/v1/community/events`,{headers:{authorization:`Bearer ${a.token}`},signal:ac.signal});
+      expect(res.status).toBe(200);expect(res.headers.get('content-type')).toContain('text/event-stream');
+      const reader=res.body!.getReader();const decoder=new TextDecoder();let buffer='';
+      const readUntil=async(needle:string)=>{for(let i=0;i<20&&!buffer.includes(needle);i++){const {value,done}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});}return buffer.includes(needle);};
+      expect(await readUntil('"type":"hello"')).toBe(true);
+      const events=await import('../src/lib/chatEvents.js');expect(events.isOnline(a.user.id)).toBe(true);
+      await call(b.token,`community/threads/${thread}/messages`,{body:'streamed',clientId:randomUUID()});
+      expect(await readUntil('"body":"streamed"')).toBe(true);
+    }finally{ac.abort();}
   });
   it('settings rejects role/email injection and security summary contains no secrets',async()=>{
     const a=await account();expect((await call(a.token,'account/profile',{fullName:'New Name'},'PATCH')).statusCode).toBe(200);expect((await prisma.user.findUniqueOrThrow({where:{id:a.user.id}})).fullName).toBe('New Name');expect((await call(a.token,'account/profile',{fullName:'Fake',role:'admin'},'PATCH')).statusCode).toBe(422);const s=(await call(a.token,'account/security-summary')).json();expect(Object.keys(s).sort()).toEqual(['method','passkeys','recoveryCodesRemaining']);expect((await call(a.token,'account/payments')).json()).toMatchObject({mode:'test',records:[]});

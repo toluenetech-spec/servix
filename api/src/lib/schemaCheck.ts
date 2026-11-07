@@ -23,6 +23,10 @@ const REQUIRED_COLUMNS: Array<{ table: string; column: string }> = [
 const OPTIONAL_TABLES: Array<{ table: string; migration: string; script: string }> = [
   { table: 'ai_feedback', migration: '20261004120000_ai_feedback', script: 'api/docs/manual-ai-feedback.sql' },
 ];
+/** Optional additive columns (same contract as OPTIONAL_TABLES; reported as `table.column`). */
+const OPTIONAL_COLUMNS: Array<{ table: string; column: string; migration: string; script: string }> = [
+  { table: 'chat_threads', column: 'delivered_at_a', migration: '20261107000000_chat_delivery', script: 'api/docs/manual-chat-upgrade.sql' },
+];
 
 export type SchemaStatus = {
   ok: boolean; missing: string[]; pendingMigration: string | null; checkedAt: string;
@@ -37,12 +41,15 @@ export async function checkSchema(force = false): Promise<SchemaStatus> {
   try {
     const present = await prisma.$queryRawUnsafe<Array<{ table_name: string; column_name: string }>>(
       `SELECT table_name::text, column_name::text FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = ANY($1::text[])`,
-      [...REQUIRED_COLUMNS.map((c) => c.table), ...OPTIONAL_TABLES.map((t) => t.table)],
+      [...REQUIRED_COLUMNS.map((c) => c.table), ...OPTIONAL_TABLES.map((t) => t.table), ...OPTIONAL_COLUMNS.map((c) => c.table)],
     );
     const have = new Set(present.map((r) => `${r.table_name}.${r.column_name}`));
     const tables = new Set(present.map((r) => r.table_name));
     missing = REQUIRED_COLUMNS.filter((c) => !have.has(`${c.table}.${c.column}`)).map((c) => `${c.table}.${c.column}`);
-    optionalPending = OPTIONAL_TABLES.filter((t) => !tables.has(t.table));
+    optionalPending = [
+      ...OPTIONAL_TABLES.filter((t) => !tables.has(t.table)),
+      ...OPTIONAL_COLUMNS.filter((c) => tables.has(c.table) && !have.has(`${c.table}.${c.column}`)).map((c) => ({ table: `${c.table}.${c.column}`, migration: c.migration, script: c.script })),
+    ];
   } catch (err) {
     // Database unreachable: readiness already reports `database: false`; do not double-report.
     const value: SchemaStatus = { ok: false, missing: ['(database unreachable)'], pendingMigration: null, checkedAt: new Date().toISOString(), optionalPending: [] };

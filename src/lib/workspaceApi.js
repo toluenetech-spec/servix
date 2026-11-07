@@ -18,6 +18,8 @@ export const getMessages = (id,before) => workspaceCall(`/community/threads/${en
 export const sendMessage = (id,body,clientId) => workspaceCall(`/community/threads/${encodeURIComponent(id)}/messages`,{body,clientId});
 export const markRead = id => workspaceCall(`/community/threads/${encodeURIComponent(id)}/read`,{});
 export const blockThread = id => workspaceCall(`/community/threads/${encodeURIComponent(id)}/block`,{});
+export const sendTyping = (id,typing) => workspaceCall(`/community/threads/${encodeURIComponent(id)}/typing`,{typing});
+export const markDelivered = id => workspaceCall(`/community/threads/${encodeURIComponent(id)}/delivered`,{});
 /* notifications */
 export const getNotifications = before => workspaceCall(`/account/notifications${before ? `?before=${encodeURIComponent(before)}` : ''}`);
 export const getUnreadCount = () => workspaceCall('/account/notifications/unread');

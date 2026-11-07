@@ -2,6 +2,25 @@
 
 All notable changes to the Servix public website.
 
+## 0.9.6 — Live chat
+
+- API: `GET /api/v1/community/events` — authenticated server-sent event stream (one per tab/app session, max 6 per
+  account). Frames: `hello` (who of your chat partners is online + last seen), `message`, `typing`, `read`,
+  `delivered`, `presence`, `connection`, `thread`. Heartbeat every 15 s. In-process fan-out (single API instance,
+  no Redis) in `api/src/lib/chatEvents.ts`.
+- API: `POST /community/threads/:id/typing { typing }` and `POST /community/threads/:id/delivered`.
+  `GET /community/threads` now also returns `lastMessageAt`, `lastMessageSenderId`, `unreadCount`, `myReadAt`,
+  `otherReadAt`, `otherDeliveredAt`, `online`, `lastSeenAt`; `GET /community/threads/:id/messages` returns the same
+  watermarks plus `clientId` per message. Participant `professionalProfile.imageUrl` is now a public URL.
+- API: optional additive migration `20261107000000_chat_delivery` (`chat_threads.delivered_at_a/b`) — run
+  `api/docs/manual-chat-upgrade.sql` once by hand. Without it everything works, only the grey "delivered" tick is
+  skipped (sent → seen). `/readyz` lists it under `optionalPending` until applied.
+- Web: Messages rewritten as a live chat — two-pane desktop / full-screen conversation on phones, avatars, unread
+  badges, online dot and "Last seen", typing indicator, day separators, grouped bubbles, sent ✓ / delivered ✓✓ /
+  seen ✓✓ (blue) ticks, optimistic sending with retry, Enter to send, "new messages" jump pill, link detection,
+  "Share my location" (sends a Google Maps link as a message). Falls back to 15 s polling if the stream is unavailable.
+  Docs: `api/docs/CHAT.md`.
+
 ## 0.9.5 — Provider sign-in for the native app
 
 - API: Google/GitHub sign-in hand-off for native apps — `GET /auth/<provider>/native/start?client=`, callback
