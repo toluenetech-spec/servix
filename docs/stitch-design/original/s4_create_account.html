@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+
+<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><meta content="mobile_stack" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{width:100vw;margin:0;padding:0;}body{overscroll-behavior:none;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com" type="96f450a2f30d0b3e8b50107d-text/javascript"></script><script id="tailwind-config" type="96f450a2f30d0b3e8b50107d-text/javascript">tailwind.config = { darkMode: "class", theme: { extend: { colors: { "on-tertiary-fixed-variant": "#84241c", "inverse-surface": "#2c322e", "on-tertiary-fixed": "#410001", "tertiary-fixed-dim": "#ffb4aa", "on-secondary": "#ffffff", "surface": "#f5fbf4", "on-background": "#171d19", "error-container": "#ffdad6", "surface-dim": "#d6dcd5", "on-tertiary-container": "#f07365", "surface-variant": "#dee4de", "secondary-fixed-dim": "#96d3b6", "surface-tint": "#416656", "surface-container-highest": "#dee4de", "on-primary": "#ffffff", "primary-fixed-dim": "#a8cfbd", "on-error": "#ffffff", "surface-container-high": "#e4eae3", "background": "#f5fbf4", "on-primary-fixed-variant": "#2a4e3f", "primary": "#002116", "on-secondary-fixed": "#002115", "secondary": "#2d6951", "surface-container-low": "#eff5ee", "surface-container": "#eaefe9", "on-tertiary": "#ffffff", "secondary-fixed": "#b2f0d1", "on-secondary-container": "#346f57", "tertiary": "#420001", "surface-bright": "#f5fbf4", "on-surface-variant": "#414844", "secondary-container": "#b2f0d1", "outline": "#717974", "surface-container-lowest": "#ffffff", "error": "#ba1a1a", "on-primary-container": "#7ba190", "on-surface": "#171d19", "primary-container": "#12372a", "inverse-on-surface": "#ecf2ec", "primary-fixed": "#c3ebd8", "tertiary-fixed": "#ffdad5", "outline-variant": "#c1c8c3", "on-error-container": "#93000a", "on-secondary-fixed-variant": "#10513a", "inverse-primary": "#a8cfbd", "tertiary-container": "#650c09", "on-primary-fixed": "#002116" }, borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, spacing: { "space-lg": "1.5rem", "space-sm": "0.5rem", "space-xs": "0.25rem", "gutter": "1rem", "space-xl": "2rem", "margin-desktop": "3rem", "space-md": "1rem", "margin": "1rem", "gutter-tablet": "1.5rem", "gutter-desktop": "2rem", "margin-tablet": "2rem" }, fontFamily: { "body-lg": ["Inter"], "body-md": ["Inter"], "headline-md": ["Inter"], "headline-lg": ["Inter"], "currency-display": ["Inter"], "label-md": ["Inter"], "title-md": ["Inter"], "headline-lg-mobile": ["Inter"], "display-lg": ["Inter"], "body-sm": ["Inter"], "title-lg": ["Inter"], "label-lg": ["Inter"] }, fontSize: { "body-lg": ["16px", { lineHeight: "24px", fontWeight: "400" }], "body-md": ["14px", { lineHeight: "20px", fontWeight: "400" }], "headline-md": ["22px", { lineHeight: "28px", letterSpacing: "-0.01em", fontWeight: "600" }], "headline-lg": ["32px", { lineHeight: "40px", letterSpacing: "-0.02em", fontWeight: "600" }], "currency-display": ["28px", { lineHeight: "36px", letterSpacing: "-0.01em", fontWeight: "700" }], "label-md": ["12px", { lineHeight: "16px", letterSpacing: "0.02em", fontWeight: "500" }], "title-md": ["16px", { lineHeight: "22px", fontWeight: "600" }], "headline-lg-mobile": ["26px", { lineHeight: "34px", letterSpacing: "-0.01em", fontWeight: "600" }], "display-lg": ["40px", { lineHeight: "48px", letterSpacing: "-0.02em", fontWeight: "700" }], "body-sm": ["12px", { lineHeight: "16px", fontWeight: "400" }], "title-lg": ["18px", { lineHeight: "24px", fontWeight: "600" }], "label-lg": ["14px", { lineHeight: "20px", letterSpacing: "0.01em", fontWeight: "600" }] } } } };</script><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head><body class="bg-surface font-body-md text-on-surface antialiased min-h-screen flex flex-col"><header class="fixed top-0 w-full z-50 pt-safe bg-surface/80 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div class="h-16 px-margin flex items-center justify-between"><div class="flex items-center gap-space-sm"><button aria-label="Go back" class="w-11 h-11 flex items-center justify-center rounded-full text-on-surface hover:bg-surface-container-high transition-colors" onclick="if (!window.__cfRLUnblockHandlers) return false; history.back()" type="button" data-cf-modified-96f450a2f30d0b3e8b50107d-=""><span class="material-symbols-outlined text-[24px]">arrow_back</span></button><h1 class="font-title-lg text-title-lg text-on-surface tracking-tight truncate max-w-[200px]">Register</h1></div><div class="flex items-center gap-space-xs"><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="flex-1 flex flex-col relative w-full bg-surface px-margin pt-16 pb-safe"><div class="flex flex-col w-full pb-space-xl">
+<!-- Trust & Intro Header Segment -->
+<div class="flex flex-col pt-space-xs pb-space-md">
+<div class="inline-flex items-center gap-space-xs self-start px-space-sm py-1 rounded-full bg-secondary-fixed text-on-secondary-fixed text-label-md font-label-md mb-space-sm">
+<span class="material-symbols-outlined text-[14px]" style="font-variation-settings: 'FILL' 1;">verified_user</span>
+<span>Escrow-Protected Registration</span>
+</div>
+<h2 class="text-headline-lg-mobile font-headline-lg-mobile text-on-surface tracking-tight">
+      Create your account
+    </h2>
+<p class="text-body-md font-body-md text-on-surface-variant mt-1">
+      Join thousands of homeowners and businesses booking verified artisans.
+    </p>
+</div>
+<!-- Main Card Container -->
+<div class="flex flex-col bg-surface-container-low rounded-xl p-space-md shadow-sm mb-space-md">
+<!-- Verified Community Social Proof Snip -->
+<div class="flex items-center gap-space-sm p-space-sm rounded-lg bg-surface-container mb-space-md">
+<div class="flex -space-x-2">
+<img class="w-8 h-8 rounded-full object-cover shadow-sm" data-alt="A warm, vibrant close-up portrait of a cheerful Nigerian female interior designer with braids smiling in a sunny Lagos studio filled with fabric samples and architectural sketches." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBEBNP-h0-C9Zw6JOP2X6xpVoN0tcRvQvNVSuRrJJywo0g1fn3OeQfibCpqVIOTBMM_t-ugDDj3ZKGZ7QAaBY-sxzkjQljQD6HMzRZFF1D3um1EQpaE0Hx4xKkBef7KLsZZ-HdrSwr60ObJc01h9u8qkwD8hrZDs_sVBpPGGAZPQv91NHlg0ngpy6ekTfQWUDJohKqvaa3JGgQrrKZerZ9F4HFJhZ4dCLJb_FDXPkVD"/>
+<img class="w-8 h-8 rounded-full object-cover shadow-sm" data-alt="A confident Nigerian electrical engineer wearing safety gear and navy polo in modern Abuja workshop, illuminated by warm natural window light." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDMa1iHNr3raDQRQ2bwj11xK3hF54yPW9jNgXIwB_7ql2r0wophRSAFaFJpBk4kc9JpGx1Ck5ZOACWTKoPHZF36LU-zixh3gcDgpJfqBp0_U0z0FIhNqA-AYuVhx5t8GCYzrgvPbakmp7c53t2Xnfilne5YCA7LagTp450IwawLJEwtXi_HLOxvbJ2GYoo3d0EEuT91QL6osmcpSECCRGucYJbnEBMTHMbI-0HlpIw3"/>
+<img class="w-8 h-8 rounded-full object-cover shadow-sm" data-alt="A friendly Nigerian master carpenter standing beside handcrafted solid mahogany furniture in a bright artisanal showroom in Port Harcourt." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA4gWo8mspnkhIvTQSG2Dlc33LCqSKT-qmX3QiGZuBTI7waB9l51S0tgfIALx-h72B0ixP4hNP2Nka_h2LkVFjhk238y_P9vnBe5X-FLg43f4t2_PEDFRDjji-xnwtloPxqln9G7OCZ1Im3obUN1gLnxecOUCbUlc-XtDa0sEg6Jk5skeSHq4Fwl10nRXPrnZN8j6SbyC4Uip5vvO2y1ynsQNbOFa1XJAT2d9bbdsi0"/>
+</div>
+<div class="flex flex-col min-w-0">
+<span class="text-label-md font-label-md text-on-surface font-semibold truncate">Over 18,400+ vetted artisans</span>
+<span class="text-body-sm font-body-sm text-on-surface-variant">Active across Lagos, Abuja, &amp; Ibadan</span>
+</div>
+</div>
+<!-- Registration Form -->
+<form class="flex flex-col gap-space-md" id="registerForm" onsubmit="if (!window.__cfRLUnblockHandlers) return false; event.preventDefault();" data-cf-modified-96f450a2f30d0b3e8b50107d-="">
+<!-- Full Name -->
+<div class="flex flex-col gap-1">
+<label class="text-label-md font-label-md text-on-surface font-semibold" for="fullName">
+          Full Name
+        </label>
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-3 text-outline text-[20px] pointer-events-none">person</span>
+<input autocomplete="name" class="w-full h-[52px] pl-10 pr-space-md rounded-lg bg-surface text-on-surface placeholder:text-outline text-body-md font-body-md focus:outline-none focus:bg-surface-container-lowest transition-all" id="fullName" name="fullName" placeholder="e.g. Olumide Adeleke" required="" type="text"/>
+</div>
+</div>
+<!-- Email Address -->
+<div class="flex flex-col gap-1">
+<label class="text-label-md font-label-md text-on-surface font-semibold" for="email">
+          Email Address
+        </label>
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-3 text-outline text-[20px] pointer-events-none">mail</span>
+<input autocomplete="email" class="w-full h-[52px] pl-10 pr-space-md rounded-lg bg-surface text-on-surface placeholder:text-outline text-body-md font-body-md focus:outline-none focus:bg-surface-container-lowest transition-all" id="email" name="email" placeholder="olumide@example.ng" required="" type="email"/>
+</div>
+</div>
+<!-- Phone Number with Nigerian Flag & Prefix -->
+<div class="flex flex-col gap-1">
+<label class="text-label-md font-label-md text-on-surface font-semibold" for="phone">
+          Phone Number
+        </label>
+<div class="relative flex items-center">
+<!-- Nigeria prefix badge -->
+<div class="absolute left-2.5 flex items-center gap-1.5 px-2 py-1 rounded bg-surface-container-high text-on-surface select-none pointer-events-none">
+<span class="text-[14px] leading-none">🇳🇬</span>
+<span class="text-label-md font-label-md font-bold text-on-surface">+234</span>
+</div>
+<input autocomplete="tel" class="w-full h-[52px] pl-[84px] pr-space-md rounded-lg bg-surface text-on-surface placeholder:text-outline text-body-md font-body-md focus:outline-none focus:bg-surface-container-lowest transition-all" id="phone" inputmode="numeric" name="phone" placeholder="803 123 4567" required="" type="tel"/>
+</div>
+<span class="text-body-sm font-body-sm text-on-surface-variant px-1">Used solely for booking updates and escrow releases.</span>
+</div>
+<!-- Password Field with Toggle -->
+<div class="flex flex-col gap-1">
+<label class="text-label-md font-label-md text-on-surface font-semibold" for="password">
+          Password
+        </label>
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-3 text-outline text-[20px] pointer-events-none">lock</span>
+<input autocomplete="new-password" class="w-full h-[52px] pl-10 pr-12 rounded-lg bg-surface text-on-surface placeholder:text-outline text-body-md font-body-md focus:outline-none focus:bg-surface-container-lowest transition-all" id="password" name="password" placeholder="Create a strong password" required="" type="password"/>
+<button aria-label="Toggle password visibility" class="absolute right-2 w-9 h-9 flex items-center justify-center rounded-full text-outline hover:text-on-surface hover:bg-surface-container transition-colors" id="togglePassword" type="button">
+<span class="material-symbols-outlined text-[20px]" id="pwdIcon">visibility</span>
+</button>
+</div>
+</div>
+<!-- Password Requirements Interactive Card -->
+<div class="flex flex-col gap-2 p-space-sm rounded-lg bg-surface-container">
+<div class="flex items-center justify-between">
+<span class="text-label-md font-label-md text-on-surface-variant font-medium">Password Requirements</span>
+<span class="text-body-sm font-body-sm text-outline" id="strengthLabel">0 of 3 met</span>
+</div>
+<div class="flex flex-col gap-1.5 pt-1">
+<!-- Rule 1: Min 8 Chars -->
+<div class="flex items-center gap-2 text-body-sm font-body-sm text-on-surface-variant transition-colors" id="rule-length">
+<span class="material-symbols-outlined text-[16px] text-outline" id="icon-length">radio_button_unchecked</span>
+<span>At least 8 characters</span>
+</div>
+<!-- Rule 2: At least one number -->
+<div class="flex items-center gap-2 text-body-sm font-body-sm text-on-surface-variant transition-colors" id="rule-number">
+<span class="material-symbols-outlined text-[16px] text-outline" id="icon-number">radio_button_unchecked</span>
+<span>At least one number</span>
+</div>
+<!-- Rule 3: At least one special character -->
+<div class="flex items-center gap-2 text-body-sm font-body-sm text-on-surface-variant transition-colors" id="rule-special">
+<span class="material-symbols-outlined text-[16px] text-outline" id="icon-special">radio_button_unchecked</span>
+<span>At least one special character (!@#$%^&amp;*...)</span>
+</div>
+</div>
+</div>
+<!-- Terms & Privacy Mandatory Checkbox -->
+<div class="flex items-start gap-space-sm pt-1">
+<div class="relative flex items-center pt-0.5">
+<input class="w-5 h-5 rounded cursor-pointer accent-secondary focus:ring-0" id="terms" name="terms" required="" type="checkbox"/>
+</div>
+<label class="text-body-sm font-body-sm text-on-surface leading-tight cursor-pointer select-none" for="terms">
+          I agree to the Servix <a class="font-semibold text-secondary underline" href="#terms-of-service">Terms of Service</a> and <a class="font-semibold text-secondary underline" href="#privacy-policy">Privacy Policy</a>, and confirm I am booking services in Nigeria.
+        </label>
+</div>
+<!-- Primary Action CTA -->
+<button class="w-full h-[52px] mt-space-xs rounded-xl bg-primary-container text-on-primary font-label-lg text-label-lg flex items-center justify-center gap-space-xs shadow-md active:scale-[0.99] transition-all hover:bg-secondary" id="submitBtn" type="submit">
+<span>Create Account</span>
+<span class="material-symbols-outlined text-[20px]">arrow_forward</span>
+</button>
+</form>
+</div>
+<!-- Social Auth Divider -->
+<div class="flex items-center gap-space-sm my-space-sm px-space-xs">
+<div class="flex-1 h-[1px] bg-surface-variant"></div>
+<span class="text-label-md font-label-md text-outline uppercase tracking-wider">or sign up with</span>
+<div class="flex-1 h-[1px] bg-surface-variant"></div>
+</div>
+<!-- Alternative OAuth Registration Options -->
+<div class="grid grid-cols-2 gap-space-sm mb-space-lg">
+<!-- Google OAuth Button -->
+<button class="h-[52px] px-space-md rounded-xl bg-surface-container flex items-center justify-center gap-2.5 text-on-surface font-label-lg text-label-lg active:bg-surface-variant transition-colors shadow-sm" type="button">
+<svg class="w-5 h-5 shrink-0" viewbox="0 0 24 24">
+<path d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.15z" fill="#4285F4"></path>
+<path d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.26v3.15C3.25 21.36 7.31 24 12 24z" fill="#34A853"></path>
+<path d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.26C.46 8.16 0 9.94 0 12s.46 3.84 1.26 5.42l4.02-3.15z" fill="#FBBC05"></path>
+<path d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.25 2.64 1.26 6.58l4.02 3.15c.95-2.83 3.6-4.98 6.72-4.98z" fill="#EA4335"></path>
+</svg>
+<span>Google</span>
+</button>
+<!-- GitHub OAuth Button -->
+<button class="h-[52px] px-space-md rounded-xl bg-surface-container flex items-center justify-center gap-2.5 text-on-surface font-label-lg text-label-lg active:bg-surface-variant transition-colors shadow-sm" type="button">
+<svg class="w-5 h-5 shrink-0 fill-current" viewbox="0 0 24 24">
+<path clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" fill-rule="evenodd"></path>
+</svg>
+<span>GitHub</span>
+</button>
+</div>
+<!-- Escrow Security Assurance Footnote -->
+<div class="flex items-center justify-center gap-space-xs text-on-surface-variant text-body-sm font-body-sm mb-space-md">
+<span class="material-symbols-outlined text-[16px] text-secondary">security</span>
+<span>Your payments and data are held in escrow under NDPR standards.</span>
+</div>
+<!-- Bottom Navigation / Sign In Switch -->
+<div class="flex items-center justify-center p-space-md rounded-xl bg-surface-container text-body-md font-body-md text-on-surface">
+<span>Already have an account?</span>
+<a class="ml-1.5 font-title-md text-title-md text-secondary underline hover:text-primary transition-colors" href="#signin">
+      Sign In
+    </a>
+</div>
+</div>
+<script type="96f450a2f30d0b3e8b50107d-text/javascript">
+  (function() {
+    const pwdInput = document.getElementById('password');
+    const toggleBtn = document.getElementById('togglePassword');
+    const pwdIcon = document.getElementById('pwdIcon');
+
+    const ruleLength = document.getElementById('rule-length');
+    const ruleNumber = document.getElementById('rule-number');
+    const ruleSpecial = document.getElementById('rule-special');
+
+    const iconLength = document.getElementById('icon-length');
+    const iconNumber = document.getElementById('icon-number');
+    const iconSpecial = document.getElementById('icon-special');
+
+    const strengthLabel = document.getElementById('strengthLabel');
+
+    if (toggleBtn && pwdInput && pwdIcon) {
+      toggleBtn.addEventListener('click', () => {
+        const isPassword = pwdInput.type === 'password';
+        pwdInput.type = isPassword ? 'text' : 'password';
+        pwdIcon.textContent = isPassword ? 'visibility_off' : 'visibility';
+      });
+    }
+
+    if (pwdInput) {
+      pwdInput.addEventListener('input', () => {
+        const val = pwdInput.value;
+        const hasLength = val.length >= 8;
+        const hasNumber = /\d/.test(val);
+        const hasSpecial = /[^A-Za-z0-9]/.test(val);
+
+        // Update Rule 1
+        if (hasLength) {
+          ruleLength.className = 'flex items-center gap-2 text-body-sm font-body-sm text-secondary font-medium transition-colors';
+          iconLength.textContent = 'check_circle';
+          iconLength.className = 'material-symbols-outlined text-[16px] text-secondary';
+        } else {
+          ruleLength.className = 'flex items-center gap-2 text-body-sm font-body-sm text-on-surface-variant transition-colors';
+          iconLength.textContent = 'radio_button_unchecked';
+          iconLength.className = 'material-symbols-outlined text-[16px] text-outline';
+        }
+
+        // Update Rule 2
+        if (hasNumber) {
+          ruleNumber.className = 'flex items-center gap-2 text-body-sm font-body-sm text-secondary font-medium transition-colors';
+          iconNumber.textContent = 'check_circle';
+          iconNumber.className = 'material-symbols-outlined text-[16px] text-secondary';
+        } else {
+          ruleNumber.className = 'flex items-center gap-2 text-body-sm font-body-sm text-on-surface-variant transition-colors';
+          iconNumber.textContent = 'radio_button_unchecked';
+          iconNumber.className = 'material-symbols-outlined text-[16px] text-outline';
+        }
+
+        // Update Rule 3
+        if (hasSpecial) {
+          ruleSpecial.className = 'flex items-center gap-2 text-body-sm font-body-sm text-secondary font-medium transition-colors';
+          iconSpecial.textContent = 'check_circle';
+          iconSpecial.className = 'material-symbols-outlined text-[16px] text-secondary';
+        } else {
+          ruleSpecial.className = 'flex items-center gap-2 text-body-sm font-body-sm text-on-surface-variant transition-colors';
+          iconSpecial.textContent = 'radio_button_unchecked';
+          iconSpecial.className = 'material-symbols-outlined text-[16px] text-outline';
+        }
+
+        const metCount = (hasLength ? 1 : 0) + (hasNumber ? 1 : 0) + (hasSpecial ? 1 : 0);
+        strengthLabel.textContent = `${metCount} of 3 met`;
+        if (metCount === 3) {
+          strengthLabel.className = 'text-body-sm font-body-sm text-secondary font-semibold';
+        } else {
+          strengthLabel.className = 'text-body-sm font-body-sm text-outline';
+        }
+      });
+    }
+  })();
+</script></main><script src="/cdn-cgi/scripts/7d0fa10a/cloudflare-static/rocket-loader.min.js" data-cf-settings="96f450a2f30d0b3e8b50107d-|49" defer></script></body></html>

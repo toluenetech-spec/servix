@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+
+<html class="h-full" lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><meta content="mobile_stack" name="shell-type"/><title>Servix</title><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><script src="https://cdn.tailwindcss.com" type="659ef54c57f9386dc6a03cb3-text/javascript"></script><script id="tailwind-config" type="659ef54c57f9386dc6a03cb3-text/javascript">tailwind.config = { darkMode: "class", theme: { extend: { colors: { "primary-container": "#12372a", "error-container": "#ffdad6", "on-secondary-fixed-variant": "#10513a", "primary-fixed": "#c3ebd8", "on-error-container": "#93000a", "on-primary-fixed-variant": "#2a4e3f", "background": "#f5fbf4", "error": "#ba1a1a", "secondary-container": "#b2f0d1", "surface-container-lowest": "#ffffff", "surface": "#f5fbf4", "inverse-on-surface": "#ecf2ec", "on-secondary": "#ffffff", "secondary-fixed": "#b2f0d1", "on-error": "#ffffff", "secondary": "#2d6951", "tertiary-fixed-dim": "#ffb4aa", "primary": "#002116", "inverse-primary": "a8cfbd", "tertiary-fixed": "#ffdad5", "surface-dim": "#d6dcd5", "on-tertiary-fixed": "#410001", "surface-tint": "#416656", "surface-container-low": "#eff5ee", "outline-variant": "#c1c8c3", "on-surface": "#171d19", "on-primary": "#ffffff", "inverse-surface": "#2c322e", "on-primary-fixed": "#002116", "on-secondary-container": "#346f57", "surface-container-high": "#e4eae3", "surface-variant": "#dee4de", "tertiary": "#420001", "on-secondary-fixed": "#002115", "surface-bright": "#f5fbf4", "on-background": "#171d19", "on-tertiary": "#ffffff", "primary-fixed-dim": "#a8cfbd", "tertiary-container": "#650c09", "on-tertiary-fixed-variant": "#84241c", "on-primary-container": "#7ba190", "on-tertiary-container": "#f07365", "outline": "#717974", "secondary-fixed-dim": "#96d3b6", "surface-container-highest": "#dee4de", "on-surface-variant": "#414844", "surface-container": "#eaefe9" }, borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, spacing: { "space-xl": "2rem", "margin-desktop": "3rem", "space-xs": "0.25rem", "gutter-tablet": "1.5rem", "space-lg": "1.5rem", "gutter": "1rem", "margin-tablet": "2rem", "space-sm": "0.5rem", "gutter-desktop": "2rem", "margin": "1rem", "space-md": "1rem" }, fontFamily: { "headline-lg": ["Inter"], "headline-md": ["Inter"], "title-md": ["Inter"], "display-lg": ["Inter"], "label-md": ["Inter"], "label-lg": ["Inter"], "body-sm": ["Inter"], "body-md": ["Inter"], "title-lg": ["Inter"], "body-lg": ["Inter"], "headline-lg-mobile": ["Inter"], "currency-display": ["Inter"] }, fontSize: { "headline-lg": ["32px", { lineHeight: "40px", letterSpacing: "-0.02em", fontWeight: "600" }], "headline-md": ["22px", { lineHeight: "28px", letterSpacing: "-0.01em", fontWeight: "600" }], "title-md": ["16px", { lineHeight: "22px", fontWeight: "600" }], "display-lg": ["40px", { lineHeight: "48px", letterSpacing: "-0.02em", fontWeight: "700" }], "label-md": ["12px", { lineHeight: "16px", letterSpacing: "0.02em", fontWeight: "500" }], "label-lg": ["14px", { lineHeight: "20px", letterSpacing: "0.01em", fontWeight: "600" }], "body-sm": ["12px", { lineHeight: "16px", fontWeight: "400" }], "body-md": ["14px", { lineHeight: "20px", fontWeight: "400" }], "title-lg": ["18px", { lineHeight: "24px", fontWeight: "600" }], "body-lg": ["16px", { lineHeight: "24px", fontWeight: "400" }], "headline-lg-mobile": ["26px", { lineHeight: "34px", letterSpacing: "-0.01em", fontWeight: "600" }], "currency-display": ["28px", { lineHeight: "36px", letterSpacing: "-0.01em", fontWeight: "700" }] } } } };</script><style>@layer base { html, body { min-height: 100%; margin: 0; padding: 0; } .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); } .pt-safe { padding-top: env(safe-area-inset-top, 0px); } main > :first-child { margin-top: 0 !important; } main > :last-child { margin-bottom: 0 !important; } } ::-webkit-scrollbar { display: none; }</style><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head><body class="bg-surface text-on-surface antialiased flex flex-col min-h-screen selection:bg-secondary-container selection:text-on-secondary-container"><header class="fixed top-0 w-full z-50 pt-safe bg-surface/80 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div class="h-16 px-space-sm flex items-center justify-between"><div class="flex items-center gap-space-sm min-w-0"><button aria-label="Go back" class="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-on-surface hover:bg-surface-container active:bg-surface-container-high transition-colors" onclick="if (!window.__cfRLUnblockHandlers) return false; history.back()" data-cf-modified-659ef54c57f9386dc6a03cb3-=""><span class="material-symbols-outlined text-[24px]">arrow_back</span></button><h1 class="font-title-lg text-title-lg text-on-surface truncate pr-space-sm">Service Detail</h1></div><div class="flex items-center gap-space-xs pr-space-xs"><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="flex-1 flex flex-col relative w-full pt-16 bg-surface"><div class="flex flex-col w-full pb-28">
+<!-- Top Action Extension Bar -->
+<div class="px-space-md pt-space-xs pb-space-sm flex items-center justify-between">
+<span class="inline-flex items-center gap-space-xs px-2.5 py-1 rounded-full bg-secondary-container text-on-secondary-container font-label-md text-label-md">
+<span class="material-symbols-outlined text-[14px]" style="font-variation-settings: 'FILL' 1;">bolt</span>
+      Available Today in Ikeja
+    </span>
+<div class="flex items-center gap-space-xs">
+<button aria-label="Save Provider" class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center text-on-surface hover:bg-surface-container-high transition-colors active:scale-95" id="saveBtn">
+<span class="material-symbols-outlined text-[20px]" id="saveIcon">favorite</span>
+</button>
+<button aria-label="Share Profile" class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center text-on-surface hover:bg-surface-container-high transition-colors active:scale-95" id="shareBtn">
+<span class="material-symbols-outlined text-[20px]">share</span>
+</button>
+</div>
+</div>
+<!-- 1. Header Card -->
+<section class="px-space-md mb-space-md">
+<div class="bg-surface-container-low rounded-xl p-space-md shadow-sm relative overflow-hidden">
+<!-- Decorative subtle ambient tone -->
+<div class="absolute -right-8 -top-8 w-32 h-32 rounded-full bg-secondary-container/30 blur-2xl pointer-events-none"></div>
+<div class="flex items-start gap-space-md relative">
+<div class="relative shrink-0">
+<img class="w-20 h-20 rounded-xl object-cover shadow-sm" data-alt="Close up professional portrait of Emeka Nwosu, a confident Nigerian male HVAC engineer in his early thirties wearing clean dark forest green technical polo attire with a warm genuine smile in soft natural studio lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDCPFwNsmkZ2LhE6wXmqIicFu-D1Ge_P1vdZXg7SxbuATwHNJgby3oO3-B6C59U-VfVX1JIRDBV8RlY6ziwW_G4VeLVi3NbrNlZtXjYz43P-QvuCKTES8kf8D4wrK14Efavez2aqly-9mwkgEhf80JcEuYkpF_g_oZwoA2S14Qcn_uHXc_sR-RR6NQ9eILmxyUNGDR3401ENY1rQntzqSlzj6os02O3RXqspDMWmYxI"/>
+<div class="absolute -bottom-1 -right-1 bg-secondary-container text-on-secondary-container rounded-full p-0.5 flex items-center justify-center">
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 1;">verified</span>
+</div>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex items-center gap-1.5 flex-wrap">
+<h2 class="font-headline-md text-headline-md text-on-surface truncate">Emeka Nwosu</h2>
+<span class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-label-md text-label-md">
+<span class="material-symbols-outlined text-[13px]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+              Verified Pro
+            </span>
+</div>
+<p class="font-label-lg text-label-lg text-secondary mt-0.5">AC &amp; Fridge Technician &amp; HVAC Specialist</p>
+<div class="flex items-center gap-1 mt-1 text-on-surface-variant font-body-sm text-body-sm">
+<span class="material-symbols-outlined text-[15px] shrink-0 text-secondary">location_on</span>
+<span class="truncate">Ikeja, Lagos (Servicing Ikeja, Maryland, VI)</span>
+</div>
+</div>
+</div>
+<!-- Trust Badges Summary Grid -->
+<div class="grid grid-cols-4 gap-2 mt-space-md pt-space-sm bg-surface-container rounded-lg p-2.5">
+<div class="flex flex-col items-center text-center">
+<div class="flex items-center gap-0.5 text-on-surface font-title-md text-title-md">
+<span>4.9</span>
+<span class="material-symbols-outlined text-[15px] text-tertiary-container" style="font-variation-settings: 'FILL' 1;">star</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant">128 reviews</span>
+</div>
+<div class="flex flex-col items-center text-center">
+<span class="font-title-md text-title-md text-on-surface">94</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Done Jobs</span>
+</div>
+<div class="flex flex-col items-center text-center">
+<span class="font-title-md text-title-md text-on-surface">99%</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">On-time</span>
+</div>
+<div class="flex flex-col items-center text-center">
+<div class="flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">shield</span>
+</div>
+<span class="font-body-sm text-body-sm text-secondary font-medium">Servix Escrow</span>
+</div>
+</div>
+</div>
+</section>
+<!-- 2. Sticky Tab Row -->
+<nav class="px-space-md mb-space-md overflow-x-auto scrollbar-none flex items-center gap-2">
+<button class="tab-btn px-4 py-2 rounded-full font-label-lg text-label-lg bg-primary-container text-on-primary shadow-sm shrink-0 transition-transform active:scale-95" data-tab="services">
+      Services &amp; Pricing
+    </button>
+<button class="tab-btn px-4 py-2 rounded-full font-label-lg text-label-lg bg-surface-container text-on-surface shrink-0 hover:bg-surface-container-high transition-transform active:scale-95" data-tab="about">
+      About &amp; Bio
+    </button>
+<button class="tab-btn px-4 py-2 rounded-full font-label-lg text-label-lg bg-surface-container text-on-surface shrink-0 hover:bg-surface-container-high transition-transform active:scale-95" data-tab="portfolio">
+      Past Work (18)
+    </button>
+<button class="tab-btn px-4 py-2 rounded-full font-label-lg text-label-lg bg-surface-container text-on-surface shrink-0 hover:bg-surface-container-high transition-transform active:scale-95" data-tab="reviews">
+      Reviews (128)
+    </button>
+</nav>
+<!-- 3. About Section Preview -->
+<section class="px-space-md mb-space-md">
+<div class="bg-surface-container-low rounded-xl p-space-md shadow-sm">
+<div class="flex items-center justify-between mb-2">
+<h3 class="font-title-lg text-title-lg text-on-surface flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[20px] text-secondary">badge</span>
+          Professional Bio
+        </h3>
+<span class="font-label-md text-label-md text-secondary bg-secondary-container/40 px-2 py-0.5 rounded-full">8+ Yrs Exp</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant leading-relaxed">
+        Certified refrigeration technician with 8+ years experience servicing residential and commercial AC systems across Lagos State. Specialized in inverter split units, duct systems, and refrigerant gas replenishment with precision diagnostic manifolds.
+      </p>
+<div class="mt-3 flex flex-wrap gap-1.5">
+<span class="px-2.5 py-1 rounded-md bg-surface-container text-on-surface-variant font-label-md text-label-md">Daikin Certified</span>
+<span class="px-2.5 py-1 rounded-md bg-surface-container text-on-surface-variant font-label-md text-label-md">LG Dual-Inverter</span>
+<span class="px-2.5 py-1 rounded-md bg-surface-container text-on-surface-variant font-label-md text-label-md">Panasonic R32/R410A</span>
+</div>
+</div>
+</section>
+<!-- 4. Trust & Verification Checklist Card -->
+<section class="px-space-md mb-space-lg">
+<div class="bg-surface-container-low rounded-xl p-space-md shadow-sm">
+<div class="flex items-center justify-between mb-3">
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded-lg bg-primary-container text-on-primary flex items-center justify-center">
+<span class="material-symbols-outlined text-[18px]">verified_user</span>
+</div>
+<div>
+<h3 class="font-title-md text-title-md text-on-surface">Servix Trust &amp; Safety Audit</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Fully cleared on Oct 14, 2024</p>
+</div>
+</div>
+<span class="px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-label-md text-label-md font-semibold">100% Verified</span>
+</div>
+<div class="grid grid-cols-1 gap-2.5">
+<div class="flex items-center gap-2.5 p-2 rounded-lg bg-surface-container">
+<span class="material-symbols-outlined text-secondary text-[20px]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<div class="flex-1 min-w-0">
+<p class="font-label-lg text-label-lg text-on-surface">Government ID &amp; NIN Verified</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Identity cross-checked against NIMC database</p>
+</div>
+</div>
+<div class="flex items-center gap-2.5 p-2 rounded-lg bg-surface-container">
+<span class="material-symbols-outlined text-secondary text-[20px]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<div class="flex-1 min-w-0">
+<p class="font-label-lg text-label-lg text-on-surface">Address &amp; Workshop Inspected</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Physical workshop verified at Computer Village Annex, Ikeja</p>
+</div>
+</div>
+<div class="flex items-center gap-2.5 p-2 rounded-lg bg-surface-container">
+<span class="material-symbols-outlined text-secondary text-[20px]" style="font-variation-settings: 'FILL' 1;">lock</span>
+<div class="flex-1 min-w-0">
+<p class="font-label-lg text-label-lg text-on-surface">Servix Protected Payment Standard</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Escrow funds released only upon job completion sign-off</p>
+</div>
+</div>
+<div class="flex items-center gap-2.5 p-2 rounded-lg bg-surface-container">
+<span class="material-symbols-outlined text-secondary text-[20px]" style="font-variation-settings: 'FILL' 1;">gavel</span>
+<div class="flex-1 min-w-0">
+<p class="font-label-lg text-label-lg text-on-surface">Criminal Background Check Passed</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Vetted by Nigerian Police Force clearance screening</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- 5. Service Offerings & Upfront Pricing -->
+<section class="px-space-md mb-space-lg">
+<div class="flex items-center justify-between mb-space-sm">
+<div>
+<h3 class="font-title-lg text-title-lg text-on-surface">Service Offerings &amp; Pricing</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Guaranteed upfront quotes. No hidden Lagos traffic levies.</p>
+</div>
+</div>
+<div class="space-y-3">
+<!-- Service 1 -->
+<div class="service-item bg-surface-container-low rounded-xl p-space-md shadow-sm hover:shadow-md transition-all">
+<div class="flex items-start justify-between gap-3">
+<div class="min-w-0 flex-1">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[18px] text-secondary">search_check</span>
+<h4 class="font-title-md text-title-md text-on-surface">AC Diagnostic &amp; Comprehensive Fault Inspection</h4>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1">Multi-point electrical test, compressor amp check, and refrigerant leak detection.</p>
+<div class="flex items-center gap-2 mt-2 font-label-md text-label-md text-on-surface-variant">
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[15px]">schedule</span> 1 hour</span>
+<span>•</span>
+<span class="text-secondary font-medium">Diagnostic report included</span>
+</div>
+</div>
+<div class="text-right shrink-0">
+<div class="font-title-lg text-title-lg text-primary font-bold">₦15,000</div>
+<span class="font-label-md text-label-md text-on-surface-variant">Fixed Fee</span>
+</div>
+</div>
+<button class="select-service-btn mt-3 w-full py-2.5 px-3 rounded-lg bg-surface-container hover:bg-secondary-container hover:text-on-secondary-container text-on-surface font-label-lg text-label-lg flex items-center justify-center gap-1 transition-colors" data-price="15,000" data-service="AC Diagnostic">
+<span>Select &amp; Book</span>
+<span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+</button>
+</div>
+<!-- Service 2 -->
+<div class="service-item bg-surface-container-low rounded-xl p-space-md shadow-sm hover:shadow-md transition-all">
+<div class="flex items-start justify-between gap-3">
+<div class="min-w-0 flex-1">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[18px] text-secondary">sanitizer</span>
+<h4 class="font-title-md text-title-md text-on-surface">Split Unit AC Deep Cleaning &amp; Chemical Wash</h4>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1">Full evaporator coil disassembly, antimicrobial foam flush, drain tray unblock.</p>
+<div class="flex items-center gap-2 mt-2 font-label-md text-label-md text-on-surface-variant">
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[15px]">schedule</span> 1.5 hours</span>
+<span>•</span>
+<span class="text-secondary font-medium">Bacterial shield spray</span>
+</div>
+</div>
+<div class="text-right shrink-0">
+<div class="font-title-lg text-title-lg text-primary font-bold">₦18,500</div>
+<span class="font-label-md text-label-md text-on-surface-variant">Fixed Fee</span>
+</div>
+</div>
+<button class="select-service-btn mt-3 w-full py-2.5 px-3 rounded-lg bg-surface-container hover:bg-secondary-container hover:text-on-secondary-container text-on-surface font-label-lg text-label-lg flex items-center justify-center gap-1 transition-colors" data-price="18,500" data-service="Split Unit Deep Cleaning">
+<span>Select &amp; Book</span>
+<span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+</button>
+</div>
+<!-- Service 3 -->
+<div class="service-item bg-surface-container-low rounded-xl p-space-md shadow-sm hover:shadow-md transition-all">
+<div class="flex items-start justify-between gap-3">
+<div class="min-w-0 flex-1">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[18px] text-secondary">propane</span>
+<h4 class="font-title-md text-title-md text-on-surface">Refrigerant Gas Refill (R410A / R22)</h4>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1">High-pressure line vacuum, virgin high-grade refrigerant top-up to optimum PSI.</p>
+<div class="flex items-center gap-2 mt-2 font-label-md text-label-md text-on-surface-variant">
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[15px]">schedule</span> 2 hours</span>
+<span>•</span>
+<span class="text-secondary font-medium">30-day pressure warranty</span>
+</div>
+</div>
+<div class="text-right shrink-0">
+<div class="font-title-lg text-title-lg text-primary font-bold">₦22,000</div>
+<span class="font-label-md text-label-md text-on-surface-variant">Fixed Fee</span>
+</div>
+</div>
+<button class="select-service-btn mt-3 w-full py-2.5 px-3 rounded-lg bg-surface-container hover:bg-secondary-container hover:text-on-secondary-container text-on-surface font-label-lg text-label-lg flex items-center justify-center gap-1 transition-colors" data-price="22,000" data-service="Gas Refill">
+<span>Select &amp; Book</span>
+<span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+</button>
+</div>
+<!-- Service 4 -->
+<div class="service-item bg-surface-container-low rounded-xl p-space-md shadow-sm hover:shadow-md transition-all">
+<div class="flex items-start justify-between gap-3">
+<div class="min-w-0 flex-1">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[18px] text-secondary">precision_manufacturing</span>
+<h4 class="font-title-md text-title-md text-on-surface">New Inverter AC Installation &amp; Bracket Mounting</h4>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1">Heavy-duty wall anchor brackets, vacuum pump test, copper conduit cladding.</p>
+<div class="flex items-center gap-2 mt-2 font-label-md text-label-md text-on-surface-variant">
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[15px]">schedule</span> 3 hours</span>
+<span>•</span>
+<span class="text-secondary font-medium">60-day install guarantee</span>
+</div>
+</div>
+<div class="text-right shrink-0">
+<div class="font-title-lg text-title-lg text-primary font-bold">₦32,000</div>
+<span class="font-label-md text-label-md text-on-surface-variant">Fixed Fee</span>
+</div>
+</div>
+<button class="select-service-btn mt-3 w-full py-2.5 px-3 rounded-lg bg-surface-container hover:bg-secondary-container hover:text-on-secondary-container text-on-surface font-label-lg text-label-lg flex items-center justify-center gap-1 transition-colors" data-price="32,000" data-service="Inverter AC Installation">
+<span>Select &amp; Book</span>
+<span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+</button>
+</div>
+</div>
+</section>
+<!-- 6. Recent Work Gallery -->
+<section class="px-space-md mb-space-lg">
+<div class="flex items-center justify-between mb-3">
+<div>
+<h3 class="font-title-lg text-title-lg text-on-surface">Recent Work in Lagos</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">All verified with photo sign-offs</p>
+</div>
+<button class="text-secondary font-label-lg text-label-lg flex items-center gap-0.5">
+        View All (18)
+        <span class="material-symbols-outlined text-[16px]">chevron_right</span>
+</button>
+</div>
+<div class="grid grid-cols-2 gap-3">
+<div class="group relative rounded-xl overflow-hidden bg-surface-container shadow-sm">
+<img class="w-full h-32 object-cover group-hover:scale-105 transition-transform duration-300" data-alt="Close up photography of pristine modern white inverter split air conditioner mounted flush against warm textured wall inside luxury residential flat in Lekki Phase 1 Lagos" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBq37ob_hB6ghM02H1v7hmYCXLCuFz7dpPn0XY0qIZG9vk3P9CdPjTZFn0LCLyoIUCmHa-3eDlIdh0PKdbcRtwGAZ_THrf85f15efnrfO8gvTKR3vzYTXnWEyr0GXMvxVNS5XmPKEnsmgdjpMbNPooGNWusCfGHGs6DKd-VcgW4UI5vSEleYzVVBFuLkt4n-3XYiP1ftgQBYJIYzCl3FcXZedAcv_lmySToPZt73oSO"/>
+<div class="p-2 bg-surface-container-low">
+<p class="font-label-md text-label-md text-on-surface truncate font-semibold">Lekki Phase 1 Flat</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Dual Inverter Mounting</p>
+</div>
+</div>
+<div class="group relative rounded-xl overflow-hidden bg-surface-container shadow-sm">
+<img class="w-full h-32 object-cover group-hover:scale-105 transition-transform duration-300" data-alt="Technical service manifold gauges connected to outdoor AC compressor unit during gas replenishment service in residential courtyard in Ikeja GRA Lagos" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDIC9OKe3VrevXg8OHITM8IGkRQukpaHMEhyJ8ytpPGSemZpCnGFihuGJpvNs6AHtrLCnQB_tUV36gIllNV_1FvecrQixNGyEEphoCHUqwYu2pQWuVT3UmsoG5pdfQxKPLEebs_MOgG00fcz4oQPWR6OzkmYxmsYI4RGw8tHVGng7gNIKMYowa8VJbTULuTuOpbNYim0YyXy5nUK8fJq1ULZzlyS1GwJ7oFbLQcxa-A"/>
+<div class="p-2 bg-surface-container-low">
+<p class="font-label-md text-label-md text-on-surface truncate font-semibold">Ikeja GRA Residence</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">R410A Refill &amp; Seal</p>
+</div>
+</div>
+<div class="group relative rounded-xl overflow-hidden bg-surface-container shadow-sm">
+<img class="w-full h-32 object-cover group-hover:scale-105 transition-transform duration-300" data-alt="Detailed view of immaculate cleaned and sanitized aluminum air conditioner coils after high pressure chemical washing service in Victoria Island office" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCp5F9epP4XwkZffmclz_87qlFaWLZ9_a-VvaOpwZOLOe7Xk1FFcwcVHXa7HCPI4Y_4HQ82_MorO31ibjDJmR9Dij2ZiNcEbXErH90AOW8kxMBZl8C_QYEdIyWVha6w4GOa4O7fR655QbfhNn-LBYXg4fV7-BBOdfJKEHQRJcc861yHD0KTmJBXkxBJUjksCiCT-wvUXBj9nBuWRPuqIgj4B6cwN5im7mYpT1kNjBTy"/>
+<div class="p-2 bg-surface-container-low">
+<p class="font-label-md text-label-md text-on-surface truncate font-semibold">Victoria Island Suite</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Chemical Deep De-scale</p>
+</div>
+</div>
+<div class="group relative rounded-xl overflow-hidden bg-surface-container shadow-sm">
+<img class="w-full h-32 object-cover group-hover:scale-105 transition-transform duration-300" data-alt="Neat external copper refrigerant pipe insulation run wrapped in UV protective tape along exterior wall of modern duplex in Maryland Lagos" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDiYH06Wm1LRICbC5txf6dd5WpZXHEqq1j99vIrSrDnxkfw9ugb-mJ55UJMvBqFNgxNE4-oS1m9V94pRPHuu07yidJMkOe0PxKopyXQxfnJRxiNU0Nj9VmBWxD01_q0by7Aycdtw6iyI1MkwDY4qcQIrDhbKRczVWC64-drmAmPsBBrwSEtVMtWVaX9IUgUKhMOkady2uOAA2wW-arhPcuPBrHylVXa2bKtsFCVDsoo"/>
+<div class="p-2 bg-surface-container-low">
+<p class="font-label-md text-label-md text-on-surface truncate font-semibold">Maryland Duplex</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Pipe Lagging &amp; Conduit</p>
+</div>
+</div>
+</div>
+</section>
+<!-- 7. Customer Review Highlight Spotlight -->
+<section class="px-space-md mb-space-md">
+<div class="bg-surface-container-low rounded-xl p-space-md shadow-sm">
+<div class="flex items-center justify-between mb-2">
+<div class="flex items-center gap-2">
+<div class="w-9 h-9 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center font-title-md text-title-md font-semibold">
+            TO
+          </div>
+<div>
+<p class="font-label-lg text-label-lg text-on-surface font-semibold">Tunde Oladipo</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Allen Avenue, Ikeja • 2 days ago</p>
+</div>
+</div>
+<div class="flex text-tertiary-container">
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 1;">star</span>
+</div>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant">
+        “Emeka arrived on time despite the bridge traffic. He accurately pinpointed the capacitor failure within 10 minutes instead of trying to sell me extra gas like past roadside technicians. Very professional and polite!”
+      </p>
+</div>
+</section>
+<!-- 8. Fixed Bottom Floating CTA Bar -->
+<div class="fixed bottom-0 inset-x-0 z-40 bg-surface/95 backdrop-blur-md shadow-[0_-4px_20px_rgba(0,0,0,0.06)] px-space-md py-3 pb-safe">
+<div class="max-w-md mx-auto flex items-center gap-3">
+<!-- Message Pro Icon Button -->
+<button aria-label="Message Emeka" class="h-[52px] w-[52px] rounded-xl bg-surface-container-high text-on-surface flex items-center justify-center hover:bg-surface-variant transition-colors active:scale-95 shrink-0" id="messageBtn">
+<span class="material-symbols-outlined text-[24px]">chat</span>
+</button>
+<!-- Pricing & Book CTA Button -->
+<button class="flex-1 h-[52px] px-space-md rounded-xl bg-primary-container text-on-primary font-label-lg text-label-lg flex items-center justify-between hover:bg-secondary transition-all active:scale-[0.99] shadow-sm" id="bookCtaBtn">
+<div class="flex flex-col text-left">
+<span class="font-body-sm text-body-sm text-primary-fixed-dim">Starting from</span>
+<span class="font-title-md text-title-md font-bold text-on-primary">₦15,000</span>
+</div>
+<div class="flex items-center gap-1 font-semibold">
+<span id="ctaActionText">Book a Service</span>
+<span class="material-symbols-outlined text-[20px]">calendar_month</span>
+</div>
+</button>
+</div>
+</div>
+<!-- Interactive Toast Notification -->
+<div class="fixed top-20 left-1/2 -translate-x-1/2 bg-inverse-surface text-inverse-on-surface px-4 py-2.5 rounded-full font-label-md text-label-md flex items-center gap-2 shadow-lg transition-opacity duration-300 opacity-0 pointer-events-none z-50" id="toast">
+<span class="material-symbols-outlined text-[18px] text-secondary-fixed">check_circle</span>
+<span id="toastMsg">Action confirmed</span>
+</div>
+</div>
+<script type="659ef54c57f9386dc6a03cb3-text/javascript">
+  // Micro-interaction handlers
+  const toast = document.getElementById('toast');
+  const toastMsg = document.getElementById('toastMsg');
+  const saveBtn = document.getElementById('saveBtn');
+  const saveIcon = document.getElementById('saveIcon');
+  const ctaActionText = document.getElementById('ctaActionText');
+  let isSaved = false;
+
+  function showToast(message) {
+    if (!toast) return;
+    toastMsg.textContent = message;
+    toast.classList.remove('opacity-0');
+    toast.classList.add('opacity-100');
+    setTimeout(() => {
+      toast.classList.remove('opacity-100');
+      toast.classList.add('opacity-0');
+    }, 2400);
+  }
+
+  saveBtn.addEventListener('click', () => {
+    isSaved = !isSaved;
+    if (isSaved) {
+      saveIcon.style.fontVariationSettings = "'FILL' 1";
+      saveIcon.classList.add('text-tertiary-container');
+      showToast('Emeka Nwosu saved to favorites');
+    } else {
+      saveIcon.style.fontVariationSettings = "'FILL' 0";
+      saveIcon.classList.remove('text-tertiary-container');
+      showToast('Removed from saved professionals');
+    }
+  });
+
+  document.getElementById('shareBtn').addEventListener('click', () => {
+    if (navigator.share) {
+      navigator.share({
+        title: 'Emeka Nwosu - Servix AC & HVAC Specialist',
+        text: 'Book verified AC and fridge technician in Ikeja, Lagos.',
+        url: window.location.href,
+      }).catch(() => {});
+    } else {
+      showToast('Profile link copied to clipboard');
+    }
+  });
+
+  document.querySelectorAll('.select-service-btn').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      const serviceName = btn.dataset.service;
+      const price = btn.dataset.price;
+      ctaActionText.textContent = 'Book ' + serviceName;
+      showToast('Selected: ' + serviceName + ' (₦' + price + ')');
+      btn.classList.add('bg-secondary-container', 'text-on-secondary-container');
+      setTimeout(() => {
+        btn.classList.remove('bg-secondary-container', 'text-on-secondary-container');
+      }, 1000);
+    });
+  });
+
+  document.getElementById('messageBtn').addEventListener('click', () => {
+    showToast('Opening Servix direct secure chat...');
+  });
+
+  document.getElementById('bookCtaBtn').addEventListener('click', () => {
+    showToast('Proceeding to schedule date & time slot...');
+  });
+
+  // Tab switcher
+  document.querySelectorAll('.tab-btn').forEach((tab) => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach((t) => {
+        t.classList.remove('bg-primary-container', 'text-on-primary', 'shadow-sm');
+        t.classList.add('bg-surface-container', 'text-on-surface');
+      });
+      tab.classList.add('bg-primary-container', 'text-on-primary', 'shadow-sm');
+      tab.classList.remove('bg-surface-container', 'text-on-surface');
+      showToast('Filtering: ' + tab.textContent.trim());
+    });
+  });
+</script></main><script src="/cdn-cgi/scripts/7d0fa10a/cloudflare-static/rocket-loader.min.js" data-cf-settings="659ef54c57f9386dc6a03cb3-|49" defer></script></body></html>

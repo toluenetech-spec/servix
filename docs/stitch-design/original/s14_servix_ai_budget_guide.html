@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+
+<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><meta content="mobile_stack" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet"/><style>@layer base{html,body{width:100%;margin:0;padding:0;background-color:#f5fbf4;}body{overscroll-behavior-y:none;-webkit-tap-highlight-color:transparent;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com" type="09686ddad10e23b6873021f1-text/javascript"></script><script id="tailwind-config" type="09686ddad10e23b6873021f1-text/javascript">tailwind.config = { darkMode: "class", theme: { extend: { colors: { "secondary-fixed-dim": "#96d3b6", "on-primary": "#ffffff", "outline": "#717974", "on-primary-fixed-variant": "#2a4e3f", "on-primary-container": "#7ba190", "on-background": "#171d19", "surface-container": "#eaefe9", "primary-fixed-dim": "#a8cfbd", "on-surface": "#171d19", "surface-container-lowest": "#ffffff", "on-error": "#ffffff", "tertiary-fixed": "#ffdad5", "surface-container-low": "#eff5ee", "on-primary-fixed": "#002116", "on-secondary-container": "#346f57", "surface-container-high": "#e4eae3", "inverse-surface": "#2c322e", "on-secondary-fixed": "#002115", "on-surface-variant": "#414844", "secondary": "#2d6951", "surface-variant": "#dee4de", "error": "#ba1a1a", "tertiary-container": "#650c09", "on-tertiary": "#ffffff", "on-tertiary-fixed": "#410001", "surface-container-highest": "#dee4de", "on-tertiary-fixed-variant": "#84241c", "surface-bright": "#f5fbf4", "secondary-fixed": "#b2f0d1", "on-secondary-fixed-variant": "#10513a", "primary": "#002116", "inverse-primary": "#a8cfbd", "outline-variant": "#c1c8c3", "on-error-container": "#93000a", "on-tertiary-container": "#f07365", "background": "#f5fbf4", "primary-fixed": "#c3ebd8", "tertiary": "#420001", "secondary-container": "#b2f0d1", "error-container": "#ffdad6", "tertiary-fixed-dim": "#ffb4aa", "surface-dim": "#d6dcd5", "surface-tint": "#416656", "surface": "#f5fbf4", "inverse-on-surface": "#ecf2ec", "primary-container": "#12372a", "on-secondary": "#ffffff" }, borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, spacing: { "gutter": "1rem", "gutter-tablet": "1.5rem", "space-xs": "0.25rem", "space-xl": "2rem", "margin": "1rem", "margin-desktop": "3rem", "space-md": "1rem", "gutter-desktop": "2rem", "space-sm": "0.5rem", "space-lg": "1.5rem", "margin-tablet": "2rem" }, fontFamily: { "headline-md": ["Inter"], "body-sm": ["Inter"], "body-md": ["Inter"], "headline-lg": ["Inter"], "currency-display": ["Inter"], "display-lg": ["Inter"], "headline-lg-mobile": ["Inter"], "title-lg": ["Inter"], "label-lg": ["Inter"], "label-md": ["Inter"], "title-md": ["Inter"], "body-lg": ["Inter"] }, fontSize: { "headline-md": ["22px", { lineHeight: "28px", letterSpacing: "-0.01em", fontWeight: "600" }], "body-sm": ["12px", { lineHeight: "16px", fontWeight: "400" }], "body-md": ["14px", { lineHeight: "20px", fontWeight: "400" }], "headline-lg": ["32px", { lineHeight: "40px", letterSpacing: "-0.02em", fontWeight: "600" }], "currency-display": ["28px", { lineHeight: "36px", letterSpacing: "-0.01em", fontWeight: "700" }], "display-lg": ["40px", { lineHeight: "48px", letterSpacing: "-0.02em", fontWeight: "700" }], "headline-lg-mobile": ["26px", { lineHeight: "34px", letterSpacing: "-0.01em", fontWeight: "600" }], "title-lg": ["18px", { lineHeight: "24px", fontWeight: "600" }], "label-lg": ["14px", { lineHeight: "20px", letterSpacing: "0.01em", fontWeight: "600" }], "label-md": ["12px", { lineHeight: "16px", letterSpacing: "0.02em", fontWeight: "500" }], "title-md": ["16px", { lineHeight: "22px", fontWeight: "600" }], "body-lg": ["16px", { lineHeight: "24px", fontWeight: "400" }] } } } }</script><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head><body class="bg-surface font-body-md text-on-surface min-h-screen flex flex-col antialiased selection:bg-secondary-fixed"><header class="fixed top-0 w-full z-50 bg-surface/80 backdrop-blur-xl pt-safe shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div class="h-16 px-gutter flex items-center justify-between gap-space-sm"><div class="flex items-center gap-space-xs"><button aria-label="Go back" class="w-11 h-11 rounded-full flex items-center justify-center text-on-surface hover:bg-surface-container active:bg-surface-container-high transition-colors" onclick="if (!window.__cfRLUnblockHandlers) return false; history.back()" data-cf-modified-09686ddad10e23b6873021f1-=""><span class="material-symbols-outlined text-[24px]">arrow_back</span></button><h1 class="font-title-lg text-title-lg text-on-surface truncate">Conversation Detail</h1></div><div class="flex items-center gap-space-xs"><button aria-label="Context actions" class="w-11 h-11 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container transition-colors"><span class="material-symbols-outlined text-[24px]">more_vert</span></button><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="flex-1 flex flex-col relative w-full pt-16 pb-safe bg-surface"><div class="flex flex-col w-full pb-8">
+<!-- Sub-Header Status Bar & Quota Tracking -->
+<div class="px-gutter pt-space-xs pb-space-sm bg-surface-container-low flex items-center justify-between shadow-sm">
+<div class="flex items-center gap-space-sm min-w-0">
+<div class="relative flex items-center justify-center w-10 h-10 rounded-full bg-primary-container text-primary-fixed shadow-sm shrink-0">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">bolt</span>
+<span class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-secondary rounded-full flex items-center justify-center text-on-secondary">
+<span class="material-symbols-outlined text-[10px]">auto_awesome</span>
+</span>
+</div>
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-space-xs">
+<span class="font-title-md text-title-md text-on-surface truncate">Servix AI Assistant</span>
+<span class="bg-secondary-container text-on-secondary-container px-2 py-0.5 rounded-full font-label-md text-body-sm shrink-0 font-medium">v1.1</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant truncate">Trained on verified Nigerian market rates</p>
+</div>
+</div>
+<div class="flex flex-col items-end shrink-0 pl-space-xs">
+<span class="bg-surface-container-highest text-on-surface-variant px-2.5 py-1 rounded-full font-label-md text-body-sm flex items-center gap-1 shadow-sm">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+<span class="font-semibold text-on-surface">18/25</span>
+<span class="opacity-80">queries</span>
+</span>
+<span class="font-body-sm text-[10px] text-outline mt-0.5">Plus Plan active</span>
+</div>
+</div>
+<div class="flex flex-col p-gutter gap-space-lg">
+<!-- Pinned Interactive Widget: Budget Estimator -->
+<section class="bg-surface-container-low rounded-xl p-space-md shadow-sm flex flex-col gap-space-md">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-secondary text-[20px]" style="font-variation-settings: 'FILL' 1;">calculate</span>
+<h2 class="font-title-md text-title-md text-on-surface">Tech & Service Budget Estimator</h2>
+</div>
+<span class="bg-surface-container-highest text-on-surface-variant font-label-md text-[11px] px-2 py-0.5 rounded-full uppercase tracking-wider">Lagos / NG</span>
+</div>
+<!-- Selectors & Scope -->
+<div class="grid grid-cols-1 gap-space-sm">
+<div class="flex flex-col gap-1">
+<label class="font-label-md text-label-md text-on-surface-variant">Trade / Category</label>
+<div class="relative bg-surface-container-lowest rounded-lg p-space-sm flex items-center justify-between shadow-sm cursor-pointer hover:bg-surface-container transition-colors">
+<div class="flex items-center gap-space-xs min-w-0">
+<span class="material-symbols-outlined text-on-surface-variant text-[20px]">terminal</span>
+<span class="font-body-md text-body-md text-on-surface font-medium truncate">Mobile App Development (Kotlin / Flutter)</span>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant text-[20px]">arrow_drop_down</span>
+</div>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-md text-label-md text-on-surface-variant">Scope Definition</label>
+<div class="relative bg-surface-container-lowest rounded-lg p-space-sm flex items-center justify-between shadow-sm cursor-pointer hover:bg-surface-container transition-colors">
+<div class="flex items-center gap-space-xs min-w-0">
+<span class="material-symbols-outlined text-on-surface-variant text-[20px]">layers</span>
+<span class="font-body-md text-body-md text-on-surface truncate">Full MVP (Auth, Paystack/Monnify, API)</span>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant text-[20px]">tune</span>
+</div>
+</div>
+</div>
+<!-- Result Card -->
+<div class="bg-surface-container-lowest rounded-lg p-space-md flex flex-col gap-space-sm shadow-sm">
+<div class="flex items-baseline justify-between">
+<div class="flex flex-col">
+<span class="font-label-md text-body-sm text-outline">Verified Market Estimate</span>
+<span class="font-currency-display text-currency-display text-primary tracking-tight">₦450,000 – ₦850,000</span>
+</div>
+<div class="flex flex-col items-end">
+<span class="font-label-md text-body-sm text-outline">Typical Timeline</span>
+<span class="font-title-md text-title-md text-secondary font-semibold">4–6 Weeks</span>
+</div>
+</div>
+<!-- Verified Artisan Match Spotlight -->
+<div class="bg-surface-container-low rounded-lg p-space-sm flex items-center justify-between gap-space-sm mt-1">
+<div class="flex items-center gap-space-sm min-w-0">
+<div class="relative w-10 h-10 rounded-full overflow-hidden shrink-0 bg-surface-container-highest">
+<img class="w-full h-full object-cover" data-alt="Warm studio portrait of an experienced Nigerian Flutter software engineer in a modern Lagos workspace with soft ambient desk lighting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCXDeQX3rvxaaDy0O_NtAkQjjbiynHXCWV70Ieyw3BKp-HsfvbXYDliSTmF-X5veGilcC9iR5HzAu9eMowZf9UzHJQcQOU9uZIXnSHPr6MeKcpGOkxo9y_EHuLERngAefJhDSYPaRl51lbbF4uGV3Ey3XPhEahh4MAc9ZvU_6T3xiDChjTWKgiRQfcxsToo8cMvA86iEVngCNVqbnyaG99cRcuXorqB3shBv2u0kQx2"/>
+<span class="absolute bottom-0 right-0 w-2.5 h-2.5 bg-secondary rounded-full ring-2 ring-surface"></span>
+</div>
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-1">
+<span class="font-title-md text-body-md text-on-surface font-semibold truncate">Babatunde A.</span>
+<span class="material-symbols-outlined text-secondary text-[16px]" style="font-variation-settings: 'FILL' 1;">verified</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Top-Rated Flutter Pro • Yaba, Lagos</span>
+</div>
+</div>
+<button class="bg-primary text-on-primary font-label-md text-body-sm px-3 py-2 rounded-lg hover:bg-secondary transition-colors shrink-0 shadow-sm flex items-center gap-1">
+<span>Hire Pro</span>
+<span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</button>
+</div>
+</div>
+</section>
+<!-- AI Chat Conversation Stream -->
+<div class="flex flex-col gap-space-md">
+<!-- User Query Bubble -->
+<div class="flex items-start justify-end gap-space-xs pl-space-lg">
+<div class="bg-primary-container text-on-primary-container rounded-2xl rounded-tr-xs p-space-md shadow-sm max-w-[90%]">
+<p class="font-body-md text-body-md text-on-primary text-opacity-95 leading-relaxed">
+            What are standard diagnostic fees for MacBook M2 board repairs in Ikeja Computer Village?
+          </p>
+<span class="block text-right font-body-sm text-[11px] text-primary-fixed-dim mt-1.5 opacity-80">14:02 PM</span>
+</div>
+<div class="w-7 h-7 rounded-full bg-surface-container-high flex items-center justify-center text-on-surface-variant shrink-0 mt-1">
+<span class="material-symbols-outlined text-[16px]">person</span>
+</div>
+</div>
+<!-- Servix AI Markdown Response Bubble -->
+<div class="flex items-start gap-space-xs pr-space-sm">
+<div class="w-8 h-8 rounded-full bg-primary-container text-primary-fixed flex items-center justify-center shrink-0 mt-1 shadow-sm">
+<span class="material-symbols-outlined text-[18px]">bolt</span>
+</div>
+<div class="flex flex-col gap-space-xs max-w-[92%]">
+<!-- Main Chat Card -->
+<div class="bg-surface-container-low rounded-2xl rounded-tl-xs p-space-md shadow-sm flex flex-col gap-space-sm">
+<div class="flex items-center gap-space-xs pb-1">
+<span class="font-label-md text-body-sm text-secondary font-semibold flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">verified_user</span>
+                Verified Pricing Data
+              </span>
+<span class="text-outline font-body-sm text-body-sm">• Computer Village (Otigba / Pepple)</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface leading-relaxed">
+              Based on Servix escrow-verified transactions in Computer Village, Ikeja:
+            </p>
+<ul class="flex flex-col gap-2 font-body-md text-body-md text-on-surface">
+<li class="flex items-start gap-2 bg-surface-container-lowest p-2.5 rounded-lg shadow-sm">
+<span class="material-symbols-outlined text-secondary text-[18px] shrink-0 mt-0.5">check_circle</span>
+<div>
+<strong class="font-semibold text-on-surface">Initial hardware diagnostics:</strong>
+<span class="text-on-surface"> ₦10,000 – ₦15,000</span>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">Typically waived or credited toward service if the logic board repair proceeds.</p>
+</div>
+</li>
+<li class="flex items-start gap-2 bg-surface-container-lowest p-2.5 rounded-lg shadow-sm">
+<span class="material-symbols-outlined text-secondary text-[18px] shrink-0 mt-0.5">check_circle</span>
+<div>
+<strong class="font-semibold text-on-surface">Component level board repair:</strong>
+<span class="text-on-surface font-semibold text-primary"> ₦45,000 – ₦90,000</span>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">Addresses micro-soldering, shorted PMIC, or blown charging mosfets.</p>
+</div>
+</li>
+<li class="flex items-start gap-2 bg-secondary-container/40 p-2.5 rounded-lg shadow-sm">
+<span class="material-symbols-outlined text-secondary text-[18px] shrink-0 mt-0.5">lock</span>
+<div>
+<strong class="font-semibold text-on-surface">Servix Protected Escrow:</strong>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">Funds are held securely until you power on the device and verify all ports in-store.</p>
+</div>
+</li>
+</ul>
+<!-- Message Action Toolbar -->
+<div class="flex items-center justify-between pt-space-xs mt-1">
+<div class="flex items-center gap-space-xs">
+<button class="w-8 h-8 rounded-full bg-surface-container-lowest text-on-surface-variant hover:text-on-surface flex items-center justify-center shadow-sm active:scale-95 transition-all" title="Copy response">
+<span class="material-symbols-outlined text-[16px]">content_copy</span>
+</button>
+<button class="w-8 h-8 rounded-full bg-surface-container-lowest text-on-surface-variant hover:text-secondary flex items-center justify-center shadow-sm active:scale-95 transition-all" title="Helpful">
+<span class="material-symbols-outlined text-[16px]">thumb_up</span>
+</button>
+<button class="w-8 h-8 rounded-full bg-surface-container-lowest text-on-surface-variant hover:text-error flex items-center justify-center shadow-sm active:scale-95 transition-all" title="Not helpful">
+<span class="material-symbols-outlined text-[16px]">thumb_down</span>
+</button>
+</div>
+<button class="bg-secondary text-on-secondary px-3.5 py-1.5 rounded-lg font-label-md text-body-sm flex items-center gap-1 shadow-sm hover:bg-on-secondary-container transition-colors active:scale-95">
+<span class="material-symbols-outlined text-[16px]">handyman</span>
+<span>Hire Pro for this</span>
+</button>
+</div>
+</div>
+<span class="font-body-sm text-[11px] text-outline ml-2">Verified with 42 Computer Village repairs this month</span>
+</div>
+</div>
+</div>
+<!-- Suggested Quick Prompts -->
+<div class="flex flex-col gap-space-xs mt-space-xs">
+<span class="font-label-md text-body-sm text-on-surface-variant px-1 flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px] text-secondary">tips_and_updates</span>
+        Explore Nigeria Market Intel
+      </span>
+<div class="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+<button class="bg-surface-container-low hover:bg-surface-container text-on-surface font-label-md text-body-sm px-3.5 py-2 rounded-full whitespace-nowrap shadow-sm transition-colors flex items-center gap-1.5 shrink-0">
+<span class="material-symbols-outlined text-[16px] text-on-surface-variant">description</span>
+          Draft contract scope
+        </button>
+<button class="bg-surface-container-low hover:bg-surface-container text-on-surface font-label-md text-body-sm px-3.5 py-2 rounded-full whitespace-nowrap shadow-sm transition-colors flex items-center gap-1.5 shrink-0">
+<span class="material-symbols-outlined text-[16px] text-on-surface-variant">compare_arrows</span>
+          Compare Flutter vs React Native rates
+        </button>
+<button class="bg-surface-container-low hover:bg-surface-container text-on-surface font-label-md text-body-sm px-3.5 py-2 rounded-full whitespace-nowrap shadow-sm transition-colors flex items-center gap-1.5 shrink-0">
+<span class="material-symbols-outlined text-[16px] text-on-surface-variant">cloud</span>
+          Average cloud server cost
+        </button>
+</div>
+</div>
+<!-- Live Context Artisan Visual Strip -->
+<div class="bg-surface-container-low rounded-xl p-space-sm flex items-center justify-between shadow-sm">
+<div class="flex items-center gap-space-sm min-w-0">
+<div class="flex -space-x-3 overflow-hidden shrink-0">
+<img class="inline-block h-8 w-8 rounded-full ring-2 ring-surface object-cover" data-alt="Portrait of an expert hardware technician working on micro-soldering motherboard under microscope in Lagos workshop." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDK3Shq64xPKvnlRWvR1so56Qgz3MkIjmgjYShr1dhwTN7VKtBNb7GJ00htFomOZHnb1lGEqSgZF5C9bJGJ5DJ7yw_tsKIVIlM2bu9LKVEXSUFl4VRWCrGoF_hNL1VOtgNlPyUc0X33ekOJnYwscwttlV0uBOT2gRrRbA-Q77uhfq5ZLkhWGviiQdtBrFWsHnG4KkfcD_xqAWUsQ_9L5EBU52jhIwDVwmliJtgsXEXN"/>
+<img class="inline-block h-8 w-8 rounded-full ring-2 ring-surface object-cover" data-alt="Portrait of a female full-stack product designer in modern tech hub office in Lekki Lagos." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCCdSTHrXZukdy2qmP9nDe9uUfNuIx_newZ0gZQ4rD9AwD7QmZWbn4mkm54Rwn1ClXqFsHDm5PF7kJ6_-UXz9zzxSVTfoTvEuwT9Ilyh9Eep8ow7tT-mVsihMQYZXie-_JdCakJKjelXstqpeMhjI1OqHmj7LMWuiwrIT_oASy2dCOz685xMWR0z8__HoVqsaP44JrkHuhSmWjFwPDJNGFVNZj1EQhTqmnnockQJgiZ"/>
+<img class="inline-block h-8 w-8 rounded-full ring-2 ring-surface object-cover" data-alt="Portrait of senior cloud DevOps architect presenting digital architecture diagrams in Nigeria." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD9sr_R8x7VjbeoBD9nLaDePP6Mn-9tvrsjPsT7CB60aZEN8_QUju9oU32wGFyJB1NO4he-SsxSbTwzK5wQmWy4SZQQcg4IN4fXFiOIpOEbANCekxEc0aOCE44l8ukK7DPIjFtin9DEH25HoXv-CslM4FLgV1T_2Soiyke9MsOdomWo62qmTRmExMWzYnFo9LIHlzBIey-ANoo_AWtRwcsBdAMwMCR5gcnWzUshDauj"/>
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-label-md text-body-sm text-on-surface truncate font-semibold">1,240 Verified Specialists Available</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant truncate">Ready for escrow milestone contracts</span>
+</div>
+</div>
+<button class="text-secondary font-label-md text-body-sm underline px-2 py-1 shrink-0">Browse</button>
+</div>
+</div>
+<!-- Chat Composer (Sticky Action Area) -->
+<div class="sticky bottom-0 bg-surface/95 backdrop-blur-md px-gutter py-space-sm shadow-md mt-auto">
+<div class="bg-surface-container rounded-2xl p-1.5 flex items-center gap-space-xs shadow-inner">
+<button class="w-10 h-10 rounded-xl bg-surface-container-lowest text-on-surface-variant hover:text-primary flex items-center justify-center shrink-0 shadow-sm transition-colors" title="Voice Search / Note">
+<span class="material-symbols-outlined text-[20px]">mic</span>
+</button>
+<input class="flex-1 bg-transparent font-body-md text-body-md text-on-surface placeholder:text-outline focus:outline-none px-2 py-2 min-w-0" placeholder="Ask Servix AI about Nigerian market rates..." type="text"/>
+<button class="w-10 h-10 rounded-xl bg-primary text-on-primary flex items-center justify-center shrink-0 shadow-sm hover:bg-secondary active:scale-95 transition-all" title="Send query">
+<span class="material-symbols-outlined text-[20px]">send</span>
+</button>
+</div>
+<div class="flex items-center justify-center gap-1 mt-1 text-center">
+<span class="material-symbols-outlined text-[12px] text-secondary" style="font-variation-settings: 'FILL' 1;">shield</span>
+<span class="font-body-sm text-[11px] text-outline">Rates cross-checked against 18,000+ Servix Escrow releases in NG</span>
+</div>
+</div>
+</div></main><script src="/cdn-cgi/scripts/7d0fa10a/cloudflare-static/rocket-loader.min.js" data-cf-settings="09686ddad10e23b6873021f1-|49" defer></script></body></html>

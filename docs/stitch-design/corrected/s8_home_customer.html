@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+
+<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><meta content="mobile_tab" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{width:100vw;margin:0;padding:0;}body{overscroll-behavior:none;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com" type="b01cf406aca34168ca422737-text/javascript"></script><script id="tailwind-config" type="b01cf406aca34168ca422737-text/javascript">tailwind.config = { darkMode: "class", theme: { extend: { colors: { "on-primary-fixed": "#12372A", "inverse-on-surface": "#F7F4EC", "surface-variant": "#EDE8DC", "on-primary-fixed-variant": "#1F5C45", "tertiary-fixed-dim": "#F3B8B0", "tertiary-container": "#FBE4E0", "tertiary": "#E56B5D", "on-secondary-container": "#12372A", "surface-container": "#EDE8DC", "surface-container-lowest": "#FFFFFF", "primary-fixed": "#EDE8DC", "surface-container-high": "#E6E0D2", "on-surface-variant": "#5F675F", "on-error-container": "#7A2418", "on-primary": "#FFFFFF", "secondary": "#1F5C45", "secondary-fixed-dim": "#DDD7C9", "on-tertiary-container": "#B3372A", "surface-bright": "#F7F4EC", "primary-container": "#1F5C45", "tertiary-fixed": "#FBE4E0", "on-tertiary-fixed": "#7A2418", "surface-container-low": "#F3EFE5", "secondary-fixed": "#EDE8DC", "outline": "#C9C2B1", "on-tertiary": "#FFFFFF", "on-secondary": "#FFFFFF", "surface-tint": "#1F5C45", "surface-container-highest": "#DDD7C9", "surface-dim": "#DDD7C9", "on-primary-container": "#F7F4EC", "inverse-primary": "#CFE0D6", "on-background": "#202622", "secondary-container": "#EDE8DC", "surface": "#F7F4EC", "on-tertiary-fixed-variant": "#B3372A", "primary": "#12372A", "error": "#B3372A", "outline-variant": "#DDD7C9", "error-container": "#F9DEDA", "primary-fixed-dim": "#C9C2B1", "on-surface": "#202622", "background": "#F7F4EC", "on-secondary-fixed": "#12372A", "on-error": "#FFFFFF", "on-secondary-fixed-variant": "#1F5C45", "inverse-surface": "#202622" }, borderRadius: { "DEFAULT": "0.75rem", "lg": "1rem", "xl": "1.25rem", "2xl": "1.5rem", "3xl": "1.75rem", "full": "9999px" }, spacing: { "space-sm": "0.5rem", "space-md": "1rem", "space-xl": "2rem", "space-lg": "1.5rem", "space-xs": "0.25rem", "gutter-tablet": "1.5rem", "gutter-desktop": "2rem", "gutter": "1rem", "margin-desktop": "3rem", "margin-tablet": "2rem", "margin": "1rem" }, fontFamily: { "title-md": ["Inter"], "label-md": ["Inter"], "label-lg": ["Inter"], "headline-md": ["Inter"], "body-sm": ["Inter"], "display-lg": ["Inter"], "headline-lg-mobile": ["Inter"], "body-lg": ["Inter"], "currency-display": ["Inter"], "body-md": ["Inter"], "title-lg": ["Inter"], "headline-lg": ["Inter"] }, fontSize: { "title-md": ["16px", { lineHeight: "22px", fontWeight: "600" }], "label-md": ["12px", { lineHeight: "16px", letterSpacing: "0.02em", fontWeight: "500" }], "label-lg": ["14px", { lineHeight: "20px", letterSpacing: "0.01em", fontWeight: "600" }], "headline-md": ["22px", { lineHeight: "28px", letterSpacing: "-0.01em", fontWeight: "600" }], "body-sm": ["12px", { lineHeight: "16px", fontWeight: "400" }], "display-lg": ["40px", { lineHeight: "48px", letterSpacing: "-0.02em", fontWeight: "700" }], "headline-lg-mobile": ["26px", { lineHeight: "34px", letterSpacing: "-0.01em", fontWeight: "600" }], "body-lg": ["16px", { lineHeight: "24px", fontWeight: "400" }], "currency-display": ["28px", { lineHeight: "36px", letterSpacing: "-0.01em", fontWeight: "700" }], "body-md": ["14px", { lineHeight: "20px", fontWeight: "400" }], "title-lg": ["18px", { lineHeight: "24px", fontWeight: "600" }], "headline-lg": ["32px", { lineHeight: "40px", letterSpacing: "-0.02em", fontWeight: "600" }] } } } }</script><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head><body class="bg-surface font-body-md text-on-surface antialiased flex flex-col min-h-screen"><header class="fixed top-0 inset-x-0 z-50 bg-surface/85 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] pt-safe"><div class="h-16 px-gutter flex items-center justify-between"><div class="flex flex-col justify-center min-w-0 pr-space-sm"><span class="font-label-md text-label-md text-secondary tracking-wider uppercase font-semibold truncate">Servix Nigeria</span><span class="font-title-lg text-title-lg text-on-surface font-bold leading-tight truncate">Home</span></div><div class="flex items-center gap-space-sm shrink-0"><button aria-label="Servix AI Assistant" class="w-11 h-11 rounded-full flex items-center justify-center text-primary-container bg-surface-container-low hover:bg-surface-container active:scale-95 transition-all" type="button"><span class="material-symbols-outlined text-[22px]">auto_awesome</span></button><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="flex-1 flex flex-col relative w-full pt-16 pb-20 bg-surface"><div class="flex flex-col w-full pb-8 space-y-6">
+<!-- 1. TOP UTILITY / DATE ROW -->
+<section class="flex items-center justify-between px-gutter pt-2">
+<div class="flex items-center gap-space-xs bg-surface-container-low px-3 py-1.5 rounded-full shadow-sm">
+<span class="material-symbols-outlined text-secondary text-[18px]">calendar_today</span>
+<span class="font-label-md text-label-md text-on-surface font-medium">Thursday, 7 Nov 2026</span>
+</div>
+<button aria-label="Notifications" class="relative w-10 h-10 rounded-full bg-surface-container-low flex items-center justify-center text-on-surface hover:bg-surface-container transition-all active:scale-95 shadow-sm" type="button">
+<span class="material-symbols-outlined text-[22px]">notifications</span>
+<span class="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-on-tertiary-container ring-2 ring-surface"></span>
+</button>
+</section>
+<!-- 2. GREETING & SEARCH -->
+<section class="px-gutter space-y-4">
+<div class="flex items-center justify-between">
+<div class="space-y-0.5">
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface font-bold">Good morning, Olumide 👋</h1>
+<p class="font-body-md text-body-md text-on-surface-variant">Find trusted local professionals in Lagos</p>
+</div>
+<div class="w-12 h-12 rounded-full bg-secondary-container flex items-center justify-center text-on-secondary-container font-title-lg text-title-lg font-bold shadow-sm shrink-0">
+        OA
+      </div>
+</div>
+<!-- Search Bar -->
+<div class="relative flex items-center w-full">
+<div class="absolute left-4 flex items-center pointer-events-none text-on-surface-variant">
+<span class="material-symbols-outlined text-[22px]">search</span>
+</div>
+<input class="w-full h-[52px] pl-12 pr-12 rounded-xl bg-surface-container-lowest text-on-surface placeholder:text-on-surface-variant font-body-md text-body-md shadow-sm focus:outline-none focus:bg-surface-container-low transition-all" placeholder="Search plumbers, electricians, AC repair" type="text"/>
+<button aria-label="Filter" class="absolute right-3 w-8 h-8 rounded-lg flex items-center justify-center text-secondary hover:bg-surface-container transition-colors" type="button">
+<span class="material-symbols-outlined text-[20px]">tune</span>
+</button>
+</div>
+</section>
+<!-- 3. URGENT ACTION REQUIRED (PROTECTED PAYMENT) -->
+<section class="px-gutter">
+<div class="relative overflow-hidden rounded-2xl bg-surface-container p-4 shadow-sm">
+<!-- Prominent Coral Accent Stripe -->
+<div class="absolute left-0 top-0 bottom-0 w-1.5 bg-on-tertiary-container"></div>
+<div class="pl-2 space-y-3">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-1.5 text-on-tertiary-container">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">error</span>
+<span class="font-label-lg text-label-lg font-bold tracking-wide uppercase">ACTION REQUIRED</span>
+</div>
+<span class="font-label-md text-label-md text-on-surface-variant">Today</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface leading-snug">
+          Bayo Alabi has marked your Electrical Wiring Repair as complete. Review the work and confirm completion to release ₦28,500.
+        </p>
+<div class="flex flex-col gap-2 pt-1">
+<button class="w-full h-[48px] rounded-xl bg-primary-container text-on-primary font-label-lg text-label-lg font-semibold flex items-center justify-center gap-2 shadow-sm hover:opacity-95 active:scale-[0.99] transition-all" type="button">
+<span class="material-symbols-outlined text-[18px]">check_circle</span>
+            Confirm completion
+          </button>
+<button class="w-full h-[44px] rounded-xl bg-surface-container-lowest text-on-surface font-label-lg text-label-lg font-semibold flex items-center justify-center gap-1.5 hover:bg-surface-container-high transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px] text-on-surface-variant">flag</span>
+            Raise a dispute
+          </button>
+</div>
+</div>
+</div>
+</section>
+
+<!-- 3b. CHATS CARD (Release 1.1) — unread total = Σ unreadCount from GET /community/threads; shown only when features.community -->
+<section class="px-gutter">
+<a href="#" class="flex items-center gap-3 p-4 rounded-2xl bg-surface-container-lowest border border-outline-variant">
+<span class="w-11 h-11 rounded-full bg-primary text-on-primary flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-[22px]" style="font-variation-settings: 'FILL' 1;">chat_bubble</span></span>
+<span class="flex-1 min-w-0">
+<span class="flex items-center justify-between"><span class="font-title-md text-title-md text-on-surface">Chats</span><span class="min-w-[22px] h-[22px] px-1.5 rounded-full bg-tertiary text-on-tertiary text-[12px] font-semibold flex items-center justify-center">2</span></span>
+<span class="block font-body-sm text-body-sm text-on-surface-variant truncate">Ada Nwosu: I've shared the first draft of the logo.</span>
+</span>
+<span class="material-symbols-outlined text-on-surface-variant">chevron_right</span>
+</a>
+</section>
+<!-- 4. ACTIVE BOOKINGS SECTION -->
+<section class="px-gutter space-y-3">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<h2 class="font-title-lg text-title-lg text-on-surface font-bold">Active Bookings</h2>
+<span class="w-6 h-6 rounded-full bg-secondary-container text-on-secondary-container font-label-md text-label-md flex items-center justify-center font-bold">2</span>
+</div>
+<a class="font-label-lg text-label-lg text-secondary font-semibold hover:underline" href="#">View All &gt;</a>
+</div>
+<!-- Booking Card A -->
+<div class="p-4 rounded-2xl bg-surface-container-low shadow-sm space-y-3.5">
+<div class="flex items-center justify-between">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-secondary-fixed text-on-secondary-fixed-variant font-label-md text-label-md font-bold">
+<span class="w-2 h-2 rounded-full bg-secondary animate-pulse"></span>
+          IN PROGRESS
+        </span>
+<span class="font-label-md text-label-md text-on-surface-variant font-medium">Scheduled Today, 4:00 PM</span>
+</div>
+<div class="space-y-0.5">
+<h3 class="font-title-md text-title-md text-on-surface font-semibold">Plumbing Pipe Maintenance</h3>
+
+</div>
+<div class="flex items-center justify-between pt-2">
+<div class="flex items-center gap-3">
+<img class="w-11 h-11 rounded-full object-cover shadow-xs" data-alt="Close-up professional portrait of Tunde Adeleke, a Nigerian male master plumber in professional navy work overalls smiling warmly in a Lagos residential workshop setting, warm natural lighting, premium editorial style." src="../assets/placeholder-avatar.svg"/>
+<div class="space-y-0.5">
+<div class="flex items-center gap-1">
+<span class="font-label-lg text-label-lg text-on-surface font-semibold">Tunde Adeleke</span>
+<span class="material-symbols-outlined text-[16px] text-secondary" style="font-variation-settings: 'FILL' 1;">verified</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Servix Protected • 4.9 ★ (76 jobs)</p>
+</div>
+</div>
+</div>
+<button class="w-full h-11 rounded-xl bg-primary-container text-on-primary font-label-lg text-label-lg font-semibold flex items-center justify-center gap-2 hover:opacity-95 active:scale-[0.99] transition-all" type="button">
+<span class="material-symbols-outlined text-[18px]">chat_bubble</span>
+        Message Tunde
+      </button>
+</div>
+<!-- Booking Card B -->
+<div class="p-4 rounded-2xl bg-surface-container-low shadow-sm space-y-3.5">
+<div class="flex items-center justify-between">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-tertiary-fixed text-on-tertiary-fixed-variant font-label-md text-label-md font-bold">
+<span class="material-symbols-outlined text-[14px]">schedule</span>
+          AWAITING CONFIRMATION
+        </span>
+<span class="font-label-md text-label-md text-secondary font-bold">Protected Payment ₦28,500</span>
+</div>
+<div class="space-y-0.5">
+<h3 class="font-title-md text-title-md text-on-surface font-semibold">Electrical Wiring Repair</h3>
+
+</div>
+<div class="flex items-center justify-between pt-2">
+<div class="flex items-center gap-3">
+<div class="w-11 h-11 rounded-full bg-surface-container-highest flex items-center justify-center text-on-surface font-title-md text-title-md font-bold">
+            BA
+          </div>
+<div class="space-y-0.5">
+<div class="flex items-center gap-1">
+<span class="font-label-lg text-label-lg text-on-surface font-semibold">Bayo Alabi</span>
+<span class="material-symbols-outlined text-[16px] text-secondary" style="font-variation-settings: 'FILL' 1;">verified</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Servix Protected • 4.8 ★ (52 jobs)</p>
+</div>
+</div>
+</div>
+<button class="w-full h-11 rounded-xl bg-surface-container-high text-on-surface font-label-lg text-label-lg font-semibold flex items-center justify-center gap-2 hover:bg-surface-variant transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">rate_review</span>
+        Review work
+      </button>
+</div>
+</section>
+<!-- 5. EXPLORE CATEGORIES GRID -->
+<section class="px-gutter space-y-3">
+<div class="flex items-center justify-between">
+<h2 class="font-title-lg text-title-lg text-on-surface font-bold">Explore Categories</h2>
+<span class="font-label-md text-label-md text-secondary font-semibold uppercase tracking-wider">Verified Professionals</span>
+</div>
+<!-- 4x2 Grid -->
+<div class="grid grid-cols-4 gap-2.5">
+<!-- 1. Electrical -->
+<button class="flex flex-col items-center p-3 rounded-2xl bg-surface-container-low hover:bg-surface-container transition-all active:scale-95 space-y-2 group shadow-xs" type="button">
+<div class="w-11 h-11 rounded-xl bg-secondary-fixed flex items-center justify-center text-on-secondary-fixed-variant group-hover:scale-105 transition-transform">
+<span class="material-symbols-outlined text-[24px]">bolt</span>
+</div>
+<span class="font-label-md text-label-md text-on-surface font-medium truncate w-full text-center">Electrical</span>
+</button>
+<!-- 2. Plumbing -->
+<button class="flex flex-col items-center p-3 rounded-2xl bg-surface-container-low hover:bg-surface-container transition-all active:scale-95 space-y-2 group shadow-xs" type="button">
+<div class="w-11 h-11 rounded-xl bg-primary-fixed flex items-center justify-center text-on-primary-fixed-variant group-hover:scale-105 transition-transform">
+<span class="material-symbols-outlined text-[24px]">plumbing</span>
+</div>
+<span class="font-label-md text-label-md text-on-surface font-medium truncate w-full text-center">Plumbing</span>
+</button>
+<!-- 3. AC & Fridge -->
+<button class="flex flex-col items-center p-3 rounded-2xl bg-surface-container-low hover:bg-surface-container transition-all active:scale-95 space-y-2 group shadow-xs" type="button">
+<div class="w-11 h-11 rounded-xl bg-secondary-fixed-dim flex items-center justify-center text-on-secondary-fixed-variant group-hover:scale-105 transition-transform">
+<span class="material-symbols-outlined text-[24px]">mode_fan</span>
+</div>
+<span class="font-label-md text-label-md text-on-surface font-medium truncate w-full text-center">AC &amp; Fridge</span>
+</button>
+<!-- 4. Generator -->
+<button class="flex flex-col items-center p-3 rounded-2xl bg-surface-container-low hover:bg-surface-container transition-all active:scale-95 space-y-2 group shadow-xs" type="button">
+<div class="w-11 h-11 rounded-xl bg-surface-container-highest flex items-center justify-center text-on-surface group-hover:scale-105 transition-transform">
+<span class="material-symbols-outlined text-[24px]">power</span>
+</div>
+<span class="font-label-md text-label-md text-on-surface font-medium truncate w-full text-center">Generator</span>
+</button>
+<!-- 5. Cleaning -->
+<button class="flex flex-col items-center p-3 rounded-2xl bg-surface-container-low hover:bg-surface-container transition-all active:scale-95 space-y-2 group shadow-xs" type="button">
+<div class="w-11 h-11 rounded-xl bg-primary-fixed flex items-center justify-center text-on-primary-fixed-variant group-hover:scale-105 transition-transform">
+<span class="material-symbols-outlined text-[24px]">cleaning_services</span>
+</div>
+<span class="font-label-md text-label-md text-on-surface font-medium truncate w-full text-center">Cleaning</span>
+</button>
+<!-- 6. Painting -->
+<button class="flex flex-col items-center p-3 rounded-2xl bg-surface-container-low hover:bg-surface-container transition-all active:scale-95 space-y-2 group shadow-xs" type="button">
+<div class="w-11 h-11 rounded-xl bg-tertiary-fixed flex items-center justify-center text-on-tertiary-fixed-variant group-hover:scale-105 transition-transform">
+<span class="material-symbols-outlined text-[24px]">format_paint</span>
+</div>
+<span class="font-label-md text-label-md text-on-surface font-medium truncate w-full text-center">Painting</span>
+</button>
+<!-- 7. Carpentry -->
+<button class="flex flex-col items-center p-3 rounded-2xl bg-surface-container-low hover:bg-surface-container transition-all active:scale-95 space-y-2 group shadow-xs" type="button">
+<div class="w-11 h-11 rounded-xl bg-surface-container-high flex items-center justify-center text-on-surface-variant group-hover:scale-105 transition-transform">
+<span class="material-symbols-outlined text-[24px]">carpenter</span>
+</div>
+<span class="font-label-md text-label-md text-on-surface font-medium truncate w-full text-center">Carpentry</span>
+</button>
+<!-- 8. Tech Repairs -->
+<button class="flex flex-col items-center p-3 rounded-2xl bg-surface-container-low hover:bg-surface-container transition-all active:scale-95 space-y-2 group shadow-xs" type="button">
+<div class="w-11 h-11 rounded-xl bg-secondary-fixed flex items-center justify-center text-secondary group-hover:scale-105 transition-transform">
+<span class="material-symbols-outlined text-[24px]">devices</span>
+</div>
+<span class="font-label-md text-label-md text-on-surface font-medium truncate w-full text-center">Tech Repairs</span>
+</button>
+</div>
+</section>
+<!-- 6. SERVIX AI ENGINE CARD -->
+<section class="px-gutter">
+<div class="relative overflow-hidden rounded-2xl bg-primary-container p-5 text-on-primary shadow-md">
+<!-- Ambient Glow SVG -->
+<div class="absolute -right-8 -top-8 w-44 h-44 rounded-full bg-secondary opacity-30 blur-2xl pointer-events-none"></div>
+<div class="relative space-y-3 z-10">
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded-lg bg-surface/10 flex items-center justify-center text-secondary-fixed">
+<span class="material-symbols-outlined text-[20px]">auto_awesome</span>
+</div>
+<span class="font-label-md text-label-md bg-secondary/30 text-secondary-fixed px-2 py-0.5 rounded-full font-bold">Instant</span>
+</div>
+<div class="space-y-1">
+<h3 class="font-title-lg text-title-lg text-on-primary font-bold">Need a project cost estimate?</h3>
+<p class="font-body-md text-body-md text-on-primary-container">Ask Servix AI for real-time Nigerian market rates and professional requirements.</p>
+</div>
+<button class="w-full h-11 rounded-xl bg-secondary-container text-on-secondary-fixed font-label-lg text-label-lg font-bold flex items-center justify-center gap-1.5 shadow-sm hover:opacity-90 active:scale-[0.99] transition-all" type="button">
+          Chat with Servix AI ✦ →
+        </button>
+</div>
+</div>
+</section>
+<!-- 7. RECOMMENDED PROFESSIONALS -->
+<section class="space-y-3">
+<div class="flex items-center justify-between px-gutter">
+<div>
+<h2 class="font-title-lg text-title-lg text-on-surface font-bold">Recommended Professionals</h2>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Top-rated in Ikeja, Lagos</p>
+</div>
+<a class="font-label-lg text-label-lg text-secondary font-semibold hover:underline" href="#">Explore &gt;</a>
+</div>
+<!-- Horizontal Scrolling Carousel -->
+<div class="flex gap-4 overflow-x-auto px-gutter no-scrollbar snap-x snap-mandatory">
+<!-- Professional Card 1 -->
+<div class="min-w-[270px] max-w-[270px] snap-start rounded-2xl bg-surface-container-low p-4 shadow-sm space-y-3 flex flex-col justify-between shrink-0">
+<div class="space-y-3">
+<div class="relative h-32 rounded-xl overflow-hidden bg-surface-container">
+<img class="w-full h-full object-cover" data-alt="Portrait of Emeka Nwosu, skilled HVAC and refrigeration technician in clean branded workwear inspecting an air conditioning unit in a modern Lagos residential home, crisp daytime lighting." src="../assets/placeholder-photo.svg"/>
+<button aria-label="Bookmark Emeka Nwosu" class="absolute top-2 right-2 w-8 h-8 rounded-full bg-surface-container-lowest/80 backdrop-blur-md flex items-center justify-center text-on-surface hover:text-secondary transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">bookmark</span>
+</button>
+<div class="absolute bottom-2 left-2 bg-surface-container-lowest/90 backdrop-blur-sm px-2 py-0.5 rounded-full flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px] text-secondary" style="font-variation-settings: 'FILL' 1;">verified</span>
+<span class="font-label-md text-label-md text-on-surface font-semibold">Verified Pro</span>
+</div>
+</div>
+<div class="space-y-1">
+<div class="flex items-baseline justify-between">
+<h3 class="font-title-md text-title-md text-on-surface font-bold truncate">Emeka Nwosu</h3>
+</div>
+<p class="font-body-sm text-body-sm text-secondary font-medium">AC &amp; Fridge</p>
+<div class="flex items-center gap-1 text-on-surface">
+<span class="material-symbols-outlined text-[15px] text-amber-500" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="font-label-md text-label-md font-semibold">4.9</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">(128 reviews)</span>
+</div>
+</div>
+</div>
+<div class="pt-2 space-y-2.5">
+<div class="flex items-baseline justify-between">
+<span class="font-label-md text-label-md text-on-surface-variant">Fixed Rate From</span>
+<span class="font-title-md text-title-md text-on-surface font-bold">₦15,000</span>
+</div>
+<button class="w-full h-10 rounded-xl bg-primary-container text-on-primary font-label-lg text-label-lg font-semibold flex items-center justify-center hover:opacity-95 active:scale-[0.98] transition-all" type="button">
+            Book Service
+          </button>
+</div>
+</div>
+<!-- Professional Card 2 (Peeking) -->
+<div class="min-w-[270px] max-w-[270px] snap-start rounded-2xl bg-surface-container-low p-4 shadow-sm space-y-3 flex flex-col justify-between shrink-0">
+<div class="space-y-3">
+<div class="relative h-32 rounded-xl overflow-hidden bg-surface-container">
+<img class="w-full h-full object-cover" data-alt="Portrait of Amaka Obi, expert interior and exterior painter holding premium paint rollers and swatches in a beautifully finished Lagos apartment with warm neutral wall tones." src="../assets/placeholder-photo.svg"/>
+<button aria-label="Bookmark Amaka Obi" class="absolute top-2 right-2 w-8 h-8 rounded-full bg-surface-container-lowest/80 backdrop-blur-md flex items-center justify-center text-on-surface hover:text-secondary transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">bookmark</span>
+</button>
+<div class="absolute bottom-2 left-2 bg-surface-container-lowest/90 backdrop-blur-sm px-2 py-0.5 rounded-full flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px] text-secondary" style="font-variation-settings: 'FILL' 1;">verified</span>
+<span class="font-label-md text-label-md text-on-surface font-semibold">Verified Pro</span>
+</div>
+</div>
+<div class="space-y-1">
+<div class="flex items-baseline justify-between">
+<h3 class="font-title-md text-title-md text-on-surface font-bold truncate">Amaka Obi</h3>
+</div>
+<p class="font-body-sm text-body-sm text-secondary font-medium">Interior &amp; Exterior Painting</p>
+<div class="flex items-center gap-1 text-on-surface">
+<span class="material-symbols-outlined text-[15px] text-amber-500" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="font-label-md text-label-md font-semibold">4.8</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">(94 reviews)</span>
+</div>
+</div>
+</div>
+<div class="pt-2 space-y-2.5">
+<div class="flex items-baseline justify-between">
+<span class="font-label-md text-label-md text-on-surface-variant">Fixed Rate From</span>
+<span class="font-title-md text-title-md text-on-surface font-bold">₦22,000</span>
+</div>
+<button class="w-full h-10 rounded-xl bg-primary-container text-on-primary font-label-lg text-label-lg font-semibold flex items-center justify-center hover:opacity-95 active:scale-[0.98] transition-all" type="button">
+            Book Service
+          </button>
+</div>
+</div>
+</div>
+</section>
+</div>
+<script>
+  // Micro-interaction behaviors for filter triggers and completion actions
+  document.addEventListener('DOMContentLoaded', () => {
+    const confirmBtn = document.querySelector('button:has(.material-symbols-outlined:contains("check_circle"))') || document.querySelector('button');
+    if (confirmBtn) {
+      confirmBtn.addEventListener('click', (e) => {
+        // Subtle feedback tactile response
+      });
+    }
+  });
+</script></main><!-- SERVIX BOTTOM BAR (canonical, Release 1.1): Home · Explore · Chats (centre, 34dp disc, badge = Σ unreadCount) · Bookings · Account. Guests: Home · Explore · Account only. -->
+<nav class="fixed bottom-0 inset-x-0 z-50 pb-safe bg-surface border-t border-outline-variant" aria-label="Main"><div class="h-16 px-1 flex items-stretch"><a class="flex-1 flex flex-col items-center justify-center gap-0.5 min-h-[48px] text-primary" data-path="home" href="#" aria-current="page"><span class="w-[34px] h-[34px] flex items-center justify-center"><span class="material-symbols-outlined text-[24px]" style="font-variation-settings: 'FILL' 1;">home</span></span><span class="font-label-md text-label-md font-semibold">Home</span></a><a class="flex-1 flex flex-col items-center justify-center gap-0.5 min-h-[48px] text-on-surface-variant" data-path="explore" href="#"><span class="w-[34px] h-[34px] flex items-center justify-center"><span class="material-symbols-outlined text-[24px]">search</span></span><span class="font-label-md text-label-md">Explore</span></a><a class="flex-1 flex flex-col items-center justify-center gap-0.5 min-h-[48px] text-on-surface-variant" data-path="chats" href="#"><span class="relative w-[34px] h-[34px] rounded-full bg-secondary-container text-primary flex items-center justify-center"><span class="material-symbols-outlined text-[20px]">chat_bubble</span><span class="absolute -top-1 -right-2 min-w-[18px] h-[18px] px-1 rounded-full bg-tertiary text-on-tertiary text-[11px] font-semibold flex items-center justify-center">2</span></span><span class="font-label-md text-label-md">Chats</span></a><a class="flex-1 flex flex-col items-center justify-center gap-0.5 min-h-[48px] text-on-surface-variant" data-path="bookings" href="#"><span class="w-[34px] h-[34px] flex items-center justify-center"><span class="material-symbols-outlined text-[24px]">calendar_month</span></span><span class="font-label-md text-label-md">Bookings</span></a><a class="flex-1 flex flex-col items-center justify-center gap-0.5 min-h-[48px] text-on-surface-variant" data-path="account" href="#"><span class="w-[34px] h-[34px] flex items-center justify-center"><span class="material-symbols-outlined text-[24px]">account_circle</span></span><span class="font-label-md text-label-md">Account</span></a></div></nav></body></html>

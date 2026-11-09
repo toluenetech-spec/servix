@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+
+<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><meta content="bookings_tab" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{width:100vw;margin:0;padding:0;}body{overscroll-behavior:none;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com" type="bdcfdf66354bbe5deb487c14-text/javascript"></script><script id="tailwind-config" type="bdcfdf66354bbe5deb487c14-text/javascript">tailwind.config = { darkMode: "class", theme: { extend: { colors: { "tertiary-container": "#FBE4E0", "on-tertiary-container": "#B3372A", "outline-variant": "#DDD7C9", "secondary-fixed-dim": "#DDD7C9", "inverse-on-surface": "#F7F4EC", "surface-tint": "#1F5C45", "primary": "#12372A", "error-container": "#F9DEDA", "background": "#F7F4EC", "on-surface-variant": "#5F675F", "on-primary-container": "#F7F4EC", "on-error-container": "#7A2418", "on-tertiary-fixed": "#7A2418", "on-secondary-fixed": "#12372A", "on-secondary": "#FFFFFF", "primary-fixed": "#EDE8DC", "surface": "#F7F4EC", "surface-container-low": "#F3EFE5", "outline": "#C9C2B1", "surface-container-highest": "#DDD7C9", "on-primary-fixed": "#12372A", "on-primary-fixed-variant": "#1F5C45", "secondary": "#1F5C45", "inverse-primary": "#CFE0D6", "inverse-surface": "#202622", "primary-fixed-dim": "#C9C2B1", "on-primary": "#FFFFFF", "secondary-fixed": "#EDE8DC", "tertiary-fixed": "#FBE4E0", "secondary-container": "#EDE8DC", "error": "#B3372A", "on-surface": "#202622", "surface-bright": "#F7F4EC", "primary-container": "#1F5C45", "surface-dim": "#DDD7C9", "surface-container": "#EDE8DC", "tertiary-fixed-dim": "#F3B8B0", "surface-container-high": "#E6E0D2", "on-secondary-fixed-variant": "#1F5C45", "tertiary": "#E56B5D", "on-secondary-container": "#12372A", "on-tertiary-fixed-variant": "#B3372A", "surface-container-lowest": "#FFFFFF", "on-error": "#FFFFFF", "surface-variant": "#EDE8DC", "on-background": "#202622", "on-tertiary": "#FFFFFF" }, borderRadius: { "DEFAULT": "0.75rem", "lg": "1rem", "xl": "1.25rem", "2xl": "1.5rem", "3xl": "1.75rem", "full": "9999px" }, spacing: { "space-sm": "0.5rem", "gutter-desktop": "2rem", "space-md": "1rem", "gutter-tablet": "1.5rem", "space-lg": "1.5rem", "margin-desktop": "3rem", "space-xl": "2rem", "margin-tablet": "2rem", "gutter": "1rem", "margin": "1rem", "space-xs": "0.25rem" }, fontFamily: { "headline-lg-mobile": ["Inter"], "currency-display": ["Inter"], "title-md": ["Inter"], "display-lg": ["Inter"], "label-lg": ["Inter"], "body-sm": ["Inter"], "headline-lg": ["Inter"], "label-md": ["Inter"], "title-lg": ["Inter"], "headline-md": ["Inter"], "body-lg": ["Inter"], "body-md": ["Inter"] }, fontSize: { "headline-lg-mobile": ["26px", { lineHeight: "34px", letterSpacing: "-0.01em", fontWeight: "600" }], "currency-display": ["28px", { lineHeight: "36px", letterSpacing: "-0.01em", fontWeight: "700" }], "title-md": ["16px", { lineHeight: "22px", fontWeight: "600" }], "display-lg": ["40px", { lineHeight: "48px", letterSpacing: "-0.02em", fontWeight: "700" }], "label-lg": ["14px", { lineHeight: "20px", letterSpacing: "0.01em", fontWeight: "600" }], "body-sm": ["12px", { lineHeight: "16px", fontWeight: "400" }], "headline-lg": ["32px", { lineHeight: "40px", letterSpacing: "-0.02em", fontWeight: "600" }], "label-md": ["12px", { lineHeight: "16px", letterSpacing: "0.02em", fontWeight: "500" }], "title-lg": ["18px", { lineHeight: "24px", fontWeight: "600" }], "headline-md": ["22px", { lineHeight: "28px", letterSpacing: "-0.01em", fontWeight: "600" }], "body-lg": ["16px", { lineHeight: "24px", fontWeight: "400" }], "body-md": ["14px", { lineHeight: "20px", fontWeight: "400" }] } } } };</script><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head><body class="bg-surface font-body-md text-on-surface flex flex-col min-h-screen"><header class="fixed top-0 w-full z-50 pt-safe bg-surface/80 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div class="h-16 px-gutter flex items-center justify-between"><div class="flex items-center gap-space-sm"><h1 class="font-title-lg text-title-lg text-on-surface tracking-tight">My Bookings</h1></div><div class="flex items-center gap-space-xs"><button aria-label="Search" class="w-11 h-11 flex items-center justify-center rounded-full text-on-surface-variant hover:text-on-surface transition-colors relative"><span class="material-symbols-outlined text-[24px]">search</span></button><button aria-label="Notifications" class="w-11 h-11 flex items-center justify-center rounded-full text-on-surface-variant hover:text-on-surface transition-colors relative"><span class="material-symbols-outlined text-[24px]">notifications</span><span class="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-on-tertiary-container ring-2 ring-surface"></span></button><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center ml-space-xs"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="flex-1 flex flex-col relative w-full pt-16 pb-20 bg-surface"><div class="flex flex-col w-full px-margin pb-space-lg gap-space-md">
+<!-- Segmented Primary View Tabs -->
+<section aria-label="Booking timeline filters" class="w-full pt-space-xs">
+<div class="flex items-center bg-surface-container rounded-xl p-1 gap-1">
+<button class="flex-1 py-2.5 px-space-sm rounded-lg bg-primary-container text-on-primary font-label-lg text-label-lg transition-all flex items-center justify-center gap-1.5 shadow-sm" id="tab-active">
+<span>Active</span>
+<span class="px-1.5 py-0.2 bg-secondary-fixed text-on-secondary-fixed rounded-full font-label-md text-[11px] leading-tight font-semibold">2</span>
+</button>
+<button class="flex-1 py-2.5 px-space-sm rounded-lg text-on-surface-variant font-label-lg text-label-lg transition-all flex items-center justify-center gap-1.5 hover:text-on-surface" id="tab-past">
+<span>Past</span>
+<span class="px-1.5 py-0.2 bg-surface-container-highest text-on-surface-variant rounded-full font-label-md text-[11px] leading-tight">4</span>
+</button>
+</div>
+</section>
+<!-- Horizontal Scrollable Filter Chips -->
+<div class="flex items-center gap-2 overflow-x-auto no-scrollbar -mx-margin px-margin py-1">
+<button class="filter-chip h-9 px-4 rounded-full bg-primary-container text-on-primary font-label-md text-label-md shrink-0 flex items-center shadow-sm">
+      All
+    </button>
+<button class="filter-chip h-9 px-3.5 rounded-full bg-surface-container text-on-surface-variant font-label-md text-label-md shrink-0 flex items-center gap-1.5">
+<span>Needs Attention</span>
+<span class="w-4 h-4 rounded-full bg-on-tertiary-container text-on-tertiary font-label-md text-[10px] flex items-center justify-center">1</span>
+</button>
+<button class="filter-chip h-9 px-4 rounded-full bg-surface-container text-on-surface-variant font-label-md text-label-md shrink-0 flex items-center">
+      In Progress
+    </button>
+<button class="filter-chip h-9 px-4 rounded-full bg-surface-container text-on-surface-variant font-label-md text-label-md shrink-0 flex items-center">
+      Scheduled
+    </button>
+</div>
+<!-- Urgent Attention Banner -->
+<aside class="relative overflow-hidden bg-error-container/70 rounded-xl p-space-md shadow-sm">
+<div class="flex items-start gap-3">
+<div class="w-10 h-10 rounded-full bg-on-tertiary-container/20 text-on-tertiary-container flex items-center justify-center shrink-0 mt-0.5">
+<span class="material-symbols-outlined text-[22px]" style="font-variation-settings: 'FILL' 1;">error</span>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex items-center justify-between gap-2">
+<span class="font-label-md text-label-md text-on-tertiary-container uppercase tracking-wider font-semibold">Action Required</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">#SV-8921</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface mt-1 leading-snug">
+<span class="font-semibold text-primary">Bayo Alabi</span> marked Electrical Wiring Repair as complete. Inspect the work to release your held payment.
+        </p>
+<div class="mt-3.5 flex flex-col sm:flex-row gap-2">
+<button class="h-11 px-4 rounded-lg bg-primary-container text-on-primary font-label-lg text-label-lg flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform shadow-sm">
+<span class="material-symbols-outlined text-[18px]">verified</span>
+<span>Confirm &amp; Release ₦28,500</span>
+</button>
+<button class="h-11 px-4 rounded-lg bg-surface-container-lowest text-on-tertiary-container font-label-lg text-label-lg flex items-center justify-center hover:bg-surface-container transition-colors">
+            Raise Dispute
+          </button>
+</div>
+</div>
+</div>
+</aside>
+<!-- Active Bookings Header -->
+<section class="flex flex-col gap-space-md mt-1">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<h2 class="font-title-lg text-title-lg text-on-surface">Active Bookings</h2>
+<span class="font-label-md text-label-md px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container">2 ongoing</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-secondary"></span> Live updates
+      </span>
+</div>
+<!-- Booking Card 1: Awaiting Confirmation -->
+<article class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col gap-3 relative overflow-hidden">
+<!-- Status & Reference -->
+<div class="flex items-center justify-between pb-1">
+<span class="px-2.5 py-1 rounded-full bg-on-tertiary-container/15 text-on-tertiary-container font-label-md text-label-md font-semibold tracking-wide flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">task_alt</span>
+          AWAITING YOUR CONFIRMATION
+        </span>
+
+</div>
+<!-- Service Title -->
+<div>
+<h3 class="font-title-md text-title-md text-on-surface">Electrical Wiring Repair &amp; Distribution Box Fix</h3>
+</div>
+<!-- Professional Detail -->
+<div class="flex items-center justify-between bg-surface-container-low p-2.5 rounded-lg">
+<div class="flex items-center gap-3 min-w-0">
+<div class="relative w-11 h-11 shrink-0 rounded-full overflow-hidden bg-surface-container">
+<img class="w-full h-full object-cover" data-alt="Close-up professional headshot portrait of Bayo Alabi, an experienced Nigerian male electrician in a clean dark green collared polo shirt, warm studio lighting with soft bokeh background" src="../assets/placeholder-photo.svg"/>
+</div>
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-1">
+<span class="font-label-lg text-label-lg text-on-surface truncate">Bayo Alabi</span>
+<span class="material-symbols-outlined text-secondary text-[16px]" style="font-variation-settings: 'FILL' 1;">verified</span>
+</div>
+<div class="flex items-center gap-1 text-on-surface-variant font-body-sm text-body-sm">
+<span class="material-symbols-outlined text-[14px] text-on-secondary-fixed-variant" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="font-semibold text-on-surface">4.8</span>
+<span>(52 jobs)</span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-1.5 shrink-0">
+<button aria-label="Message Bayo Alabi" class="w-9 h-9 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-[18px]">chat</span>
+</button>
+<!-- element removed in Servix correction pass -->
+</div>
+</div>
+<!-- Time & Location Context -->
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-on-surface-variant font-body-sm text-body-sm pt-0.5">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px] text-secondary">event_available</span>
+<span class="truncate">Completed Today, 2:30 PM</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px] text-secondary">location_on</span>
+<span class="truncate">Allen Avenue, Ikeja, Lagos</span>
+</div>
+</div>
+<!-- Price & Protection Badge -->
+<div class="flex items-center justify-between pt-2">
+<div class="flex flex-col">
+<span class="font-body-sm text-body-sm text-on-surface-variant">Agreed Total</span>
+<span class="font-currency-display text-currency-display text-primary tracking-tight">₦28,500</span>
+</div>
+<div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary-container/60 text-on-secondary-container font-label-md text-label-md">
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 1;">verified_user</span>
+<span class="font-medium">Servix Protected Payment</span>
+</div>
+</div>
+<!-- CTA Buttons -->
+<div class="flex flex-col sm:flex-row gap-2 pt-1">
+<button class="flex-1 h-12 rounded-xl bg-primary-container text-on-primary font-label-lg text-label-lg flex items-center justify-center gap-2 active:scale-[0.99] transition-transform">
+<span class="material-symbols-outlined text-[20px]">check_circle</span>
+<span>Confirm completion</span>
+</button>
+<button class="h-12 px-4 rounded-xl bg-surface-container-low text-on-surface font-label-lg text-label-lg flex items-center justify-center hover:bg-surface-container transition-colors">
+          Review Work Details
+        </button>
+</div>
+</article>
+<!-- Booking Card 2: In Progress / On The Way -->
+<article class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col gap-3 relative overflow-hidden">
+<!-- Status & Reference -->
+<div class="flex items-center justify-between pb-1">
+<span class="px-2.5 py-1 rounded-full bg-secondary-container text-on-secondary-container font-label-md text-label-md font-semibold tracking-wide flex items-center gap-1.5">
+<span class="relative flex h-2 w-2">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-secondary opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-secondary"></span>
+</span>
+          IN PROGRESS
+        </span>
+
+</div>
+<!-- Service Title -->
+<div>
+<h3 class="font-title-md text-title-md text-on-surface">Plumbing Pipe Maintenance &amp; Leak Sealing</h3>
+</div>
+<!-- Professional Detail -->
+<div class="flex items-center justify-between bg-surface-container-low p-2.5 rounded-lg">
+<div class="flex items-center gap-3 min-w-0">
+<div class="relative w-11 h-11 shrink-0 rounded-full overflow-hidden bg-surface-container">
+<img class="w-full h-full object-cover" data-alt="Warm environmental headshot portrait of Tunde Adeleke, a professional master plumber smiling confidently with toolbox background in Lagos Nigeria, wearing indigo safety work uniform" src="../assets/placeholder-photo.svg"/>
+</div>
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-1">
+<span class="font-label-lg text-label-lg text-on-surface truncate">Tunde Adeleke</span>
+<span class="material-symbols-outlined text-secondary text-[16px]" style="font-variation-settings: 'FILL' 1;">verified</span>
+</div>
+<div class="flex items-center gap-1 text-on-surface-variant font-body-sm text-body-sm">
+<span class="material-symbols-outlined text-[14px] text-on-secondary-fixed-variant" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="font-semibold text-on-surface">4.9</span>
+<span>(76 jobs)</span>
+</div>
+</div>
+</div>
+<!-- element removed in Servix correction pass -->
+</div>
+<!-- Time & Location Context -->
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-on-surface-variant font-body-sm text-body-sm pt-0.5">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px] text-secondary">schedule</span>
+<span class="truncate">Today, 4:00 PM – 5:30 PM</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px] text-secondary">near_me</span>
+<span class="truncate">Lekki Phase 1, Lagos</span>
+</div>
+</div>
+<!-- Price & Protection Badge -->
+<div class="flex items-center justify-between pt-2">
+<div class="flex flex-col">
+<span class="font-body-sm text-body-sm text-on-surface-variant">Amount</span>
+<span class="font-currency-display text-currency-display text-primary tracking-tight">₦18,500</span>
+</div>
+<div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-container text-on-surface-variant font-label-md text-label-md">
+<span class="material-symbols-outlined text-[16px] text-secondary" style="font-variation-settings: 'FILL' 1;">shield</span>
+<span>Paid through Servix</span>
+</div>
+</div>
+<!-- CTA Buttons -->
+<div class="grid grid-cols-2 gap-2 pt-1">
+<button class="h-12 rounded-xl bg-primary-container text-on-primary font-label-lg text-label-lg flex items-center justify-center gap-2 active:scale-[0.99] transition-transform">
+<span class="material-symbols-outlined text-[18px]">chat_bubble</span>
+<span>Message</span>
+</button>
+<button class="h-12 rounded-xl bg-surface-container-low text-on-surface font-label-lg text-label-lg flex items-center justify-center gap-1.5 hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined text-[18px]">visibility</span>
+<span>View details</span>
+</button>
+</div>
+</article>
+<!-- Booking Card 3: Pending Payment -->
+<article class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col gap-3 relative overflow-hidden">
+<!-- Status & Reference -->
+<div class="flex items-center justify-between pb-1">
+<span class="px-2.5 py-1 rounded-full bg-error-container text-on-error-container font-label-md text-label-md font-semibold tracking-wide flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">credit_card_clock</span>
+          PAYMENT REQUIRED
+        </span>
+
+</div>
+<!-- Service Title -->
+<div>
+<h3 class="font-title-md text-title-md text-on-surface">AC Deep Cleaning &amp; Chemical Wash</h3>
+</div>
+<!-- Professional Detail -->
+<div class="flex items-center justify-between bg-surface-container-low p-2.5 rounded-lg">
+<div class="flex items-center gap-3 min-w-0">
+<div class="relative w-11 h-11 shrink-0 rounded-full overflow-hidden bg-surface-container">
+<img class="w-full h-full object-cover" data-alt="Portrait of HVAC specialist Emeka Nwosu in Lagos Nigeria, wearing professional safety cap and branded maintenance polo, smiling warmly with neat equipment in background" src="../assets/placeholder-photo.svg"/>
+</div>
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-1">
+<span class="font-label-lg text-label-lg text-on-surface truncate">Emeka Nwosu</span>
+<span class="material-symbols-outlined text-secondary text-[16px]" style="font-variation-settings: 'FILL' 1;">verified</span>
+</div>
+<div class="flex items-center gap-1 text-on-surface-variant font-body-sm text-body-sm">
+<span class="material-symbols-outlined text-[14px] text-on-secondary-fixed-variant" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="font-semibold text-on-surface">4.9</span>
+<span>(94 jobs)</span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-1 text-on-surface-variant font-label-md text-label-md">
+<span class="material-symbols-outlined text-[16px] text-secondary">alarm</span>
+<span>Reserved</span>
+</div>
+</div>
+<!-- Time Context -->
+<div class="flex items-center gap-2 text-on-surface-variant font-body-sm text-body-sm pt-0.5">
+<span class="material-symbols-outlined text-[18px] text-secondary">calendar_today</span>
+<span>Tomorrow, 10:00 AM • Victoria Island, Lagos</span>
+</div>
+<!-- Price -->
+<div class="flex items-center justify-between pt-2">
+<div class="flex flex-col">
+<span class="font-body-sm text-body-sm text-on-surface-variant">Due Amount</span>
+<span class="font-currency-display text-currency-display text-primary tracking-tight">₦18,500</span>
+</div>
+<div class="flex items-center gap-1 px-2.5 py-1 rounded bg-surface-container font-label-md text-[11px] text-on-surface-variant">
+<span class="material-symbols-outlined text-[14px] text-secondary">lock</span>
+<span>Paystack Secured</span>
+</div>
+</div>
+<!-- CTA Buttons -->
+<div class="flex flex-col sm:flex-row gap-2 pt-1">
+<button class="flex-1 h-12 rounded-xl bg-primary-container text-on-primary font-label-lg text-label-lg flex items-center justify-center gap-2 active:scale-[0.99] transition-transform shadow-sm">
+<span class="material-symbols-outlined text-[18px]">payments</span>
+<span>Pay ₦18,500 via Paystack</span>
+</button>
+<button class="h-12 px-4 rounded-xl bg-surface-container-low text-on-surface-variant hover:text-error font-label-lg text-label-lg flex items-center justify-center transition-colors">
+          Cancel Booking
+        </button>
+</div>
+</article>
+</section>
+<!-- Servix Protected Payment Trust Guarantee Card -->
+<footer class="mt-2 rounded-xl bg-surface-container-low p-space-md flex items-start gap-3.5">
+<div class="w-10 h-10 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center shrink-0 mt-0.5">
+<span class="material-symbols-outlined text-[22px]" style="font-variation-settings: 'FILL' 1;">shield_with_heart</span>
+</div>
+<div class="flex-1 min-w-0">
+<h4 class="font-title-md text-title-md text-on-surface flex items-center gap-1.5">
+        Servix Protected Payment Guarantee
+      </h4>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1 leading-relaxed">
+        Your payment is held safely until you inspect and approve the completed job. Never make cash or direct bank transfers to professionals outside the platform.
+      </p>
+<div class="mt-2 flex items-center gap-3 text-secondary font-label-md text-label-md font-semibold">
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">check_circle</span>
+          100% Satisfaction Check
+        </span>
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">support_agent</span>
+          Servix support in the app
+        </span>
+</div>
+</div>
+</footer>
+</div>
+<script>
+  // Simple interactive tab toggle for demonstration
+  const tabActive = document.getElementById('tab-active');
+  const tabPast = document.getElementById('tab-past');
+  const filterChips = document.querySelectorAll('.filter-chip');
+
+  if (tabActive && tabPast) {
+    tabActive.addEventListener('click', () => {
+      tabActive.className = 'flex-1 py-2.5 px-space-sm rounded-lg bg-primary-container text-on-primary font-label-lg text-label-lg transition-all flex items-center justify-center gap-1.5 shadow-sm';
+      tabPast.className = 'flex-1 py-2.5 px-space-sm rounded-lg text-on-surface-variant font-label-lg text-label-lg transition-all flex items-center justify-center gap-1.5 hover:text-on-surface';
+    });
+
+    tabPast.addEventListener('click', () => {
+      tabPast.className = 'flex-1 py-2.5 px-space-sm rounded-lg bg-primary-container text-on-primary font-label-lg text-label-lg transition-all flex items-center justify-center gap-1.5 shadow-sm';
+      tabActive.className = 'flex-1 py-2.5 px-space-sm rounded-lg text-on-surface-variant font-label-lg text-label-lg transition-all flex items-center justify-center gap-1.5 hover:text-on-surface';
+    });
+  }
+
+  filterChips.forEach(chip => {
+    chip.addEventListener('click', () => {
+      filterChips.forEach(c => {
+        c.className = 'filter-chip h-9 px-4 rounded-full bg-surface-container text-on-surface-variant font-label-md text-label-md shrink-0 flex items-center transition-colors';
+      });
+      chip.className = 'filter-chip h-9 px-4 rounded-full bg-primary-container text-on-primary font-label-md text-label-md shrink-0 flex items-center shadow-sm transition-colors';
+    });
+  });
+</script></main><!-- SERVIX BOTTOM BAR (canonical, Release 1.1): Home · Explore · Chats (centre, 34dp disc, badge = Σ unreadCount) · Bookings · Account. Guests: Home · Explore · Account only. -->
+<nav class="fixed bottom-0 inset-x-0 z-50 pb-safe bg-surface border-t border-outline-variant" aria-label="Main"><div class="h-16 px-1 flex items-stretch"><a class="flex-1 flex flex-col items-center justify-center gap-0.5 min-h-[48px] text-on-surface-variant" data-path="home" href="#"><span class="w-[34px] h-[34px] flex items-center justify-center"><span class="material-symbols-outlined text-[24px]">home</span></span><span class="font-label-md text-label-md">Home</span></a><a class="flex-1 flex flex-col items-center justify-center gap-0.5 min-h-[48px] text-on-surface-variant" data-path="explore" href="#"><span class="w-[34px] h-[34px] flex items-center justify-center"><span class="material-symbols-outlined text-[24px]">search</span></span><span class="font-label-md text-label-md">Explore</span></a><a class="flex-1 flex flex-col items-center justify-center gap-0.5 min-h-[48px] text-on-surface-variant" data-path="chats" href="#"><span class="relative w-[34px] h-[34px] rounded-full bg-secondary-container text-primary flex items-center justify-center"><span class="material-symbols-outlined text-[20px]">chat_bubble</span></span><span class="font-label-md text-label-md">Chats</span></a><a class="flex-1 flex flex-col items-center justify-center gap-0.5 min-h-[48px] text-primary" data-path="bookings" href="#" aria-current="page"><span class="w-[34px] h-[34px] flex items-center justify-center"><span class="material-symbols-outlined text-[24px]" style="font-variation-settings: 'FILL' 1;">calendar_month</span></span><span class="font-label-md text-label-md font-semibold">Bookings</span></a><a class="flex-1 flex flex-col items-center justify-center gap-0.5 min-h-[48px] text-on-surface-variant" data-path="account" href="#"><span class="w-[34px] h-[34px] flex items-center justify-center"><span class="material-symbols-outlined text-[24px]">account_circle</span></span><span class="font-label-md text-label-md">Account</span></a></div></nav></body></html>
